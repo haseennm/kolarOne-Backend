@@ -54,8 +54,8 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             try {
                 cns(request.url, request.body)
                 const controller = new CompanyController()
-                const user = await controller.createCompany(request.body)
-                return reply.code(201).send(user)
+                const company = await controller.createCompany(request.body)
+                return reply.code(201).send(company)
 
             } catch (err: any) {
                 el(err)
@@ -143,8 +143,8 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             try {
                 cns(request.url, request.body)
                 const controller = new CompanyController()
-                const user = await controller.editCompany(request.body)
-                return reply.code(201).send(user)
+                const company = await controller.editCompany(request.body)
+                return reply.code(201).send(company)
 
             } catch (err: any) {
                 el(err)
@@ -175,8 +175,8 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             try {
                 cns(request.url, request.body)
                 const controller = new CompanyController()
-                const user = await controller.deleteCompany(request.body)
-                return reply.code(201).send(user)
+                const company = await controller.deleteCompany(request.body)
+                return reply.code(201).send(company)
 
             } catch (err: any) {
                 el(err)

@@ -138,8 +138,8 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             try {
                 cns(request.url, request.body)
                 const controller = new BranchController()
-                const user = await controller.createBranch(request.body)
-                return reply.code(201).send(user)
+                const branch = await controller.createBranch(request.body)
+                return reply.code(201).send(branch)
 
             } catch (err: any) {
                 el(err)
@@ -280,8 +280,8 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             try {
                 cns(request.url, request.body)
                 const controller = new BranchController()
-                const user = await controller.editBranch(request.body)
-                return reply.code(201).send(user)
+                const branch = await controller.editBranch(request.body)
+                return reply.code(201).send(branch)
 
             } catch (err: any) {
                 el(err)
@@ -314,8 +314,8 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             try {
                 cns(request.url, request.body)
                 const controller = new BranchController()
-                const user = await controller.deleteBranch(request.body)
-                return reply.code(201).send(user)
+                const branch = await controller.deleteBranch(request.body)
+                return reply.code(201).send(branch)
 
             } catch (err: any) {
                 el(err)
