@@ -1,7 +1,9 @@
 
+import { AppError } from '../../middleware/errorMiddlware'
+import { generateToken, hashPassword, verifyPassword } from '../../utils/auth.util'
 import { getStatusCode, getStatusText } from '../../utils/extra'
 import BranchService from './branch.service'
-import { CreateBranchBody, DeleteBranchBody, EditBranchBody, FetchBranchParams } from './branch.types'
+import { BranchLoginBody, CreateBranchBody, DeleteBranchBody, EditBranchBody, FetchBranchParams } from './branch.types'
 
 export default class BranchController {
 
@@ -25,7 +27,8 @@ export default class BranchController {
         }
     }
     async createBranch(data: CreateBranchBody) {
-        const { created_by, status, ...rest } = data;
+        const { created_by, status,password, ...rest } = data;
+    const hashed = await hashPassword(password)
 
         const remark = {
             action: "Created",
@@ -38,7 +41,8 @@ export default class BranchController {
         const branch = await service.createBranch({
             ...rest,
             remark,
-            statusCode
+            statusCode,
+            hashed
         });
 
         return branch;
@@ -85,4 +89,24 @@ export default class BranchController {
         return branch;
     }
 
+     async loginBranch(data: BranchLoginBody) {
+        const { password ,username} = data
+        const service = new BranchService();
+        const branch = await service.loginBranch(data);
+        const isValid = await verifyPassword(password, branch.password)
+    
+        if (!isValid) {
+          throw new AppError('Invalid credentials', 401)
+        }
+    
+        const token = generateToken({
+          id: branch.id,
+          username:username,
+        })
+    
+        return {
+          token: token,
+          message: `branch ${branch.branch_name} Login success`
+        }
+      }
 }

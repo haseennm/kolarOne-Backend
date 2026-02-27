@@ -6,8 +6,7 @@ export interface CreateFirmBody {
   email?: string | null;
   website?: string | null;
   logo?: string | null;
-  status: string; // will be converted to number (1,0,-1) at service level
-  remarks?: object | null;
+  status: string; 
   created_by: string;
   gstin?: string;
   pan_number?: string;
@@ -18,7 +17,7 @@ export interface CreateFirmBody {
 }
 
 export interface CreateFirmParams
-  extends Omit<CreateFirmBody, "created_by" | "status" | "remarks" | "password">  {
+  extends Omit<CreateFirmBody, "created_by" | "status" | "password">  {
   remark: object;
   statusCode: number;
   hashed:string

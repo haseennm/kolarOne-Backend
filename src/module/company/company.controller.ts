@@ -1,6 +1,8 @@
-import { CreateCompanyBody, DeleteCompanyBody, EditCompanyBody, GetCompanyParams } from './company.types'
+import { CompanyLoginBody, CreateCompanyBody, DeleteCompanyBody, EditCompanyBody, GetCompanyParams } from './company.types'
 import CompanyService from './company.service'
 import { getStatusCode, getStatusText } from '../../utils/extra'
+import { generateToken, hashPassword, verifyPassword } from '../../utils/auth.util'
+import { AppError } from '../../middleware/errorMiddlware'
 
 export default class CompanyController {
 
@@ -25,7 +27,8 @@ export default class CompanyController {
     }
   }
   async createCompany(data: CreateCompanyBody) {
-    const { created_by, status, ...rest } = data;
+    const { created_by, status,password, ...rest } = data;
+    const hashed = await hashPassword(password)
 
     const remark = {
       action: "Created",
@@ -38,7 +41,8 @@ export default class CompanyController {
     const company = await service.createCompany({
       ...rest,
       remark,
-      statusCode
+      statusCode,
+      hashed
     });
 
     return company;
@@ -81,4 +85,24 @@ export default class CompanyController {
     return company;
   }
 
+   async loginCompany(data: CompanyLoginBody) {
+      const { password,username } = data
+      const service = new CompanyService();
+      const company = await service.loginCompany(data);
+      const isValid = await verifyPassword(password, company.password)
+  
+      if (!isValid) {
+        throw new AppError('Invalid credentials', 401)
+      }
+  
+      const token = generateToken({
+        id: company.id,
+        username: username,
+      })
+  
+      return {
+        token: token,
+        message: `company ${company.company_name} Login success`
+      }
+    }
 }

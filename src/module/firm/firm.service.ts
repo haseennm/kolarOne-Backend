@@ -147,8 +147,9 @@ export default class FirmService {
 
     const total = await query<CountResult>(countQuery, values);
 
+    const sanitizedFirm = firm.map(({ password, ...rest }) => rest)
     return {
-      firm,
+      firm: sanitizedFirm,
       page,
       limit,
       total: Number(total[0].count),
@@ -255,9 +256,9 @@ RETURNING *;
     return `Firm ${isFirmExist.firm_name} Deleted Successfully`;
   }
   async loginFirm(data: FirmLoginBody) {
-    const { username, password } = data
-    const query = `SELECT * FROM firm WHERE username = $1 AND password = $2 AND status != $3`;
-    const values = [username, password, 0]
+    const { username } = data
+    const query = `SELECT id,password,firm_name FROM firm WHERE username = $1 AND status != $2`;
+    const values = [username, 0]
 
 
     const result = await pool.query(query, values);

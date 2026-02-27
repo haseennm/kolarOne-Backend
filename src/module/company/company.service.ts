@@ -1,7 +1,7 @@
 import { pool, query } from "../../config/db"
 import { AppError } from "../../middleware/errorMiddlware";
 import { isExist } from "../../utils/extra";
-import { CountResult, CreateCompanyParams, DeleteCompanyParams, EditCompanyParams, GetCompanyParams, getDbCompany } from "./company.types";
+import { CompanyLoginBody, CountResult, CreateCompanyParams, DeleteCompanyParams, EditCompanyParams, GetCompanyParams, getDbCompany } from "./company.types";
 
 export default class CompanyService {
 
@@ -22,7 +22,9 @@ export default class CompanyService {
             email,
             website,
             logo,
-            remark
+            remark,
+            username,
+            hashed
         } = data;
 
         const query = `
@@ -41,12 +43,15 @@ export default class CompanyService {
       phone_number,
       email,
       website,
-      logo,remarks
+      logo,
+      remarks,
+      username,
+      password
     )
     VALUES (
       $1,$2,$3,$4,$5,
       $6,$7,$8,$9,$10,
-      $11,$12,$13,$14,$15,$16
+      $11,$12,$13,$14,$15,$16,$17,$18
     )
     RETURNING *;
   `;
@@ -67,7 +72,9 @@ export default class CompanyService {
             email,
             website,
             logo,
-            JSON.stringify(remark)
+            JSON.stringify(remark),
+            username,
+            hashed
         ];
 
         const { rows } = await pool.query(query, values);
@@ -211,9 +218,10 @@ export default class CompanyService {
 
         const company = await query<getDbCompany>(companyQuery, [...values, filters.limit, offset])
         const total = await query<CountResult>(countQuery, values)
+        const sanitizedCompany = company.map(({ password, ...rest }) => rest)
 
         return {
-            company: company,
+            company: sanitizedCompany,
             page: filters.page,
             limit: filters.limit,
             total: Number(total[0].count)
@@ -248,4 +256,15 @@ export default class CompanyService {
         await pool.query(query, values);
         return `${isCompanyExist.company_name} Company Deleted Successfull`;
     }
+
+    async loginCompany(data: CompanyLoginBody) {
+        const { username, } = data
+        const query = `SELECT id,password,company_name FROM company WHERE username = $1 AND status != $2`;
+        const values = [username,  0]
+
+
+        const result = await pool.query(query, values);
+        return result.rows[0];
+    }
+
 }

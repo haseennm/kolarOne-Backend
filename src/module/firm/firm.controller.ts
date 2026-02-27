@@ -103,7 +103,7 @@ export default class FirmController {
     return firm;
   }
   async loginFirm(data: FirmLoginBody) {
-    const { password } = data
+    const { password ,username} = data
     const service = new FirmService();
     const firm = await service.loginFirm(data);
     const isValid = await verifyPassword(password, firm.password)
@@ -114,7 +114,7 @@ export default class FirmController {
 
     const token = generateToken({
       id: firm.id,
-      username: firm.username,
+      username:username,
     })
 
     return {

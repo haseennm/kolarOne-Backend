@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { cns, el } from '../../utils/extra';
-import { CreateBranchBody, DeleteBranchBody, EditBranchBody, FetchBranchBody } from './branch.types';
+import { BranchLoginBody, CreateBranchBody, DeleteBranchBody, EditBranchBody, FetchBranchBody } from './branch.types';
 import BranchController from './branch.controller';
 
 export async function branchRouter(app: FastifyInstance): Promise<void> {
@@ -28,6 +28,8 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
                         "phone_number",
                         "email",
                         'created_by',
+                        'username',
+                        'password'
                     ],
                     properties: {
                         company_id: {
@@ -99,7 +101,16 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
                             type: 'string',
                             enum: ["Active", "Inactive"]
                         },
-
+                        username: {
+                            type: "string",
+                            minLength: 2,
+                            maxLength: 150,
+                        },
+                        password: {
+                            type: "string",
+                            minLength: 2,
+                            maxLength: 150,
+                        },
 
                         name_of_manager: {
                             type: "string",
@@ -205,7 +216,7 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
                     properties: {
                         id: { type: 'number' },
                         company_id: { type: 'number' },
-                         
+
 
                         address: {
                             type: "string",
@@ -326,7 +337,34 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
         }
     )
 
-
+    app.post<{ Body: BranchLoginBody }>(
+        "/login",
+        {
+            schema: {
+                body: {
+                    type: "object",
+                    required: ["password", "username"],
+                    properties: {
+                        password: { type: "string" },
+                        username: { type: "string" },
+                    },
+                },
+            },
+        },
+        async (request, reply) => {
+            try {
+                cns(request.url, request.body);
+                const controller = new BranchController();
+                const firm = await controller.loginBranch(request.body);
+                return reply.code(201).send(firm);
+            } catch (err: any) {
+                el(err);
+                return reply
+                    .status(err.statusCode || 500)
+                    .send({ message: err.message || "Internal Server Error" });
+            }
+        }
+    );
 
 
 }

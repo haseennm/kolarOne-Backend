@@ -15,11 +15,14 @@ export interface CreateCompanyBody {
   email?: string | null;
   website?: string | null;
   logo?: string | null;
+  password:string;
+  username:string
 }
 export interface CreateCompanyParams
-  extends Omit<CreateCompanyBody, "created_by" | "status"> {
-  remark: object
-  statusCode: number
+  extends Omit<CreateCompanyBody, "created_by" | "status" | "password">  {
+  remark: object;
+  statusCode: number;
+  hashed:string
 }
 export interface GetCompanyBody {
   page?: number
@@ -71,4 +74,8 @@ export interface DeleteCompanyBody {
 export interface DeleteCompanyParams
   extends Omit<DeleteCompanyBody, "deleted_by"> {
   remark: object,
+}
+export interface CompanyLoginBody{
+  password:string;
+  username:string
 }

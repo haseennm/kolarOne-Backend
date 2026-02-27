@@ -1,7 +1,7 @@
 import { pool, query } from "../../config/db"
 import { AppError } from "../../middleware/errorMiddlware";
 import { isExist } from "../../utils/extra";
-import { CountResult, CreateBranchParams, DeleteBranchParams, EditBranchParams, FetchBranchParams, FetchDbBranch } from "./branch.types";
+import { BranchLoginBody, CountResult, CreateBranchParams, DeleteBranchParams, EditBranchParams, FetchBranchParams, FetchDbBranch } from "./branch.types";
 
 export default class BranchService {
 
@@ -24,7 +24,10 @@ export default class BranchService {
             email,
             website,
             logo,
-            remark
+            remark,
+            username,
+            hashed
+
         } = data;
 
         const isCompanyExist = await isExist(company_id, "company", "id", company_id);
@@ -51,12 +54,14 @@ export default class BranchService {
             email,
             website,
             logo,
-            remarks
+            remarks,
+            username,
+            password
     )
     VALUES (
       $1,$2,$3,$4,$5,
       $6,$7,$8,$9,$10,
-      $11,$12,$13,$14,$15,$16,$17,$18
+      $11,$12,$13,$14,$15,$16,$17,$18,$19,$20
     )
     RETURNING *;
   `;
@@ -79,7 +84,9 @@ export default class BranchService {
             email,
             website,
             logo,
-            JSON.stringify(remark)
+            JSON.stringify(remark),
+            username,
+            hashed
         ];
 
         const { rows } = await pool.query(query, values);
@@ -150,9 +157,9 @@ export default class BranchService {
         )
 
         const total = await query<CountResult>(countQuery, values)
-
+        const sanitizedBranch = branch.map(({ password, ...rest }) => rest)
         return {
-            branch,
+            branch: sanitizedBranch,
             page,
             limit,
             total: Number(total[0].count)
@@ -240,8 +247,6 @@ export default class BranchService {
         const { rows } = await pool.query(query, values);
         return rows[0];
     }
-
-
     async deleteBranch(data: DeleteBranchParams) {
         const { r_id, remark, company_id } = data
         const isbranch_exist = await isExist(r_id, "branches", "company_id", company_id);
@@ -270,5 +275,14 @@ export default class BranchService {
 
         await pool.query(query, values);
         return `${isbranch_exist.branch_name}(${isbranch_exist.branch_code}) Company Deleted Successfull`;
+    }
+    async loginBranch(data: BranchLoginBody) {
+        const { username } = data
+        const query = `SELECT id,password, branch_name FROM branches WHERE username = $1 AND status != $2`;
+        const values = [username, 0]
+
+        const result = await pool.query(query, values);
+        console.log(result)
+        return result.rows[0];
     }
 }

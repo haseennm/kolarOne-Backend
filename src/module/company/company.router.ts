@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import { CreateCompanyBody, DeleteCompanyBody, EditCompanyBody, GetCompanyBody } from './company.types'
+import { CompanyLoginBody, CreateCompanyBody, DeleteCompanyBody, EditCompanyBody, GetCompanyBody } from './company.types'
 import CompanyController from './company.controller'
 import { cns, el } from '../../utils/extra';
 
@@ -21,7 +21,9 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
                         'state_code',
                         'status',
                         'created_by',
-                        'phone_number'
+                        'phone_number',
+                        'username',
+                        'password'
                     ],
                     properties: {
                         company_name: { type: 'string', minLength: 2 },
@@ -36,7 +38,16 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
                         district: { type: 'string', minLength: 2 },
                         state: { type: 'string', minLength: 2 },
                         state_code: { type: 'string', minLength: 1 },
-
+                        username: {
+                            type: "string",
+                            minLength: 2,
+                            maxLength: 150,
+                        },
+                        password: {
+                            type: "string",
+                            minLength: 2,
+                            maxLength: 150,
+                        },
                         status: { type: 'string', enum: ["Active", "Inactive"] },
 
                         created_by: { type: 'string' },
@@ -188,7 +199,34 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
     )
 
 
-
+    app.post<{ Body: CompanyLoginBody }>(
+        "/login",
+        {
+            schema: {
+                body: {
+                    type: "object",
+                    required: ["password", "username"],
+                    properties: {
+                        password: { type: "string" },
+                        username: { type: "string" },
+                    },
+                },
+            },
+        },
+        async (request, reply) => {
+            try {
+                cns(request.url, request.body);
+                const controller = new CompanyController();
+                const firm = await controller.loginCompany(request.body);
+                return reply.code(201).send(firm);
+            } catch (err: any) {
+                el(err);
+                return reply
+                    .status(err.statusCode || 500)
+                    .send({ message: err.message || "Internal Server Error" });
+            }
+        }
+    );
 
 }
 

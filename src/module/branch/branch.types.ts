@@ -17,11 +17,14 @@ export interface CreateBranchBody {
   website?: string | null;
   logo?: string | null;
   created_by: string;
+  password:string;
+  username:string
 }
 export interface CreateBranchParams
-  extends Omit<CreateBranchBody, "created_by" | "status"> {
-  remark: object
-  statusCode: number
+  extends Omit<CreateBranchBody, "created_by" | "status" | "password">  {
+  remark: object;
+  statusCode: number;
+  hashed:string
 }
 export interface FetchBranchBody {
   page?: number
@@ -77,4 +80,9 @@ export interface DeleteBranchParams
   extends Omit<DeleteBranchBody, "deleted_by"> {
   remark: object,
   company_id:number
+}
+
+export interface BranchLoginBody{
+  password:string;
+  username:string
 }
