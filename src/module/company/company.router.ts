@@ -1,10 +1,10 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import { CreateCompanyBody, GetCompanyBody } from './company.types'
+import { CreateCompanyBody, DeleteCompanyBody, EditCompanyBody, GetCompanyBody } from './company.types'
 import CompanyController from './company.controller'
-import { cns } from '../../utils/extra';
+import { cns, el } from '../../utils/extra';
 
 export async function companyRoutes(app: FastifyInstance): Promise<void> {
- app.post<{ Body: CreateCompanyBody }>(
+    app.post<{ Body: CreateCompanyBody }>(
         '/create',
         {
             schema: {
@@ -52,19 +52,16 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
         },
         async (request, reply) => {
             try {
-                cns(request.url,request.body)
+                cns(request.url, request.body)
                 const controller = new CompanyController()
                 const user = await controller.createCompany(request.body)
                 return reply.code(201).send(user)
 
             } catch (err: any) {
-                app.log.error(err)
-
-                // if (err.code === '23505') {
-                //   return reply.status(409).send({ message: 'Email already exists' })
-                // }
-
-                return reply.status(500).send({ message: 'Internal Server Error' })
+                el(err)
+                return reply
+                    .status(err.statusCode || 500)
+                    .send({ message: err.message || "Internal Server Error" });
             }
         }
     )
@@ -85,7 +82,7 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
         },
         async (request: FastifyRequest<{ Body: GetCompanyBody }>, reply: FastifyReply) => {
             try {
-                cns(request.url,request.body)
+                cns(request.url, request.body)
                 const { page = 1, limit = 10, ...filters } = request.body;
                 const offset = (page - 1) * limit;
                 const controller = new CompanyController();
@@ -97,61 +94,102 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
                         limit
                     }
                 });
-    console.log(companies)
+                console.log(companies)
 
                 return reply.code(200).send(companies);
 
-            } catch (err) {
-                // app.log.error(err);
-                console.log(err)
-                return reply.status(500).send({ message: 'Internal Server Error' });
+            } catch (err: any) {
+                el(err)
+                return reply
+                    .status(err.statusCode || 500)
+                    .send({ message: err.message || "Internal Server Error" });
             }
         }
     );
 
+    app.post<{ Body: EditCompanyBody }>(
+        '/edit',
+        {
+            schema: {
+                body: {
+                    type: 'object',
+                    required: [
+                        'id',
+                        'updated_by'
+                    ],
+                    properties: {
+                        id: { type: 'number' },
+                        company_name: { type: 'string', minLength: 2 },
+                        bussiness_category: { type: 'string', minLength: 2 },
+                        tin_number: { type: ['string', 'null'] },
+                        gstin: { type: ['string', 'null'] },
+                        pan_number: { type: ['string', 'null'] },
+                        address: { type: 'string', minLength: 3 },
+                        city: { type: 'string', minLength: 2 },
+                        district: { type: 'string', minLength: 2 },
+                        state: { type: 'string', minLength: 2 },
+                        state_code: { type: 'string', minLength: 1 },
+                        status: { type: 'string', enum: ["Active", "Inactive"] },
+                        updated_by: { type: 'string' },
+                        phone_number: { type: 'string', minLength: 5 },
+                        email: { type: ['string', 'null'], format: 'email' },
+                        website: { type: ['string', 'null'] },
+                        logo: { type: ['string', 'null'] }
+                    },
+                },
+            },
+        },
+        async (request, reply) => {
+            try {
+                cns(request.url, request.body)
+                const controller = new CompanyController()
+                const user = await controller.editCompany(request.body)
+                return reply.code(201).send(user)
 
-   
+            } catch (err: any) {
+                el(err)
+                return reply
+                    .status(err.statusCode || 500)
+                    .send({ message: err.message || "Internal Server Error" });
+            }
+        }
+    )
+    app.post<{ Body: DeleteCompanyBody }>(
+        '/delete',
+        {
+            schema: {
+                body: {
+                    type: 'object',
+                    required: [
+                        'r_id',
+                        'deleted_by'
+                    ],
+                    properties: {
+                        r_id: { type: 'number' },
+                        deleted_by: { type: 'string' },
+                    },
+                },
+            },
+        },
+        async (request, reply) => {
+            try {
+                cns(request.url, request.body)
+                const controller = new CompanyController()
+                const user = await controller.deleteCompany(request.body)
+                return reply.code(201).send(user)
+
+            } catch (err: any) {
+                el(err)
+                return reply
+                    .status(err.statusCode || 500)
+                    .send({ message: err.message || "Internal Server Error" });
+            }
+        }
+    )
+
+
+
+
 }
-    //   app.post<{ Body: GetStaffsBody }>(
-    //     '/get',
-    //     async (request, reply) => {
-    //       try {
-    //         const {
-    //           page = 1,
-    //           limit = 10,
-    //           email,
-    //           name,
-    //           id
-    //         } = request.body
 
-    //         const offset = (page - 1) * limit
-
-    //         const controller = new CompanyController()
-    //         const result = await controller.getStaffById({
-    //           limit: Number(limit),
-    //           offset: Number(offset),
-    //           filters: {
-    //             email,
-    //             name,
-    //             id
-    //           }
-    //         })
-
-    //         if (!result.staffs.length) {
-    //           return reply.status(404).send({ message: 'No staffs found' })
-    //         }
-
-    //         return reply.code(200).send({
-    //           page: Number(page),
-    //           limit: Number(limit),
-    //           total: result.total,
-    //           staffs: result.staffs
-    //         })
-
-    //       } catch (err) {
-    //         app.log.error(err)
-    //         return reply.status(500).send({ message: 'Internal Server Error' })
-    //       }
-    //     }
-    //   )
 

@@ -1,4 +1,4 @@
-import { CreateCompanyBody, EditCompanyBody, GetCompanyParams } from './company.types'
+import { CreateCompanyBody, DeleteCompanyBody, EditCompanyBody, GetCompanyParams } from './company.types'
 import CompanyService from './company.service'
 import { getStatusCode, getStatusText } from '../../utils/extra'
 
@@ -59,6 +59,24 @@ export default class CompanyController {
       ...rest,
       remark,
       statusCode
+    });
+    return company;
+  }
+  async deleteCompany(data: DeleteCompanyBody) {
+    const { deleted_by, ...rest } = data;
+
+    const remark = {
+      action: "Deleted",
+      deleted_by,
+      updated_at: Date.now(),
+    };
+
+    
+    const service = new CompanyService();
+
+    const company = await service.deleteCompany({
+      ...rest,
+      remark,
     });
     return company;
   }

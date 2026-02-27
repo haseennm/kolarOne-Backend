@@ -1,5 +1,7 @@
 import { pool, query } from "../../config/db"
-import { CountResult, CreateCompanyParams, GetCompanyParams, getDbCompany } from "./company.types";
+import { AppError } from "../../middleware/errorMiddlware";
+import { isExist } from "../../utils/extra";
+import { CountResult, CreateCompanyParams, DeleteCompanyParams, EditCompanyParams, GetCompanyParams, getDbCompany } from "./company.types";
 
 export default class CompanyService {
 
@@ -65,29 +67,110 @@ export default class CompanyService {
             email,
             website,
             logo,
+            JSON.stringify(remark)
+        ];
+
+        const { rows } = await pool.query(query, values);
+        return rows[0];
+    }
+    async updateCompany(data: EditCompanyParams) {
+        const {
+            id,
+            company_name,
+            bussiness_category,
+            tin_number,
+            gstin,
+            pan_number,
+            address,
+            city,
+            district,
+            state,
+            state_code,
+            statusCode,
+            phone_number,
+            email,
+            website,
+            logo,
             remark
+        } = data;
+        // check is company exist and it is status is not Deleted
+        const isCompanyExist = await pool.query(
+            `SELECT * FROM company WHERE id = $1 AND status != $2`,
+            [id, 0]
+        );
+
+        if (!isCompanyExist) {
+            throw new AppError("Company not found or already deleted", 404);
+        }
+        // remark want  append previous remarks not replace
+        const query = `
+    UPDATE company 
+     SET
+      company_name = $1,
+      bussiness_category = $2,
+      tin_number = $3,
+      gstin = $4,
+      pan_number = $5,
+      address = $6,
+      city = $7,
+      district = $8,
+      state = $9,
+      state_code = $10,
+      status = $11,
+      phone_number = $12,
+      email = $13,
+      website = $14,
+      logo = $15,
+      remarks =
+  CASE
+    WHEN jsonb_typeof(remarks) = 'array'
+      THEN remarks || $16::jsonb
+    ELSE jsonb_build_array(remarks) || $16::jsonb
+  END
+    WHERE id = $17
+    RETURNING *;
+  `;
+
+        const values = [
+            company_name,
+            bussiness_category,
+            tin_number,
+            gstin,
+            pan_number,
+            address,
+            city,
+            district,
+            state,
+            state_code,
+            statusCode,
+            phone_number,
+            email,
+            website,
+            logo,
+            JSON.stringify(remark),
+            id
         ];
 
         const { rows } = await pool.query(query, values);
         return rows[0];
     }
 
-   async getCompany(data: GetCompanyParams) {
-    const { offset, filters } = data
+    async getCompany(data: GetCompanyParams) {
+        const { offset, filters } = data
 
-    let where: string[] = []
-    let values: any[] = []
+        let where: string[] = []
+        let values: any[] = []
 
-    // Always exclude deleted
-    where.push(`status != $${values.length + 1}`)
-    values.push(0) // 0 = Deleted
+        // Always exclude deleted
+        where.push(`status != $${values.length + 1}`)
+        values.push(0) // 0 = Deleted
 
-    // Search across multiple columns
-    if (filters.search) {
-        values.push(`%${filters.search}%`)
-        const searchIndex = values.length
+        // Search across multiple columns
+        if (filters.search) {
+            values.push(`%${filters.search}%`)
+            const searchIndex = values.length
 
-        where.push(`
+            where.push(`
             (
                 company_name ILIKE $${searchIndex} OR
                 bussiness_category ILIKE $${searchIndex} OR
@@ -103,17 +186,17 @@ export default class CompanyService {
                 email ILIKE $${searchIndex}
             )
         `)
-    }
+        }
 
-    // Optional filter by id
-    if (filters.id) {
-        values.push(filters.id)
-        where.push(`id = $${values.length}`)
-    }
+        // Optional filter by id
+        if (filters.id) {
+            values.push(filters.id)
+            where.push(`id = $${values.length}`)
+        }
 
-    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
+        const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
 
-    const companyQuery = `
+        const companyQuery = `
         SELECT * FROM company
         ${whereClause}
         ORDER BY id DESC
@@ -121,20 +204,48 @@ export default class CompanyService {
         OFFSET $${values.length + 2}
     `
 
-    const countQuery = `
+        const countQuery = `
         SELECT COUNT(*) FROM company
         ${whereClause}
     `
 
-    const company = await query<getDbCompany>(companyQuery, [...values, filters.limit, offset])
-    const total = await query<CountResult>(countQuery, values)
+        const company = await query<getDbCompany>(companyQuery, [...values, filters.limit, offset])
+        const total = await query<CountResult>(countQuery, values)
 
-    return {
-        company: company,
-        page:filters.page,
-        limit:filters.limit,
-        total: Number(total[0].count)
+        return {
+            company: company,
+            page: filters.page,
+            limit: filters.limit,
+            total: Number(total[0].count)
+        }
     }
-}
+    async deleteCompany(data: DeleteCompanyParams) {
+        const { r_id, remark } = data
+        const isCompanyExist = await isExist(r_id, "company", "id", r_id);
+        if (!isCompanyExist) {
+            throw new AppError("Company not found or already deleted", 404);
+        }
+        const query = `
+         UPDATE company 
+        SET
+        status = $1,
+        remarks =
+        CASE
+            WHEN jsonb_typeof(remarks) = 'array'
+            THEN remarks || $2::jsonb
+            ELSE jsonb_build_array(remarks) || $2::jsonb
+        END
+        WHERE id = $3
+        RETURNING *;
+  `;
 
+        const values = [
+            0,
+            JSON.stringify(remark),
+            r_id
+        ];
+
+        await pool.query(query, values);
+        return `${isCompanyExist.company_name} Company Deleted Successfull`;
+    }
 }
