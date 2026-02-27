@@ -3,6 +3,7 @@ import { env } from './utils/env'
 import multipart from '@fastify/multipart'
 import { companyRoutes } from './module/company/company.router'
 import { branchRouter } from './module/branch/branch.router'
+import { firmRouter } from './module/firm/firm.router'
 
 const app = Fastify({
     logger: false,
@@ -10,6 +11,7 @@ const app = Fastify({
 app.register(multipart)
 app.register(companyRoutes, { prefix: '/company' })
 app.register(branchRouter, { prefix: '/branch' })
+app.register(firmRouter, { prefix: '/firm' })
 
 const start = async () => {
     try {
