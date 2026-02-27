@@ -46,7 +46,7 @@ export function getStatusText(code: number): string {
 export async function isExist(id:number | string, table:string,bussiness_category:string,bussiness_id:number) {
   // bussiness_category = branch or company or firm
   // bussiness_id is row id
- const allowedTables = ["company", "branch", "firm"];
+ const allowedTables = ["company", "branches", "firm"];
 if (!allowedTables.includes(table)) {
   throw new Error("Invalid table name");
 }
