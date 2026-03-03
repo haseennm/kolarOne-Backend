@@ -35,7 +35,7 @@ export default class FirmController {
   }
 
   async createFirm(data: CreateFirmBody) {
-    const { created_by, status, password, ...rest } = data;
+    const { created_by, status, password,logo, ...rest } = data;
 
     const remark = {
       action: "Created",
@@ -52,7 +52,8 @@ export default class FirmController {
       ...rest,
       remark,
       statusCode,
-      hashed
+      hashed,
+      logo
     });
 
     return firm;
@@ -106,6 +107,7 @@ export default class FirmController {
     const { password ,username} = data
     const service = new FirmService();
     const firm = await service.loginFirm(data);
+    console.log("firm in controe",firm)
     const isValid = await verifyPassword(password, firm.password)
 
     if (!isValid) {

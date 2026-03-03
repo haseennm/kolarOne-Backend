@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-
+import fs from "fs";
+import { pipeline } from "stream/promises";
 import { cns, el } from "../../utils/extra";
 import {
   CreateFirmBody,
@@ -9,142 +10,108 @@ import {
   FirmLoginBody,
 } from "./firm.types";
 import FirmController from "./firm.controller";
+import { saveMultipartFile } from "../../utils/upload.utils";
+import path from "path";
 
 export async function firmRouter(app: FastifyInstance): Promise<void> {
 
   // CREATE
-  app.post<{ Body: CreateFirmBody }>(
-    "/create",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: [
-            "branch_id",
-            "status",
-            "created_by",
-            "company_id",
-            "name_of_manager",
-            "phone_number",
-            "firm_name",
-            "firm_code",
-            "username",
-            "password",
-          ],
-          properties: {
-            branch_id: {
-              type: "integer",
-              minimum: 1,
-            },
-            company_id: {
-              type: "integer",
-              minimum: 1,
-            },
+   app.post("/create", async (request, reply) => {
 
-            firm_code: {
-              type: "string",
-              minLength: 2,
-              maxLength: 150,
-            },
-            firm_name: {
-              type: "string",
-              minLength: 2,
-              maxLength: 150,
-            },
-            username: {
-              type: "string",
-              minLength: 2,
-              maxLength: 150,
-            },
-            password: {
-              type: "string",
-              minLength: 2,
-              maxLength: 150,
-            },
-            name_of_manager: {
-              type: "string",
-              minLength: 2,
-              maxLength: 150,
-            },
+    const parts = request.parts();
 
-            phone_number: {
-              type: "string",
-              pattern: "^[0-9]{10,15}$",
-            },
+    const body: any = {};
+    let logoDbPath: string | null = null;
+    let uploadedFullPath: string | null = null;
 
-            email: {
-              type: "string",
-              format: "email",
-            },
+    try {
 
-            website: {
-              type: "string",
-              format: "uri",
-            },
+      for await (const part of parts) {
 
-            logo: {
-              type: "string",
-            },
+        if (part.type === "file") {
 
-            status: {
-              type: "string",
-              enum: ["Active", "Inactive"],
-            },
+          const uploadDir = path.join(process.cwd(), "uploads");
 
-            created_by: {
-              type: "string",
-              minimum: 1,
-            },
-            gstin: {
-              type: ['string', 'null']
-            },
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+          }
 
-            pan_number: {
-              type: ['string', 'null']
-            },
+          const fileName = `${Date.now()}-${part.filename}`;
+          const fullPath = path.join(uploadDir, fileName);
 
-            address: {
-              type: ['string', 'null'],
-              minLength: 3
-            },
+          await pipeline(part.file, fs.createWriteStream(fullPath));
 
-            city: {
-              type: ['string', 'null'],
-              minLength: 2
-            },
+          logoDbPath = `/uploads/${fileName}`;
+          uploadedFullPath = fullPath;
+        }
 
-            district: {
-              type: ['string', 'null'],
-              minLength: 2
-            },
-
-            state: {
-              type: ['string', 'null'],
-              minLength: 2
-            },
-
-            state_code: {
-              type: ['string', 'null'],
-              minLength: 1
-            }
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      try {
-        cns(request.url, request.body);
-        const controller = new FirmController();
-        const firm = await controller.createFirm(request.body);
-        return reply.code(201).send(firm);
-      } catch (err: any) {
-        el(err);
-        return reply
-          .status(err.statusCode || 500)
-          .send({ message: err.message || "Internal Server Error" });
+        // 🔹 Handle Text Fields
+        else {
+          const cleanKey = part.fieldname.trim(); // remove accidental spaces
+          body[cleanKey] = part.value;
+        }
       }
+
+      // --------------------------
+      // ✅ Basic Required Validation
+      // --------------------------
+      const requiredFields = [
+        "branch_id",
+        "company_id",
+        "name_of_manager",
+        "phone_number",
+        "firm_name",
+        "firm_code",
+        "username",
+        "password",
+        "status",
+        "created_by"
+      ];
+
+      for (const field of requiredFields) {
+        if (!body[field]) {
+          throw new Error(`${field} is required`);
+        }
+      }
+
+      // --------------------------
+      // ✅ Type Conversion
+      // --------------------------
+      body.branch_id = Number(body.branch_id);
+      body.company_id = Number(body.company_id);
+
+      if (!isNaN(Number(body.created_by))) {
+        body.created_by = Number(body.created_by);
+      }
+
+      // --------------------------
+      // ✅ Call Controller (Transaction Inside)
+      // --------------------------
+      const controller = new FirmController();
+
+      const result = await controller.createFirm({
+        ...body,
+        logo: logoDbPath
+      });
+
+      return reply.code(201).send({
+        status: "Success",
+        message: result
+      });
+
+    } catch (error: any) {
+
+      // 🔥 Delete uploaded file if DB fails
+      if (uploadedFullPath && fs.existsSync(uploadedFullPath)) {
+        fs.unlinkSync(uploadedFullPath);
+      }
+
+      return reply.status(400).send({
+        status: "Error",
+        message: error.message || "Firm creation failed"
+      });
     }
-  );
+  });
 
   // FETCH
   app.post<{ Body: FetchFirmBody }>(
@@ -195,78 +162,79 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
   );
 
   // EDIT
-  app.post<{ Body: EditFirmBody }>(
-    "/edit",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: ["id", "branch_id", "updated_by"],
-          properties: {
-            id: { type: "number" },
-            branch_id: { type: "number" },
+app.post("/edit", async (request, reply) => {
 
-            firm_name: {
-              type: "string",
-              minLength: 2,
-              maxLength: 150,
-            },
-            firm_code: {
-              type: "string",
-              minLength: 2,
-              maxLength: 150,
-            },
-            name_of_manager: {
-              type: "string",
-              minLength: 2,
-              maxLength: 150,
-            },
+  const parts = request.parts();
+  const body: any = {};
+  let logoPath: string | null = null;
+  let fullPath: string | null = null;
 
-            phone_number: {
-              type: "string",
-              pattern: "^[0-9]{10,15}$",
-            },
+  try {
 
-            email: {
-              type: "string",
-              format: "email",
-            },
+    for await (const part of parts) {
 
-            website: {
-              type: "string",
-              format: "uri",
-            },
+      if (part.type === "file") {
 
-            logo: {
-              type: "string",
-            },
+        if (!part.filename) continue;
 
-            status: {
-              type: "string",
-              enum: ["Active", "Inactive"],
-            },
+        const uploadDir = path.join(process.cwd(), "uploads");
 
-            updated_by: {
-              type: "string",
-            },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      try {
-        cns(request.url, request.body);
-        const controller = new FirmController();
-        const firm = await controller.editFirm(request.body);
-        return reply.code(201).send(firm);
-      } catch (err: any) {
-        el(err);
-        return reply
-          .status(err.statusCode || 500)
-          .send({ message: err.message || "Internal Server Error" });
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        const fileName = `${Date.now()}-${part.filename}`;
+        fullPath = path.join(uploadDir, fileName);
+
+        await pipeline(part.file, fs.createWriteStream(fullPath));
+
+        logoPath = `/uploads/${fileName}`;
+
+      } else {
+        body[part.fieldname.trim()] = part.value;
       }
     }
-  );
+
+    if (!body.id) {
+      throw new Error("id is required");
+    }
+
+    if (!body.branch_id) {
+      throw new Error("branch_id is required");
+    }
+
+    if (!body.updated_by) {
+      throw new Error("updated_by is required");
+    }
+
+    body.id = Number(body.id);
+    body.branch_id = Number(body.branch_id);
+
+    if (logoPath) {
+      body.logo = logoPath;
+    }
+
+    const controller = new FirmController();
+    const firm = await controller.editFirm(body);
+
+    return reply.code(200).send({
+      status: "Success",
+      message: firm
+    });
+
+  } catch (err: any) {
+
+    // delete uploaded file if error happens
+    if (fullPath && fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+
+    return reply.status(400).send({
+      status: "Error",
+      message: err.message || "Firm update failed"
+    });
+  }
+});
 
   // DELETE
   app.post<{ Body: DeleteFirmBody }>(

@@ -47,25 +47,33 @@ export default class CompanyController {
 
     return company;
   }
-  async editCompany(data: EditCompanyBody) {
-    const { updated_by, status, ...rest } = data;
+ async editCompany(data: EditCompanyBody) {
+
+    const { id, updated_by, status, ...rest } = data;
 
     const remark = {
-      action: "Updated",
-      updated_by,
-      updated_at: Date.now(),
+        action: "Updated",
+        updated_by,
+        updated_at: Date.now(),
     };
 
-    const statusCode = getStatusCode(status)
+    let statusCode = 99;
+
+    if (typeof status === "string") {
+        statusCode = getStatusCode(status);
+    }
+
     const service = new CompanyService();
 
     const company = await service.updateCompany({
-      ...rest,
-      remark,
-      statusCode
+        id,
+        ...rest,
+        remark,
+        statusCode
     });
+
     return company;
-  }
+}
   async deleteCompany(data: DeleteCompanyBody) {
     const { deleted_by, ...rest } = data;
 

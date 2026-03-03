@@ -1,4 +1,5 @@
-import { pool, query } from "../../config/db";
+import { Result } from "pg";
+import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../middleware/errorMiddlware";
 import { isExist } from "../../utils/extra";
 import {
@@ -12,7 +13,6 @@ import {
 } from "./firm.types";
 
 export default class FirmService {
-
   async createFirm(data: CreateFirmParams) {
     const {
       company_id,
@@ -31,56 +31,59 @@ export default class FirmService {
       hashed,
       username
     } = data;
+    const result = transaction(async (client) => {
 
-    const isBranchExist = await isExist(branch_id, "branches", "company_id", company_id);
-    if (!isBranchExist) {
-      throw new AppError("Branch not found", 404);
-    }
+      const isBranchExist = await isExist(branch_id, "branches", "company_id", company_id, client);
+      if (!isBranchExist) {
+        throw new AppError("Branch not found", 404);
+      }
 
-    const queryText = `
-      INSERT INTO firm (
-        branch_id,
-        name_of_manager,
-        phone_number,
-        email,
-        website,
-        logo,
-        status,
-        remarks,
-        gstin,
-        pan_number,
-       
-        firm_name,
-      firm_code,
-      password,
-      username
-      )
-       VALUES (
-    $1,$2,$3,$4,$5,$6,$7,$8,
-    $9,$10,$11,$12,$13,$14
-  )
-      RETURNING *;
-    `;
-
-    const values = [
+      const queryText = `
+    INSERT INTO firm (
       branch_id,
       name_of_manager,
       phone_number,
       email,
       website,
       logo,
-      statusCode,
-      JSON.stringify(remark),
-      gstin || null,
-      pan_number || null,
+      status,
+      remarks,
+      gstin,
+      pan_number,
+     
       firm_name,
-      firm_code,
-      hashed,
-      username
-    ];
+    firm_code,
+    password,
+    username
+    )
+     VALUES (
+  $1,$2,$3,$4,$5,$6,$7,$8,
+  $9,$10,$11,$12,$13,$14
+)
+    RETURNING *;
+  `;
 
-    const { rows } = await pool.query(queryText, values);
-    return `${rows[0].firm_name} created`;
+      const values = [
+        branch_id,
+        name_of_manager,
+        phone_number,
+        email,
+        website,
+        logo,
+        statusCode,
+        JSON.stringify(remark),
+        gstin || null,
+        pan_number || null,
+        firm_name,
+        firm_code,
+        hashed,
+        username
+      ];
+
+      const { rows } = await executeInTransaction(client, queryText, values);
+      return `${rows[0].firm_name} created`;
+    })
+    return result;
   }
 
   async fetchFirm(data: FetchFirmParams) {
@@ -172,14 +175,14 @@ export default class FirmService {
       firm_name,
       firm_code,
     } = data;
+    const result = transaction(async (client) => {
+      const isFirmExist = await isExist(id, "firm", "branch_id", branch_id, client);
 
-    const isFirmExist = await isExist(id, "firm", "branch_id", branch_id);
+      if (!isFirmExist) {
+        throw new AppError("Firm not found or deleted", 404);
+      }
 
-    if (!isFirmExist) {
-      throw new AppError("Firm not found or deleted", 404);
-    }
-
-    const queryText = `
+      const queryText = `
   UPDATE firm
 SET
   name_of_manager = $1,
@@ -203,35 +206,37 @@ WHERE id = $12
 RETURNING *;
   `;
 
-    const values = [
-      name_of_manager ?? isFirmExist.name_of_manager,
-      phone_number ?? isFirmExist.phone_number,
-      email ?? isFirmExist.email,
-      website ?? isFirmExist.website,
-      logo ?? isFirmExist.logo,
-      statusCode ?? isFirmExist.status,
-      gstin ?? isFirmExist.gstin,
-      pan_number ?? isFirmExist.pan_number,
-      firm_name ?? isFirmExist.firm_name,
-      firm_code ?? isFirmExist.firm_code,
-      JSON.stringify(remark),
-      id
-    ];
+      const values = [
+        name_of_manager ?? isFirmExist.name_of_manager,
+        phone_number ?? isFirmExist.phone_number,
+        email ?? isFirmExist.email,
+        website ?? isFirmExist.website,
+        logo ?? isFirmExist.logo,
+        statusCode ?? isFirmExist.status,
+        gstin ?? isFirmExist.gstin,
+        pan_number ?? isFirmExist.pan_number,
+        firm_name ?? isFirmExist.firm_name,
+        firm_code ?? isFirmExist.firm_code,
+        JSON.stringify(remark),
+        id
+      ];
 
-    const { rows } = await pool.query(queryText, values);
-    return rows[0];
+      const { rows } = await executeInTransaction(client, queryText, values);
+      return rows[0];
+    })
+    return result
   }
 
   async deleteFirm(data: DeleteFirmParams) {
     const { r_id, remark, branch_id } = data;
+   const result= transaction(async (client) => {
+      const isFirmExist = await isExist(r_id, "firm", "branch_id", branch_id, client);
 
-    const isFirmExist = await isExist(r_id, "firm", "branch_id", branch_id);
+      if (!isFirmExist) {
+        throw new AppError("Firm not found or already deleted", 404);
+      }
 
-    if (!isFirmExist) {
-      throw new AppError("Firm not found or already deleted", 404);
-    }
-
-    const queryText = `
+      const queryText = `
       UPDATE firm
       SET
         status = $1,
@@ -245,24 +250,30 @@ RETURNING *;
       RETURNING *;
     `;
 
-    const values = [
-      0, // soft delete (same as your branch logic)
-      JSON.stringify(remark),
-      r_id,
-    ];
+      const values = [
+        0, // soft delete (same as your branch logic)
+        JSON.stringify(remark),
+        r_id,
+      ];
 
-    await pool.query(queryText, values);
+      await executeInTransaction(client, queryText, values);
 
-    return `Firm ${isFirmExist.firm_name} Deleted Successfully`;
+      return `Firm ${isFirmExist.firm_name} Deleted Successfully`;
+    })
+    return result
   }
   async loginFirm(data: FirmLoginBody) {
     const { username } = data
+   const result= transaction(async (client) => {
+
     const query = `SELECT id,password,firm_name FROM firm WHERE username = $1 AND status != $2`;
     const values = [username, 0]
 
 
-    const result = await pool.query(query, values);
-    console.log(result)
-    return result.rows[0];
+    const login = await executeInTransaction(client,query, values);
+    console.log(login)
+    return login.rows[0];
+   })
+   return result
   }
 }

@@ -1,165 +1,98 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-
+import fs from "fs";
+import { pipeline } from "stream/promises";
 import { cns, el } from '../../utils/extra';
 import { BranchLoginBody, CreateBranchBody, DeleteBranchBody, EditBranchBody, FetchBranchBody } from './branch.types';
 import BranchController from './branch.controller';
+import path from 'path';
 
 export async function branchRouter(app: FastifyInstance): Promise<void> {
-    app.post<{ Body: CreateBranchBody }>(
-        '/create',
-        {
-            schema: {
-                body: {
-                    type: 'object',
-                    required: [
-                        "company_id",
-                        "branch_code",
-                        "branch_name",
-                        "gstin",
-                        "pan_number",
-                        "address",
-                        "city",
-                        "district",
-                        "state",
-                        "state_code",
-                        "pincode",
-                        "status",
-                        "name_of_manager",
-                        "phone_number",
-                        "email",
-                        'created_by',
-                        'username',
-                        'password'
-                    ],
-                    properties: {
-                        company_id: {
-                            type: "integer",
-                            minimum: 1
-                        },
+    app.post("/create", async (request, reply) => {
 
-                        branch_code: {
-                            type: "string",
-                            minLength: 1,
-                            maxLength: 50
-                        },
+        const parts = request.parts();
+        const body: any = {};
+        let logoPath: string | null = null;
+        let fullPath: string | null = null;
 
-                        branch_name: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 150
-                        },
+        try {
 
-                        gstin: {
-                            type: "string",
-                            minLength: 15,
-                            maxLength: 15,
-                            pattern: "^[0-9A-Z]{15}$"
-                        },
+            for await (const part of parts) {
 
-                        pan_number: {
-                            type: "string",
-                            minLength: 10,
-                            maxLength: 10,
-                            pattern: "^[A-Z]{5}[0-9]{4}[A-Z]{1}$"
-                        },
+                if (part.type === "file") {
 
-                        address: {
-                            type: "string",
-                            minLength: 5
-                        },
+                    const uploadDir = path.join(process.cwd(), "uploads");
 
-                        city: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 100
-                        },
-
-                        district: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 100
-                        },
-
-                        state: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 100
-                        },
-
-                        state_code: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 2
-                        },
-
-                        pincode: {
-                            type: "string",
-                            pattern: "^[0-9]{6}$"
-                        },
-
-                        status: {
-                            type: 'string',
-                            enum: ["Active", "Inactive"]
-                        },
-                        username: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 150,
-                        },
-                        password: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 150,
-                        },
-
-                        name_of_manager: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 150
-                        },
-
-                        phone_number: {
-                            type: "string",
-                            pattern: "^[0-9]{10,15}$"
-                        },
-
-                        email: {
-                            type: "string",
-                            format: "email"
-                        },
-
-                        website: {
-                            type: "string",
-                            format: "uri"
-                        },
-
-                        logo: {
-                            type: "string"
-                        },
-
-                        created_by: {
-                            type: "integer",
-                            minimum: 1
-                        }
+                    if (!fs.existsSync(uploadDir)) {
+                        fs.mkdirSync(uploadDir, { recursive: true });
                     }
-                },
-            },
-        },
-        async (request, reply) => {
-            try {
-                cns(request.url, request.body)
-                const controller = new BranchController()
-                const branch = await controller.createBranch(request.body)
-                return reply.code(201).send(branch)
 
-            } catch (err: any) {
-                el(err)
-                return reply
-                    .status(err.statusCode || 500)
-                    .send({ message: err.message || "Internal Server Error" });
+                    const fileName = `${Date.now()}-${part.filename}`;
+                    fullPath = path.join(uploadDir, fileName);
+
+                    await pipeline(part.file, fs.createWriteStream(fullPath));
+
+                    logoPath = `/uploads/${fileName}`;
+                } else {
+                    body[part.fieldname.trim()] = part.value;
+                }
             }
+
+            // ✅ Required Fields
+            const required = [
+                "company_id",
+                "branch_code",
+                "branch_name",
+                "gstin",
+                "pan_number",
+                "address",
+                "city",
+                "district",
+                "state",
+                "state_code",
+                "pincode",
+                "status",
+                "name_of_manager",
+                "phone_number",
+                "email",
+                "created_by",
+                "username",
+                "password"
+            ];
+
+            for (const field of required) {
+                if (!body[field]) {
+                    throw new Error(`${field} is required`);
+                }
+            }
+
+            body.company_id = Number(body.company_id);
+            body.state_code = Number(body.state_code);
+            body.pincode = Number(body.pincode);
+
+            const controller = new BranchController();
+
+            const result = await controller.createBranch({
+                ...body,
+                logo: logoPath
+            });
+            cns("branch","branch")
+            return reply.code(201).send({
+                status: "Success",
+                message: result
+            });
+
+        } catch (error: any) {
+
+            if (fullPath && fs.existsSync(fullPath)) {
+                fs.unlinkSync(fullPath);
+            }
+
+            return reply.status(400).send({
+                status: "Error",
+                message: error.message || "Branch creation failed"
+            });
         }
-    )
+    });
     app.post<{ Body: FetchBranchBody }>(
         '/get',
         {
@@ -202,106 +135,78 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
         }
     );
 
-    app.post<{ Body: EditBranchBody }>(
-        '/edit',
-        {
-            schema: {
-                body: {
-                    type: 'object',
-                    required: [
-                        'id',
-                        'updated_by',
-                        'company_id'
-                    ],
-                    properties: {
-                        id: { type: 'number' },
-                        company_id: { type: 'number' },
+   app.post<{ Body: EditBranchBody }>("/edit", async (request, reply) => {
 
+    const parts = request.parts();
+    const body: any = {};
+    let logoPath: string | null = null;
+    let fullPath: string | null = null;
 
-                        address: {
-                            type: "string",
-                            minLength: 5
-                        },
+    try {
 
-                        city: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 100
-                        },
+        for await (const part of parts) {
 
-                        district: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 100
-                        },
+            if (part.type === "file") {
 
-                        state: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 100
-                        },
+                if (!part.filename) continue;
 
-                        state_code: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 2
-                        },
+                const uploadDir = path.join(process.cwd(), "uploads");
 
-                        pincode: {
-                            type: "string",
-                            pattern: "^[0-9]{6}$"
-                        },
+                if (!fs.existsSync(uploadDir)) {
+                    fs.mkdirSync(uploadDir, { recursive: true });
+                }
 
-                        status: {
-                            type: 'string',
-                            enum: ["Active", "Inactive"]
-                        },
+                const fileName = `${Date.now()}-${part.filename}`;
+                fullPath = path.join(uploadDir, fileName);
 
+                await pipeline(part.file, fs.createWriteStream(fullPath));
 
-                        name_of_manager: {
-                            type: "string",
-                            minLength: 2,
-                            maxLength: 150
-                        },
+                logoPath = `/uploads/${fileName}`;
 
-                        phone_number: {
-                            type: "string",
-                            pattern: "^[0-9]{10,15}$"
-                        },
-
-                        email: {
-                            type: "string",
-                            format: "email"
-                        },
-
-                        website: {
-                            type: "string",
-                            format: "uri"
-                        },
-
-                        logo: {
-                            type: "string"
-                        },
-                        updated_by: { type: 'string' },
-                    },
-                },
-            },
-        },
-        async (request, reply) => {
-            try {
-                cns(request.url, request.body)
-                const controller = new BranchController()
-                const branch = await controller.editBranch(request.body)
-                return reply.code(201).send(branch)
-
-            } catch (err: any) {
-                el(err)
-                return reply
-                    .status(err.statusCode || 500)
-                    .send({ message: err.message || "Internal Server Error" });
+            } else {
+                body[part.fieldname.trim()] = part.value;
             }
         }
-    )
+
+        if (!body.id) {
+            throw new Error("id is required");
+        }
+
+        if (!body.updated_by) {
+            throw new Error("updated_by is required");
+        }
+
+        delete body.company_id;
+        delete body.id; 
+        
+        const branchId = Number(body.id);
+        body.updated_by = Number(body.updated_by);
+
+        if (logoPath) {
+            body.logo = logoPath;
+        }
+
+        const controller = new BranchController();
+
+        const result = await controller.editBranch(request.body);
+
+        return reply.code(200).send({
+            status: "Success",
+            message: result
+        });
+
+    } catch (error: any) {
+
+        if (fullPath && fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+        }
+
+        return reply.status(400).send({
+            status: "Error",
+            message: error.message || "Branch update failed"
+        });
+    }
+});
     app.post<{ Body: DeleteBranchBody }>(
         '/delete',
         {

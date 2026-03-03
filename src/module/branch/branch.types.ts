@@ -9,7 +9,7 @@ export interface CreateBranchBody {
   city: string;
   district: string;
   state: string;
-  state_code: string;
+  state_code: number;
   pincode: number;
   name_of_manager: string;
   phone_number: string;

@@ -27,8 +27,8 @@ export default class BranchController {
         }
     }
     async createBranch(data: CreateBranchBody) {
-        const { created_by, status,password, ...rest } = data;
-    const hashed = await hashPassword(password)
+        const { created_by, status, password, ...rest } = data;
+        const hashed = await hashPassword(password)
 
         const remark = {
             action: "Created",
@@ -47,8 +47,8 @@ export default class BranchController {
 
         return branch;
     }
-  async editBranch(data: EditBranchBody) {
-    const { updated_by, status, ...rest } = data;
+    async editBranch(data: EditBranchBody) {
+    const { id, updated_by, status, ...rest } = data;
 
     const remark = {
         action: "Updated",
@@ -65,6 +65,7 @@ export default class BranchController {
     const service = new BranchService();
 
     const branch = await service.updateBranch({
+        id,
         ...rest,
         remark,
         statusCode,
@@ -89,24 +90,24 @@ export default class BranchController {
         return branch;
     }
 
-     async loginBranch(data: BranchLoginBody) {
-        const { password ,username} = data
+    async loginBranch(data: BranchLoginBody) {
+        const { password, username } = data
         const service = new BranchService();
         const branch = await service.loginBranch(data);
         const isValid = await verifyPassword(password, branch.password)
-    
+
         if (!isValid) {
-          throw new AppError('Invalid credentials', 401)
+            throw new AppError('Invalid credentials', 401)
         }
-    
+
         const token = generateToken({
-          id: branch.id,
-          username:username,
+            id: branch.id,
+            username: username,
         })
-    
+
         return {
-          token: token,
-          message: `branch ${branch.branch_name} Login success`
+            token: token,
+            message: `branch ${branch.branch_name} Login success`
         }
-      }
+    }
 }
