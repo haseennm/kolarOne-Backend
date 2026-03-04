@@ -47,10 +47,10 @@ export function getStatusText(code: number): string {
 export async function isExist(id:number | string, table:string,bussiness_category:string,bussiness_id:number,client:PoolClient) {
   // bussiness_category = branch or company or firm
   // bussiness_id is row id
- const allowedTables = ["company", "branches", "firm"];
-if (!allowedTables.includes(table)) {
-  throw new Error("Invalid table name");
-}
+//  const allowedTables = ["company", "branches", "firm","product_categories"];
+// if (!allowedTables.includes(table)) {
+//   throw new Error("Invalid table name to check Exist");
+// }
 const  isrowExist = await executeInTransaction(client,
   `SELECT * FROM ${table} WHERE id = $1 AND ${bussiness_category} = $2 AND status != $3`,
   [id,bussiness_id, 0]

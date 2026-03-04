@@ -6,6 +6,8 @@ import { companyRoutes } from './module/company/company.router'
 import { branchRouter } from './module/branch/branch.router'
 import { firmRouter } from './module/firm/firm.router'
 import path from "path";
+import { productCategoryRouter } from './module/productCategory/proCat.router';
+import registerRoutes from './registerRoutes';
 
 const app = Fastify({
     logger: false,
@@ -21,9 +23,7 @@ app.register(fastifyStatic, {
     prefix: "/uploads/",
 });
 // app.register(multipart)
-app.register(companyRoutes, { prefix: '/company' })
-app.register(branchRouter, { prefix: '/branch' })
-app.register(firmRouter, { prefix: '/firm' })
+app.register(registerRoutes, { prefix: '/api' });
 
 
 const start = async () => {
