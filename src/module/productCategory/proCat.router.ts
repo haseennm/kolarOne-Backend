@@ -5,6 +5,7 @@ import { cns, el } from "../../utils/extra";
 import ProCatController from "./proCat.controller";
 import path from "path";
 import { DeleteProductCatBody, FetchProductCatBody } from "./proCat.types";
+import { error } from "console";
 
 export async function productCategoryRouter(app: FastifyInstance): Promise<void> {
 
@@ -87,10 +88,7 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
         fs.unlinkSync(uploadedFullPath);
       }
 
-      return reply.status(400).send({
-        status: "Error",
-        message: error.message || "Firm creation failed"
-      });
+      throw error
     }
   });
 
@@ -116,7 +114,7 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
       request: FastifyRequest<{ Body: FetchProductCatBody }>,
       reply: FastifyReply
     ) => {
-      try {
+      // try {
         cns(request.url, request.body);
 
         const { page = 1, limit = 10, ...filters } = request.body;
@@ -134,12 +132,12 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
         });
 
         return reply.code(200).send(firms);
-      } catch (err: any) {
-        el(err);
-        return reply
-          .status(err.statusCode || 500)
-          .send({ message: err.message || "Internal Server Error" });
-      }
+      // } catch (err: any) {
+      //   el(err);
+      //   return reply
+      //     .status(err.statusCode || 500)
+      //     .send({ message: err.message || "Internal Server Error" });
+      // }
     }
   );
 
@@ -211,10 +209,7 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
         fs.unlinkSync(fullPath);
       }
 
-      return reply.status(400).send({
-        status: "Error",
-        message: err.message || "Firm update failed"
-      });
+      throw error
     }
   });
 
@@ -235,17 +230,17 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
       },
     },
     async (request, reply) => {
-      try {
-        cns(request.url, request.body);
-        const controller = new ProCatController();
-        const firm = await controller.deleteProductCat(request.body);
-        return reply.code(201).send(firm);
-      } catch (err: any) {
-        el(err);
-        return reply
-          .status(err.statusCode || 500)
-          .send({ message: err.message || "Internal Server Error" });
-      }
+      // try {
+      cns(request.url, request.body);
+      const controller = new ProCatController();
+      const firm = await controller.deleteProductCat(request.body);
+      return reply.code(201).send(firm);
+      // } catch (err: any) {
+      //   el(err);
+      //   return reply
+      //     .status(err.statusCode || 500)
+      //     .send({ message: err.message || "Internal Server Error" });
+      // }
     }
   );
 }

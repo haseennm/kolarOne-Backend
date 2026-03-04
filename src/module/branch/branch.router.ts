@@ -13,31 +13,21 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
         const body: any = {};
         let logoPath: string | null = null;
         let fullPath: string | null = null;
-
         try {
-
             for await (const part of parts) {
-
                 if (part.type === "file") {
-
                     const uploadDir = path.join(process.cwd(), "uploads");
-
                     if (!fs.existsSync(uploadDir)) {
                         fs.mkdirSync(uploadDir, { recursive: true });
                     }
-
                     const fileName = `${Date.now()}-${part.filename}`;
                     fullPath = path.join(uploadDir, fileName);
-
                     await pipeline(part.file, fs.createWriteStream(fullPath));
-
                     logoPath = `/uploads/${fileName}`;
                 } else {
                     body[part.fieldname.trim()] = part.value;
                 }
             }
-
-            // ✅ Required Fields
             const required = [
                 "company_id",
                 "branch_code",
@@ -75,7 +65,7 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
                 ...body,
                 logo: logoPath
             });
-            cns("branch","branch")
+            cns("branch", "branch")
             return reply.code(201).send({
                 status: "Success",
                 message: result
@@ -86,11 +76,7 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             if (fullPath && fs.existsSync(fullPath)) {
                 fs.unlinkSync(fullPath);
             }
-
-            return reply.status(400).send({
-                status: "Error",
-                message: error.message || "Branch creation failed"
-            });
+                 throw error
         }
     });
     app.post<{ Body: FetchBranchBody }>(
@@ -109,7 +95,7 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             }
         },
         async (request: FastifyRequest<{ Body: FetchBranchBody }>, reply: FastifyReply) => {
-            try {
+            // try {
                 cns(request.url, request.body)
                 const { page = 1, limit = 10, ...filters } = request.body;
                 const offset = (page - 1) * limit;
@@ -126,87 +112,69 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
 
                 return reply.code(200).send(companies);
 
-            } catch (err: any) {
-                el(err)
-                return reply
-                    .status(err.statusCode || 500)
-                    .send({ message: err.message || "Internal Server Error" });
-            }
+            // } catch (err: any) {
+            //     el(err)
+            //     return reply
+            //         .status(err.statusCode || 500)
+            //         .send({ message: err.message || "Internal Server Error" });
+            // }
         }
     );
 
-   app.post<{ Body: EditBranchBody }>("/edit", async (request, reply) => {
+    app.post<{ Body: EditBranchBody }>("/edit", async (request, reply) => {
 
-    const parts = request.parts();
-    const body: any = {};
-    let logoPath: string | null = null;
-    let fullPath: string | null = null;
-
-    try {
-
-        for await (const part of parts) {
-
-            if (part.type === "file") {
-
-                if (!part.filename) continue;
-
-                const uploadDir = path.join(process.cwd(), "uploads");
-
-                if (!fs.existsSync(uploadDir)) {
-                    fs.mkdirSync(uploadDir, { recursive: true });
+        const parts = request.parts();
+        const body: any = {};
+        let logoPath: string | null = null;
+        let fullPath: string | null = null;
+        try {
+            for await (const part of parts) {
+                if (part.type === "file") {
+                    if (!part.filename) continue;
+                    const uploadDir = path.join(process.cwd(), "uploads");
+                    if (!fs.existsSync(uploadDir)) {
+                        fs.mkdirSync(uploadDir, { recursive: true });
+                    }
+                    const fileName = `${Date.now()}-${part.filename}`;
+                    fullPath = path.join(uploadDir, fileName);
+                    await pipeline(part.file, fs.createWriteStream(fullPath));
+                    logoPath = `/uploads/${fileName}`;
+                } else {
+                    body[part.fieldname.trim()] = part.value;
                 }
-
-                const fileName = `${Date.now()}-${part.filename}`;
-                fullPath = path.join(uploadDir, fileName);
-
-                await pipeline(part.file, fs.createWriteStream(fullPath));
-
-                logoPath = `/uploads/${fileName}`;
-
-            } else {
-                body[part.fieldname.trim()] = part.value;
             }
+            if (!body.id) {
+                throw new Error("id is required");
+            }
+            if (!body.updated_by) {
+                throw new Error("updated_by is required");
+            }
+            delete body.company_id;
+            delete body.id;
+            const branchId = Number(body.id);
+            body.updated_by = Number(body.updated_by);
+
+            if (logoPath) {
+                body.logo = logoPath;
+            }
+
+            const controller = new BranchController();
+
+            const result = await controller.editBranch(request.body);
+
+            return reply.code(200).send({
+                status: "Success",
+                message: result
+            });
+
+        } catch (error: any) {
+
+            if (fullPath && fs.existsSync(fullPath)) {
+                fs.unlinkSync(fullPath);
+            }
+                 throw error
         }
-
-        if (!body.id) {
-            throw new Error("id is required");
-        }
-
-        if (!body.updated_by) {
-            throw new Error("updated_by is required");
-        }
-
-        delete body.company_id;
-        delete body.id; 
-        
-        const branchId = Number(body.id);
-        body.updated_by = Number(body.updated_by);
-
-        if (logoPath) {
-            body.logo = logoPath;
-        }
-
-        const controller = new BranchController();
-
-        const result = await controller.editBranch(request.body);
-
-        return reply.code(200).send({
-            status: "Success",
-            message: result
-        });
-
-    } catch (error: any) {
-
-        if (fullPath && fs.existsSync(fullPath)) {
-            fs.unlinkSync(fullPath);
-        }
-
-        return reply.status(400).send({
-            status: "Error",
-            message: error.message || "Branch update failed"
-        });
-    }
-});
+    });
     app.post<{ Body: DeleteBranchBody }>(
         '/delete',
         {
@@ -227,18 +195,18 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             },
         },
         async (request, reply) => {
-            try {
-                cns(request.url, request.body)
-                const controller = new BranchController()
-                const branch = await controller.deleteBranch(request.body)
-                return reply.code(201).send(branch)
+            // try {
+            cns(request.url, request.body)
+            const controller = new BranchController()
+            const branch = await controller.deleteBranch(request.body)
+            return reply.code(201).send(branch)
 
-            } catch (err: any) {
-                el(err)
-                return reply
-                    .status(err.statusCode || 500)
-                    .send({ message: err.message || "Internal Server Error" });
-            }
+            // } catch (err: any) {
+            //     el(err)
+            //     return reply
+            //         .status(err.statusCode || 500)
+            //         .send({ message: err.message || "Internal Server Error" });
+            // }
         }
     )
 
@@ -257,17 +225,17 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             },
         },
         async (request, reply) => {
-            try {
-                cns(request.url, request.body);
-                const controller = new BranchController();
-                const firm = await controller.loginBranch(request.body);
-                return reply.code(201).send(firm);
-            } catch (err: any) {
-                el(err);
-                return reply
-                    .status(err.statusCode || 500)
-                    .send({ message: err.message || "Internal Server Error" });
-            }
+            // try {
+            cns(request.url, request.body);
+            const controller = new BranchController();
+            const firm = await controller.loginBranch(request.body);
+            return reply.code(201).send(firm);
+            // } catch (err: any) {
+            //     el(err);
+            //     return reply
+            //         .status(err.statusCode || 500)
+            //         .send({ message: err.message || "Internal Server Error" });
+            // }
         }
     );
 

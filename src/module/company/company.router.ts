@@ -14,75 +14,75 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
         let logoPath: string | null = null;
         let fullPath: string | null = null;
 
-        try {
+        // try {
 
-            for await (const part of parts) {
+        for await (const part of parts) {
 
-                if (part.type === "file") {
+            if (part.type === "file") {
 
-                    const uploadDir = path.join(process.cwd(), "uploads");
+                const uploadDir = path.join(process.cwd(), "uploads");
 
-                    if (!fs.existsSync(uploadDir)) {
-                        fs.mkdirSync(uploadDir, { recursive: true });
-                    }
-
-                    const fileName = `${Date.now()}-${part.filename}`;
-                    fullPath = path.join(uploadDir, fileName);
-
-                    await pipeline(part.file, fs.createWriteStream(fullPath));
-
-                    logoPath = `/uploads/${fileName}`;
-                } else {
-                    body[part.fieldname.trim()] = part.value;
+                if (!fs.existsSync(uploadDir)) {
+                    fs.mkdirSync(uploadDir, { recursive: true });
                 }
+
+                const fileName = `${Date.now()}-${part.filename}`;
+                fullPath = path.join(uploadDir, fileName);
+
+                await pipeline(part.file, fs.createWriteStream(fullPath));
+
+                logoPath = `/uploads/${fileName}`;
+            } else {
+                body[part.fieldname.trim()] = part.value;
             }
-
-            // ✅ Required Fields
-            const required = [
-                "company_name",
-                "bussiness_category",
-                "address",
-                "city",
-                "district",
-                "state",
-                "state_code",
-                "status",
-                "created_by",
-                "phone_number",
-                "username",
-                "password"
-            ];
-
-            for (const field of required) {
-                if (!body[field]) {
-                    throw new Error(`${field} is required`);
-                }
-            }
-
-            body.created_by = Number(body.created_by);
-            const controller = new CompanyController();
-
-            const result = await controller.createCompany({
-                ...body,
-                logo: logoPath
-            });
-
-            return reply.code(201).send({
-                status: "Success",
-                message: result
-            });
-
-        } catch (error: any) {
-
-            if (fullPath && fs.existsSync(fullPath)) {
-                fs.unlinkSync(fullPath);
-            }
-
-            return reply.status(400).send({
-                status: "Error",
-                message: error.message || "Company creation failed"
-            });
         }
+
+        // ✅ Required Fields
+        const required = [
+            "company_name",
+            "bussiness_category",
+            "address",
+            "city",
+            "district",
+            "state",
+            "state_code",
+            "status",
+            "created_by",
+            "phone_number",
+            "username",
+            "password"
+        ];
+
+        for (const field of required) {
+            if (!body[field]) {
+                throw new Error(`${field} is required`);
+            }
+        }
+
+        body.created_by = Number(body.created_by);
+        const controller = new CompanyController();
+
+        const result = await controller.createCompany({
+            ...body,
+            logo: logoPath
+        });
+
+        return reply.code(201).send({
+            status: "Success",
+            message: result
+        });
+
+        // } catch (error: any) {
+
+        //     if (fullPath && fs.existsSync(fullPath)) {
+        //         fs.unlinkSync(fullPath);
+        //     }
+
+        //     return reply.status(400).send({
+        //         status: "Error",
+        //         message: error.message || "Company creation failed"
+        //     });
+        // }
     });
     app.post<{ Body: GetCompanyBody }>(
         '/get',
@@ -100,40 +100,40 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             }
         },
         async (request: FastifyRequest<{ Body: GetCompanyBody }>, reply: FastifyReply) => {
-            try {
-                cns(request.url, request.body)
-                const { page = 1, limit = 10, ...filters } = request.body;
-                const offset = (page - 1) * limit;
-                const controller = new CompanyController();
-                const companies = await controller.getCompany({
-                    offset,
-                    filters: {
-                        ...filters,
-                        page,
-                        limit
-                    }
-                });
-                console.log(companies)
+            // try {
+            cns(request.url, request.body)
+            const { page = 1, limit = 10, ...filters } = request.body;
+            const offset = (page - 1) * limit;
+            const controller = new CompanyController();
+            const companies = await controller.getCompany({
+                offset,
+                filters: {
+                    ...filters,
+                    page,
+                    limit
+                }
+            });
+            console.log(companies)
 
-                return reply.code(200).send(companies);
+            return reply.code(200).send(companies);
 
-            } catch (err: any) {
-                el(err)
-                return reply
-                    .status(err.statusCode || 500)
-                    .send({ message: err.message || "Internal Server Error" });
-            }
+            // } catch (err: any) {
+            //     el(err)
+            //     return reply
+            //         .status(err.statusCode || 500)
+            //         .send({ message: err.message || "Internal Server Error" });
+            // }
         }
     );
 
-   app.post<{ Body: EditCompanyBody }>("/edit", async (request, reply) => {
+    app.post<{ Body: EditCompanyBody }>("/edit", async (request, reply) => {
 
-    const parts = request.parts();
-    const body: any = {};
-    let logoPath: string | null = null;
-    let fullPath: string | null = null;
+        const parts = request.parts();
+        const body: any = {};
+        let logoPath: string | null = null;
+        let fullPath: string | null = null;
 
-    try {
+        // try {
 
         for await (const part of parts) {
 
@@ -181,19 +181,19 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             message: company
         });
 
-    } catch (err: any) {
+        // } catch (err: any) {
 
-        // delete uploaded file if error happens
-        if (fullPath && fs.existsSync(fullPath)) {
-            fs.unlinkSync(fullPath);
-        }
+        //     // delete uploaded file if error happens
+        //     if (fullPath && fs.existsSync(fullPath)) {
+        //         fs.unlinkSync(fullPath);
+        //     }
 
-        return reply.status(400).send({
-            status: "Error",
-            message: err.message || "Company update failed"
-        });
-    }
-});
+        //     return reply.status(400).send({
+        //         status: "Error",
+        //         message: err.message || "Company update failed"
+        //     });
+        // }
+    });
     app.post<{ Body: DeleteCompanyBody }>(
         '/delete',
         {
@@ -212,18 +212,18 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             },
         },
         async (request, reply) => {
-            try {
-                cns(request.url, request.body)
-                const controller = new CompanyController()
-                const company = await controller.deleteCompany(request.body)
-                return reply.code(201).send(company)
+            // try {
+            cns(request.url, request.body)
+            const controller = new CompanyController()
+            const company = await controller.deleteCompany(request.body)
+            return reply.code(201).send(company)
 
-            } catch (err: any) {
-                el(err)
-                return reply
-                    .status(err.statusCode || 500)
-                    .send({ message: err.message || "Internal Server Error" });
-            }
+            // } catch (err: any) {
+            //     el(err)
+            //     return reply
+            //         .status(err.statusCode || 500)
+            //         .send({ message: err.message || "Internal Server Error" });
+            // }
         }
     )
 
@@ -243,17 +243,12 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             },
         },
         async (request, reply) => {
-            try {
-                cns(request.url, request.body);
-                const controller = new CompanyController();
-                const firm = await controller.loginCompany(request.body);
-                return reply.code(201).send(firm);
-            } catch (err: any) {
-                el(err);
-                return reply
-                    .status(err.statusCode || 500)
-                    .send({ message: err.message || "Internal Server Error" });
-            }
+
+            cns(request.url, request.body);
+            const controller = new CompanyController();
+            const firm = await controller.loginCompany(request.body);
+            return reply.code(201).send(firm);
+
         }
     );
 

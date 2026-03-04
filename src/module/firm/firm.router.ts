@@ -16,7 +16,7 @@ import path from "path";
 export async function firmRouter(app: FastifyInstance): Promise<void> {
 
   // CREATE
-   app.post("/create", async (request, reply) => {
+  app.post("/create", async (request, reply) => {
 
     const parts = request.parts();
 
@@ -52,9 +52,6 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
         }
       }
 
-      // --------------------------
-      // ✅ Basic Required Validation
-      // --------------------------
       const requiredFields = [
         "branch_id",
         "company_id",
@@ -73,20 +70,12 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
           throw new Error(`${field} is required`);
         }
       }
-
-      // --------------------------
-      // ✅ Type Conversion
-      // --------------------------
       body.branch_id = Number(body.branch_id);
       body.company_id = Number(body.company_id);
 
       if (!isNaN(Number(body.created_by))) {
         body.created_by = Number(body.created_by);
       }
-
-      // --------------------------
-      // ✅ Call Controller (Transaction Inside)
-      // --------------------------
       const controller = new FirmController();
 
       const result = await controller.createFirm({
@@ -105,11 +94,7 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
       if (uploadedFullPath && fs.existsSync(uploadedFullPath)) {
         fs.unlinkSync(uploadedFullPath);
       }
-
-      return reply.status(400).send({
-        status: "Error",
-        message: error.message || "Firm creation failed"
-      });
+      throw error
     }
   });
 
@@ -134,107 +119,96 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
       request: FastifyRequest<{ Body: FetchFirmBody }>,
       reply: FastifyReply
     ) => {
-      try {
-        cns(request.url, request.body);
+      // try {
+      cns(request.url, request.body);
 
-        const { page = 1, limit = 10, ...filters } = request.body;
-        const offset = (page - 1) * limit;
+      const { page = 1, limit = 10, ...filters } = request.body;
+      const offset = (page - 1) * limit;
 
-        const controller = new FirmController();
+      const controller = new FirmController();
 
-        const firms = await controller.fetchFirm({
-          offset,
-          filters: {
-            ...filters,
-            page,
-            limit,
-          },
-        });
+      const firms = await controller.fetchFirm({
+        offset,
+        filters: {
+          ...filters,
+          page,
+          limit,
+        },
+      });
 
-        return reply.code(200).send(firms);
-      } catch (err: any) {
-        el(err);
-        return reply
-          .status(err.statusCode || 500)
-          .send({ message: err.message || "Internal Server Error" });
-      }
+      return reply.code(200).send(firms);
+      // } catch (err: any) {
+      //   el(err);
+      //   return reply
+      //     .status(err.statusCode || 500)
+      //     .send({ message: err.message || "Internal Server Error" });
+      // }
     }
   );
 
   // EDIT
-app.post("/edit", async (request, reply) => {
+  app.post("/edit", async (request, reply) => {
+    const parts = request.parts();
+    const body: any = {};
+    let logoPath: string | null = null;
+    let fullPath: string | null = null;
 
-  const parts = request.parts();
-  const body: any = {};
-  let logoPath: string | null = null;
-  let fullPath: string | null = null;
+    try {
 
-  try {
+      for await (const part of parts) {
 
-    for await (const part of parts) {
+        if (part.type === "file") {
 
-      if (part.type === "file") {
+          if (!part.filename) continue;
 
-        if (!part.filename) continue;
+          const uploadDir = path.join(process.cwd(), "uploads");
 
-        const uploadDir = path.join(process.cwd(), "uploads");
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+          }
 
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
+          const fileName = `${Date.now()}-${part.filename}`;
+          fullPath = path.join(uploadDir, fileName);
+
+          await pipeline(part.file, fs.createWriteStream(fullPath));
+
+          logoPath = `/uploads/${fileName}`;
+
+        } else {
+          body[part.fieldname.trim()] = part.value;
         }
-
-        const fileName = `${Date.now()}-${part.filename}`;
-        fullPath = path.join(uploadDir, fileName);
-
-        await pipeline(part.file, fs.createWriteStream(fullPath));
-
-        logoPath = `/uploads/${fileName}`;
-
-      } else {
-        body[part.fieldname.trim()] = part.value;
       }
+      if (!body.id) {
+        throw new Error("id is required");
+      }
+      if (!body.branch_id) {
+        throw new Error("branch_id is required");
+      }
+      if (!body.updated_by) {
+        throw new Error("updated_by is required");
+      }
+
+      body.id = Number(body.id);
+      body.branch_id = Number(body.branch_id);
+
+      if (logoPath) {
+        body.logo = logoPath;
+      }
+      const controller = new FirmController();
+      const firm = await controller.editFirm(body);
+      return reply.code(200).send({
+        status: "Success",
+        message: firm
+      });
+    } catch (error: any) {
+      // delete uploaded file if error happens
+      if (fullPath && fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+      throw error
+
     }
-
-    if (!body.id) {
-      throw new Error("id is required");
-    }
-
-    if (!body.branch_id) {
-      throw new Error("branch_id is required");
-    }
-
-    if (!body.updated_by) {
-      throw new Error("updated_by is required");
-    }
-
-    body.id = Number(body.id);
-    body.branch_id = Number(body.branch_id);
-
-    if (logoPath) {
-      body.logo = logoPath;
-    }
-
-    const controller = new FirmController();
-    const firm = await controller.editFirm(body);
-
-    return reply.code(200).send({
-      status: "Success",
-      message: firm
-    });
-
-  } catch (err: any) {
-
-    // delete uploaded file if error happens
-    if (fullPath && fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath);
-    }
-
-    return reply.status(400).send({
-      status: "Error",
-      message: err.message || "Firm update failed"
-    });
-  }
-});
+  });
 
   // DELETE
   app.post<{ Body: DeleteFirmBody }>(
@@ -253,17 +227,17 @@ app.post("/edit", async (request, reply) => {
       },
     },
     async (request, reply) => {
-      try {
-        cns(request.url, request.body);
-        const controller = new FirmController();
-        const firm = await controller.deleteFirm(request.body);
-        return reply.code(201).send(firm);
-      } catch (err: any) {
-        el(err);
-        return reply
-          .status(err.statusCode || 500)
-          .send({ message: err.message || "Internal Server Error" });
-      }
+      // try {
+      cns(request.url, request.body);
+      const controller = new FirmController();
+      const firm = await controller.deleteFirm(request.body);
+      return reply.code(201).send(firm);
+      // } catch (err: any) {
+      //   el(err);
+      //   return reply
+      //     .status(err.statusCode || 500)
+      //     .send({ message: err.message || "Internal Server Error" });
+      // }
     }
   );
   app.post<{ Body: FirmLoginBody }>(
@@ -281,17 +255,17 @@ app.post("/edit", async (request, reply) => {
       },
     },
     async (request, reply) => {
-      try {
-        cns(request.url, request.body);
-        const controller = new FirmController();
-        const firm = await controller.loginFirm(request.body);
-        return reply.code(201).send(firm);
-      } catch (err: any) {
-        el(err);
-        return reply
-          .status(err.statusCode || 500)
-          .send({ message: err.message || "Internal Server Error" });
-      }
+      // try {
+      cns(request.url, request.body);
+      const controller = new FirmController();
+      const firm = await controller.loginFirm(request.body);
+      return reply.code(201).send(firm);
+      // } catch (err: any) {
+      //   el(err);
+      //   return reply
+      //     .status(err.statusCode || 500)
+      //     .send({ message: err.message || "Internal Server Error" });
+      // }
     }
   );
 }

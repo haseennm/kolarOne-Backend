@@ -9,12 +9,13 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { AppError } from "../utils/AppError";
 import { env } from "../utils/env";
+import { el } from "../utils/extra";
 
 export const registerErrorHandler = (app: FastifyInstance) => {
   app.setErrorHandler(
     (error: any, request: FastifyRequest, reply: FastifyReply) => {
       // always log the original error for diagnostics
-      console.error(error);
+      el(error);
 
       let statusCode = 500;
       let message = "Internal Server Error";
