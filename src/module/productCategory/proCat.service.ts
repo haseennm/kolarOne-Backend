@@ -1,6 +1,5 @@
 import { Result } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
-import { AppError } from "../../middleware/errorMiddlware";
 import { cns, isExist } from "../../utils/extra";
 import {
   CountResult,
@@ -10,6 +9,7 @@ import {
   EditProductCatParams,
   FetchProductCatParams,
 } from "./proCat.types";
+import { AppError } from "../../utils/AppError";
 
 export default class ProductCatService {
   async createProductCat(data: CreateProductCatParams) {

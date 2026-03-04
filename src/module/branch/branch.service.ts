@@ -1,5 +1,5 @@
 import { executeInTransaction, pool, query, transaction } from "../../config/db"
-import { AppError } from "../../middleware/errorMiddlware";
+import { AppError } from "../../utils/AppError";
 import { isExist } from "../../utils/extra";
 import { BranchLoginBody, CountResult, CreateBranchParams, DeleteBranchParams, EditBranchParams, FetchBranchParams, FetchDbBranch } from "./branch.types";
 

@@ -2,7 +2,7 @@ import { CompanyLoginBody, CreateCompanyBody, DeleteCompanyBody, EditCompanyBody
 import CompanyService from './company.service'
 import { getStatusCode, getStatusText } from '../../utils/extra'
 import { generateToken, hashPassword, verifyPassword } from '../../utils/auth.util'
-import { AppError } from '../../middleware/errorMiddlware'
+import { AppError } from '../../utils/AppError'
 
 export default class CompanyController {
 

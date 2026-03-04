@@ -1,8 +1,8 @@
 import { Client } from "pg";
 import { executeInTransaction, pool, query, transaction } from "../../config/db"
-import { AppError } from "../../middleware/errorMiddlware";
 import { isExist } from "../../utils/extra";
 import { CompanyLoginBody, CountResult, CreateCompanyParams, DeleteCompanyParams, EditCompanyParams, GetCompanyParams, getDbCompany } from "./company.types";
+import { AppError } from "../../utils/AppError";
 
 export default class CompanyService {
 

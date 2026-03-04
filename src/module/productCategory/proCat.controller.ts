@@ -1,5 +1,3 @@
-import { AppError } from "../../middleware/errorMiddlware";
-import { generateToken, hashPassword, verifyPassword } from "../../utils/auth.util";
 import { getStatusCode, getStatusText } from "../../utils/extra";
 import ProductCatService from "./proCat.service";
 import {

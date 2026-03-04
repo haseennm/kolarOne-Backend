@@ -8,6 +8,7 @@ import { firmRouter } from './module/firm/firm.router'
 import path from "path";
 import { productCategoryRouter } from './module/productCategory/proCat.router';
 import registerRoutes from './registerRoutes';
+import { registerErrorHandler } from './middleware/errorMiddlware';
 
 const app = Fastify({
     logger: false,
@@ -16,7 +17,7 @@ app.register(multipart, {
     limits: {
         fileSize: 5 * 1024 * 1024, // 5MB
     },
-    
+
 });
 app.register(fastifyStatic, {
     root: path.join(__dirname, "../uploads"),
@@ -24,7 +25,7 @@ app.register(fastifyStatic, {
 });
 // app.register(multipart)
 app.register(registerRoutes, { prefix: '/api' });
-
+registerErrorHandler(app);
 
 const start = async () => {
     try {

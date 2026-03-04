@@ -1,6 +1,5 @@
 import { Result } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
-import { AppError } from "../../middleware/errorMiddlware";
 import { isExist } from "../../utils/extra";
 import {
   CountResult,
@@ -11,6 +10,7 @@ import {
   FetchDbFirm,
   FirmLoginBody,
 } from "./firm.types";
+import { AppError } from "../../utils/AppError";
 
 export default class FirmService {
   async createFirm(data: CreateFirmParams) {

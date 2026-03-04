@@ -1,5 +1,4 @@
-
-import { AppError } from '../../middleware/errorMiddlware'
+import { AppError } from '../../utils/AppError'
 import { generateToken, hashPassword, verifyPassword } from '../../utils/auth.util'
 import { getStatusCode, getStatusText } from '../../utils/extra'
 import BranchService from './branch.service'
