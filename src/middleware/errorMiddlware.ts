@@ -43,7 +43,7 @@ export const registerErrorHandler = (app: FastifyInstance) => {
       };
 
       if (env.NODE_ENV === "development" && error.stack) {
-        response.error.stack = error.stack;
+        console.log(error.stack)
       }
 
       reply.status(statusCode).send(response);

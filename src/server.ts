@@ -6,7 +6,6 @@ import { companyRoutes } from './module/company/company.router'
 import { branchRouter } from './module/branch/branch.router'
 import { firmRouter } from './module/firm/firm.router'
 import path from "path";
-import { productCategoryRouter } from './module/productCategory/proCat.router';
 import registerRoutes from './registerRoutes';
 import { registerErrorHandler } from './middleware/errorMiddlware';
 
