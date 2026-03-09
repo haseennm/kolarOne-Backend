@@ -8,6 +8,7 @@ import { productRouter } from './module/product/product.router'
 import { brandRouter } from './module/brand/brand.router'
 import { customerRouter } from './module/customer/customer.router'
 import { vendorRouter } from './module/vendor/vendor.router'
+import { ledgerCategoryRouter } from './module/ledgerCategory/ledgerCategory.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -18,4 +19,5 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(brandRouter, { prefix: '/brand' })
   app.register(customerRouter, { prefix: '/customer' })
   app.register(vendorRouter, { prefix: '/vendor' })
+  app.register(ledgerCategoryRouter, { prefix: '/ledger/category' })
 }
