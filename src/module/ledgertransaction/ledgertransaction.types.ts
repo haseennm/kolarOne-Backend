@@ -1,9 +1,9 @@
 export interface CreateLedgerTransactionBody {
-  category_id:number;
-  amount:number;
-  transaction_date:string;
-  reference_id:string;
-  entity_type:string;
+  category_id: number;
+  amount: number;
+  transaction_date: string;
+  reference_id: string;
+  entity_type: string;
   entity_id: number;
   company_id: number;
   status: string;
@@ -19,11 +19,11 @@ export interface CreateLedgerTransactionParams
 export interface FetchLedgerTransactionBody {
   id?: number;
   company_id: number;
-  from_date?:string;
-  to_date?:string;
-  entity_id?:string;
-  entity_type?:string;
-  category_id?: number; 
+  from_date?: string;
+  to_date?: string;
+  entity_id?: string;
+  entity_type?: string;
+  category_id?: number;
   status?: number;
   page: number;
   limit: number;
@@ -35,7 +35,7 @@ export interface FetchLedgerTransactionParams {
 export interface FetchDbLedgerTransaction
   extends Omit<CreateLedgerTransactionBody, "status" | "created_by"> {
   id: string;
-  status: number; 
+  status: number;
   remarks: object | null;
 }
 export type LedgerTransactionCountResult = {
@@ -46,11 +46,14 @@ export interface EditLedgerTransactionBody {
   id: number;
   company_id: number;
   updated_by: string;
- category_id?:number;
-  amount?:number;
-  transaction_date?:string;
-  reference_id?:string;
+  entity_type: string;
+  entity_id: number;
+  category_id?: number;
+  amount?: number;
+  transaction_date?: string;
+  reference_id?: string;
   status?: number;
+
 }
 
 export interface EditLedgerTransactionParams

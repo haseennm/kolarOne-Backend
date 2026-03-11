@@ -4,62 +4,61 @@ import { cns, isExist } from "../../utils/extra";
 import { CreateLedgerTransactionParams, DeleteLedgerTransactionParams, LedgerTransactionCountResult, EditLedgerTransactionParams, FetchLedgerTransactionParams, FetchDbLedgerTransaction } from "./ledgertransaction.types";
 export default class LedgerTransactionService {
 
-  async createLedgerTransaction(data: CreateLedgerTransactionParams) {
+  async createLedgerTransaction(data: CreateLedgerTransactionParams, client: any) {
 
     const {
       entity_id, amount, category_id, company_id, entity_type, reference_id,
       remark, statusCode, transaction_date
     } = data;
 
-    const result = transaction(async (client) => {
 
-      const isCompanyExist = await isExist(
-        company_id,
-        "company",
-        "id",
-        company_id,
-        client
-      );
+    const isCompanyExist = await isExist(
+      company_id,
+      "company",
+      "id",
+      company_id,
+      client
+    );
 
-      if (!isCompanyExist) {
-        throw new AppError("Company not found", 404);
-      }
-      const isCategory_exist = await isExist(
-        category_id,
-        "ledger_categories",
-        "company_id",
-        company_id,
-        client
-      );
-      if (!isCategory_exist) {
-        throw new AppError("Category not found", 404);
-      }
-      const entityTableMap: Record<string, string> = {
-        C: "company",
-        B: "branches",
-        F: "firm"
-      };
+    if (!isCompanyExist) {
+      throw new AppError("Company not found", 404);
+    }
+    const isCategory_exist = await isExist(
+      category_id,
+      "ledger_categories",
+      "company_id",
+      company_id,
+      client
+    );
+    if (!isCategory_exist) {
+      throw new AppError("Category not found", 404);
+    }
+    const entityTableMap: Record<string, string> = {
+      C: "company",
+      B: "branches",
+      F: "firm"
+    };
 
-      const entity_table = entityTableMap[entity_type];
+    const entity_table = entityTableMap[entity_type];
 
-      if (!entity_table) {
-        throw new Error("Invalid entity type");
-      }
+    if (!entity_table) {
+      throw new Error("Invalid entity type");
+    }
 
-      const isEntityExist = await isExist(
-        entity_id,
-        entity_table,
-        "company_id",
-        company_id,
-        client
-      );
+    const isEntityExist = await isExist(
+      entity_id,
+      entity_table,
+      "company_id",
+      company_id,
+      client
+    );
 
-      if (!isEntityExist) {
-        throw new AppError(`${entity_table} not found`, 404);
-      }
+    if (!isEntityExist) {
+      throw new AppError(`${entity_table} not found`, 404);
+    }
 
 
-      const queryText = `
+    const queryText = `
   INSERT INTO ledger_transactions (
     entity_id, amount, category_id, company_id, entity_type,
     reference_id, transaction_date, status, remarks
@@ -68,23 +67,21 @@ export default class LedgerTransactionService {
   RETURNING *;
 `;
 
-      const values = [
-        entity_id,
-        amount,
-        category_id,
-        company_id,
-        entity_type,
-        reference_id,
-        transaction_date,
-        statusCode,
-        JSON.stringify(remark)
-      ];
-      const { rows } = await executeInTransaction(client, queryText, values);
+    const values = [
+      entity_id,
+      amount,
+      category_id,
+      company_id,
+      entity_type,
+      reference_id,
+      transaction_date,
+      statusCode,
+      JSON.stringify(remark)
+    ];
+    const { rows } = await executeInTransaction(client, queryText, values);
 
-      return `Ledger transaction created of  ${rows[0].amount}`;
-    });
+    return rows[0];
 
-    return result;
   }
 
 
@@ -171,7 +168,7 @@ export default class LedgerTransactionService {
   }
 
 
-  async updateLedgerTransaction(data: EditLedgerTransactionParams) {
+  async updateLedgerTransaction(data: EditLedgerTransactionParams, client: any) {
 
     const {
       id,
@@ -181,24 +178,23 @@ export default class LedgerTransactionService {
       reference_id,
       transaction_date,
       statusCode,
-      remark
+      remark,
     } = data;
 
-    const result = transaction(async (client) => {
 
-      const isLedgerTransactionExist = await isExist(
-        id,
-        "ledger_transactions",
-        "company_id",
-        company_id,
-        client
-      );
+    const isLedgerTransactionExist = await isExist(
+      id,
+      "ledger_transactions",
+      "company_id",
+      company_id,
+      client
+    );
 
-      if (!isLedgerTransactionExist) {
-        throw new AppError("Ledger transaction not found", 404);
-      }
+    if (!isLedgerTransactionExist) {
+      throw new AppError("Ledger transaction not found", 404);
+    }
 
-      const updateQuery = `
+    const updateQuery = `
   UPDATE ledger_transactions
   SET
     company_id = $1,
@@ -217,27 +213,26 @@ export default class LedgerTransactionService {
   WHERE id = $8
   RETURNING *;
 `;
-      const status = statusCode === 99
-        ? isLedgerTransactionExist.status
-        : statusCode;
+    const status = statusCode === 99
+      ? isLedgerTransactionExist.status
+      : statusCode;
 
-      const values = [
-        isLedgerTransactionExist.company_id,
-        amount ?? isLedgerTransactionExist.amount,
-        category_id ?? isLedgerTransactionExist.category_id,
-        reference_id ?? isLedgerTransactionExist.reference_id,
-        transaction_date ?? isLedgerTransactionExist.transaction_date,
-        status,
-        JSON.stringify(remark),
-        id
-      ];
+    const values = [
+      isLedgerTransactionExist.company_id,
+      amount ?? isLedgerTransactionExist.amount,
+      category_id ?? isLedgerTransactionExist.category_id,
+      reference_id ?? isLedgerTransactionExist.reference_id,
+      transaction_date ?? isLedgerTransactionExist.transaction_date,
+      status,
+      JSON.stringify(remark),
+      id
+    ];
 
-      const { rows } = await executeInTransaction(client, updateQuery, values);
-      console.log(rows)
-      return `Ledger Transaction Updated`;
-    });
+    const { rows } = await executeInTransaction(client, updateQuery, values);
+    console.log(rows)
+    return rows;
 
-    return result;
+
   }
 
 
@@ -258,7 +253,7 @@ export default class LedgerTransactionService {
       if (!isLedgerTransactionExist) {
         throw new AppError("Ledger transaction not found or already deleted", 404);
       }
-      cns("category",[isLedgerTransactionExist.entity_id,entity_id])
+      cns("category", [isLedgerTransactionExist.entity_id, entity_id])
 
       if (isLedgerTransactionExist.entity_id != entity_id) {
         throw new AppError("Entity id not matching", 400);
@@ -284,9 +279,9 @@ export default class LedgerTransactionService {
         r_id, entity_id
       ];
 
-      await executeInTransaction(client, queryText, values);
+      const row = await executeInTransaction(client, queryText, values);
 
-      return `Ledger Transation of  ${isLedgerTransactionExist.amount} deleted successfully`;
+      return row.rows[0];
     });
 
     return result;

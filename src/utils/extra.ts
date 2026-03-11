@@ -57,3 +57,65 @@ const  isrowExist = await executeInTransaction(client,
   )
   return isrowExist.rows[0] || null;
 } 
+
+const ENTITY_MAP = {
+  Company: "C",
+  Branch: "B",
+  Firm: "F",
+} as const;
+
+export type EntityKey = keyof typeof ENTITY_MAP;
+
+export function convertEntityType(entityType: EntityKey): string {
+  return ENTITY_MAP[entityType];
+}
+
+export function convertEntityCode(code: string): EntityKey | undefined {
+  return (Object.keys(ENTITY_MAP) as EntityKey[]).find(
+    key => ENTITY_MAP[key] === code
+  );
+}
+
+// 
+// PAYMENT TRANSACTION
+// 
+export enum PaymentTransactionCode {
+  SALE_CREDIT = "SC",
+  SALE = "SL",
+  SALE_RETURN = "SR",
+  PURCHASE_CREDIT = "PC",
+  PURCHASE = "PS",
+  PURCHASE_RETURN = "PR",
+  BALANCE = "BL",
+  LOAN = "LN",
+  LOAN_REPAY = "LR",
+  SALARY = "SY",
+  LEDGER_TRANSACTION = "LT"
+}
+export const PaymentTransactionTypeCodeMap: Record<string, PaymentTransactionCode> = {
+  sale_credit: PaymentTransactionCode.SALE_CREDIT,
+  sale: PaymentTransactionCode.SALE,
+  sale_return: PaymentTransactionCode.SALE_RETURN,
+  purchase_credit: PaymentTransactionCode.PURCHASE_CREDIT,
+  purchase: PaymentTransactionCode.PURCHASE,
+  purchase_return: PaymentTransactionCode.PURCHASE_RETURN,
+  balance: PaymentTransactionCode.BALANCE,
+  loan: PaymentTransactionCode.LOAN,
+  loanrepay: PaymentTransactionCode.LOAN_REPAY,
+  salary: PaymentTransactionCode.SALARY,
+  ledger_transaction: PaymentTransactionCode.LEDGER_TRANSACTION
+};
+
+export const PaymentTransactionCodeTypeMap: Record<PaymentTransactionCode, string> = {
+  SC: "sale_credit",
+  SL: "sale",
+  SR: "sale_return",
+  PC: "purchase_credit",
+  PS: "purchase",
+  PR: "purchase_return",
+  BL: "balance",
+  LN: "loan",
+  LR: "loanrepay",
+  SY: "salary",
+  LT: "ledger_transaction"
+};
