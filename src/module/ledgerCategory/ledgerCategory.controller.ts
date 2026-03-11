@@ -1,4 +1,4 @@
-import { getStatusCode } from "../../utils/extra";
+import { getStatusCode, getStatusText } from "../../utils/extra";
 import LedgerCategoryService from "./ledgerCategory.service";
 import { CreateLedgerCategoryBody, DeleteLedgerCategoryBody, EditLedgerCategoryBody } from "./ledgerCategory.types";
 
@@ -30,8 +30,20 @@ export default class LedgerCategoryController {
    }
 
   async fetchCategory(data: any) {
-    return this.service.fetchLedgerCategory(data);
-  }
+ 
+     const service = new LedgerCategoryService();
+ 
+     const category_with_code = await service.fetchLedgerCategory(data);
+ 
+     const category = category_with_code.categories.map((row) => ({
+       ...row,
+       status: getStatusText(row.status),
+     }));
+     return {
+       category,
+       pagination: { ...category_with_code.pagination }
+     }
+   }
 
 async editCategory(data: EditLedgerCategoryBody) {
 
