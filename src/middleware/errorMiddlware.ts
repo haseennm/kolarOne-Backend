@@ -103,6 +103,7 @@ export const registerErrorHandler = (app: FastifyInstance) => {
           unique_company_role: "Role",
           uq_branch_code_company: "Branch code",
           branches_username_key: "User name",
+          firm_username_key: "User name",
         };
 
         if (error.constraint && constraint_map[error.constraint]) {

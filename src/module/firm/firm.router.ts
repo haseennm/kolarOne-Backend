@@ -76,6 +76,13 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
       if (!isNaN(Number(body.created_by))) {
         body.created_by = Number(body.created_by);
       }
+      if (body.role) {
+        try {
+          body.role = JSON.parse(body.role);
+        } catch {
+          body.role = [];
+        }
+      }
       const controller = new FirmController();
 
       const result = await controller.createFirm({
@@ -187,12 +194,23 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
       if (!body.updated_by) {
         throw new Error("updated_by is required");
       }
+      if (!body.company_id) {
+        throw new Error("company_id is required");
+      }
 
       body.id = Number(body.id);
       body.branch_id = Number(body.branch_id);
+      body.company_id = Number(body.company_id);
 
       if (logoPath) {
         body.logo = logoPath;
+      }
+      if (body.role) {
+        try {
+          body.role = JSON.parse(body.role);
+        } catch {
+          body.role = [];
+        }
       }
       const controller = new FirmController();
       const firm = await controller.editFirm(body);

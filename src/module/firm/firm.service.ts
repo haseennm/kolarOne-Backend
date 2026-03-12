@@ -29,7 +29,8 @@ export default class FirmService {
       gstin,
       pan_number,
       hashed,
-      username
+      username,
+      role
     } = data;
     const result = transaction(async (client) => {
 
@@ -37,7 +38,13 @@ export default class FirmService {
       if (!isBranchExist) {
         throw new AppError("Branch not found", 404);
       }
+      for (const roleId of role) {
+        const isRoleExist = await isExist(roleId, "role", "company_id", company_id, client);
 
+        if (!isRoleExist) {
+          throw new AppError("One or more roles do not exist", 404);
+        }
+      }
       const queryText = `
     INSERT INTO firm (
       branch_id,
@@ -50,15 +57,15 @@ export default class FirmService {
       remarks,
       gstin,
       pan_number,
-     
       firm_name,
     firm_code,
     password,
-    username
+    username,
+    role
     )
      VALUES (
   $1,$2,$3,$4,$5,$6,$7,$8,
-  $9,$10,$11,$12,$13,$14
+  $9,$10,$11,$12,$13,$14,$15
 )
     RETURNING *;
   `;
@@ -77,7 +84,8 @@ export default class FirmService {
         firm_name,
         firm_code,
         hashed,
-        username
+        username,
+        role
       ];
 
       const { rows } = await executeInTransaction(client, queryText, values);
@@ -174,12 +182,23 @@ export default class FirmService {
       pan_number,
       firm_name,
       firm_code,
+      role,
+      company_id
     } = data;
     const result = transaction(async (client) => {
       const isFirmExist = await isExist(id, "firm", "branch_id", branch_id, client);
 
       if (!isFirmExist) {
         throw new AppError("Firm not found or deleted", 404);
+      }
+      if (role) {
+        for (const roleId of role) {
+          const isRoleExist = await isExist(roleId, "role", "company_id", company_id, client);
+
+          if (!isRoleExist) {
+            throw new AppError("One or more roles do not exist", 404);
+          }
+        }
       }
 
       const queryText = `
@@ -195,14 +214,15 @@ SET
   pan_number = $8,
   firm_name = $9,
   firm_code = $10,
+  role =$11,
   remarks =
     CASE
-      WHEN remarks IS NULL THEN $11::jsonb
+      WHEN remarks IS NULL THEN $12::jsonb
       WHEN jsonb_typeof(remarks) = 'array'
-        THEN remarks || $11::jsonb
-      ELSE jsonb_build_array(remarks) || $11::jsonb
+        THEN remarks || $12::jsonb
+      ELSE jsonb_build_array(remarks) || $12::jsonb
     END
-WHERE id = $12
+WHERE id = $13
 RETURNING *;
   `;
 
@@ -217,19 +237,20 @@ RETURNING *;
         pan_number ?? isFirmExist.pan_number,
         firm_name ?? isFirmExist.firm_name,
         firm_code ?? isFirmExist.firm_code,
+        role ?? isFirmExist.role,
         JSON.stringify(remark),
         id
       ];
 
       const { rows } = await executeInTransaction(client, queryText, values);
-      return rows[0];
+      return `Branch ${rows[0].firm_name} Updated successfully`;
     })
     return result
   }
 
   async deleteFirm(data: DeleteFirmParams) {
     const { r_id, remark, branch_id } = data;
-   const result= transaction(async (client) => {
+    const result = transaction(async (client) => {
       const isFirmExist = await isExist(r_id, "firm", "branch_id", branch_id, client);
 
       if (!isFirmExist) {
@@ -264,16 +285,16 @@ RETURNING *;
   }
   async loginFirm(data: FirmLoginBody) {
     const { username } = data
-   const result= transaction(async (client) => {
+    const result = transaction(async (client) => {
 
-    const query = `SELECT id,password,firm_name FROM firm WHERE username = $1 AND status != $2`;
-    const values = [username, 0]
+      const query = `SELECT id,password,firm_name FROM firm WHERE username = $1 AND status != $2`;
+      const values = [username, 0]
 
 
-    const login = await executeInTransaction(client,query, values);
-    console.log(login)
-    return login.rows[0];
-   })
-   return result
+      const login = await executeInTransaction(client, query, values);
+      console.log(login)
+      return login.rows[0];
+    })
+    return result
   }
 }
