@@ -96,6 +96,16 @@ export const registerErrorHandler = (app: FastifyInstance) => {
         });
       }
 
+      else if (error.code === "23505") {
+        statusCode = 409;
+
+        if (error.constraint === "unique_company_role") {
+          message = "Role already exists";
+        } else {
+          message = "Duplicate record already exists";
+        }
+      }
+
       else if (error.code && typeof error.code === "string") {
         statusCode = 500;
         message = "Database operation failed";

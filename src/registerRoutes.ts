@@ -11,6 +11,7 @@ import { vendorRouter } from './module/vendor/vendor.router'
 import { ledgerCategoryRouter } from './module/ledgerCategory/ledgerCategory.router'
 import { ledgerTransactionRouter } from './module/ledgertransaction/ledgertransaction.router'
 import { paymentMethodRouter } from './module/paymentmethod/paymentMethod.router'
+import { roleRouter } from './module/role/role.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -24,4 +25,5 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(ledgerCategoryRouter, { prefix: '/ledger/category' })
   app.register(ledgerTransactionRouter, { prefix: '/ledger/transaction' })
   app.register(paymentMethodRouter, { prefix: '/payment/method' })
+  app.register(roleRouter, { prefix: '/role' })
 }
