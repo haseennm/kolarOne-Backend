@@ -99,13 +99,18 @@ export const registerErrorHandler = (app: FastifyInstance) => {
       else if (error.code === "23505") {
         statusCode = 409;
 
-        if (error.constraint === "unique_company_role") {
-          message = "Role already exists";
+        const constraint_map: Record<string, string> = {
+          unique_company_role: "Role",
+          uq_branch_code_company: "Branch code",
+          branches_username_key: "User name",
+        };
+
+        if (error.constraint && constraint_map[error.constraint]) {
+          message = `${constraint_map[error.constraint]} already exists`;
         } else {
           message = "Duplicate record already exists";
         }
       }
-
       else if (error.code && typeof error.code === "string") {
         statusCode = 500;
         message = "Database operation failed";

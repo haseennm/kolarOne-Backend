@@ -26,7 +26,8 @@ export default class BranchService {
             logo,
             remark,
             username,
-            hashed
+            hashed,
+            role
 
         } = data;
         const result = transaction(async (client) => {
@@ -36,6 +37,13 @@ export default class BranchService {
                 throw new AppError("Company not found", 404);
             }
 
+            for (const roleId of role) {
+                const isRoleExist = await isExist(roleId, "role", "company_id", company_id, client);
+
+                if (!isRoleExist) {
+                    throw new AppError("One or more roles do not exist", 404);
+                }
+            }
             const query = `
     INSERT INTO branches (
      company_id,
@@ -57,12 +65,13 @@ export default class BranchService {
             logo,
             remarks,
             username,
-            password
+            password,
+            role
     )
     VALUES (
       $1,$2,$3,$4,$5,
       $6,$7,$8,$9,$10,
-      $11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+      $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
     )
     RETURNING *;
   `;
@@ -87,8 +96,9 @@ export default class BranchService {
                 logo,
                 JSON.stringify(remark),
                 username,
-                hashed
-            ];
+                hashed,
+                role
+            ]
 
             const { rows } = await executeInTransaction(client, query, values);
             return rows[0];
@@ -170,37 +180,48 @@ export default class BranchService {
     }
     async updateBranch(data: EditBranchParams) {
 
-    const {
-        id,
-        branch_code,
-        branch_name,
-        gstin,
-        pan_number,
-        address,
-        city,
-        district,
-        state,
-        state_code,
-        pincode,
-        statusCode,
-        name_of_manager,
-        phone_number,
-        email,
-        website,
-        logo,
-        remark
-    } = data;
+        const {
+            id,
+            branch_code,
+            branch_name,
+            gstin,
+            pan_number,
+            address,
+            city,
+            district,
+            state,
+            state_code,
+            pincode,
+            statusCode,
+            name_of_manager,
+            phone_number,
+            email,
+            website,
+            logo,
+            remark,
+            role,
+            company_id
+        } = data;
 
-    const result = transaction(async (client) => {
+        const result = transaction(async (client) => {
 
-        // ✅ Only check by id
-        const is_branch_exist = await isExist(id, "branches", "id", id, client);
+            // ✅ Only check by id
+            const is_branch_exist = await isExist(id, "branches", "id", id, client);
 
-        if (!is_branch_exist) {
-            throw new AppError("Branch not found or deleted", 404);
-        }
+            if (!is_branch_exist) {
+                throw new AppError("Branch not found or deleted", 404);
+            }
+            if (role) {
+                console.log("role", role)
+                for (const roleId of role) {
+                const isRoleExist = await isExist(roleId, "role", "company_id", company_id, client);
 
-        const query = `
+                if (!isRoleExist) {
+                    throw new AppError("One or more roles do not exist", 404);
+                }
+            }
+            }
+            const query = `
         UPDATE branches 
         SET
             branch_code = $1,
@@ -219,48 +240,51 @@ export default class BranchService {
             email = $14,
             website = $15,
             logo = $16,
+            role = $17,
             remarks =
             CASE
                 WHEN jsonb_typeof(remarks) = 'array'
-                THEN remarks || $17::jsonb
-                ELSE jsonb_build_array(remarks) || $17::jsonb
+                THEN remarks || $18::jsonb
+                ELSE jsonb_build_array(remarks) || $18::jsonb
             END
-        WHERE id = $18
+        WHERE id = $19
         RETURNING *;
         `;
 
-        const values = [
-            branch_code ?? is_branch_exist.branch_code,
-            branch_name ?? is_branch_exist.branch_name,
-            gstin ?? is_branch_exist.gstin,
-            pan_number ?? is_branch_exist.pan_number,
-            address ?? is_branch_exist.address,
-            city ?? is_branch_exist.city,
-            district ?? is_branch_exist.district,
-            state ?? is_branch_exist.state,
-            state_code ?? is_branch_exist.state_code,
-            pincode ?? is_branch_exist.pincode,
-            statusCode ?? is_branch_exist.status,
-            name_of_manager ?? is_branch_exist.name_of_manager,
-            phone_number ?? is_branch_exist.phone_number,
-            email ?? is_branch_exist.email,
-            website ?? is_branch_exist.website,
-            logo ?? is_branch_exist.logo,
-            JSON.stringify(remark),
-            id
-        ];
+            const values = [
+                branch_code ?? is_branch_exist.branch_code,
+                branch_name ?? is_branch_exist.branch_name,
+                gstin ?? is_branch_exist.gstin,
+                pan_number ?? is_branch_exist.pan_number,
+                address ?? is_branch_exist.address,
+                city ?? is_branch_exist.city,
+                district ?? is_branch_exist.district,
+                state ?? is_branch_exist.state,
+                state_code ?? is_branch_exist.state_code,
+                pincode ?? is_branch_exist.pincode,
+                statusCode ?? is_branch_exist.status,
+                name_of_manager ?? is_branch_exist.name_of_manager,
+                phone_number ?? is_branch_exist.phone_number,
+                email ?? is_branch_exist.email,
+                website ?? is_branch_exist.website,
+                logo ?? is_branch_exist.logo,
+                role ?? is_branch_exist.role,
+                JSON.stringify(role),
+                JSON.stringify(remark),
+                id
+            ];
 
-        const { rows } = await executeInTransaction(client, query, values);
-        return rows[0];
-    });
+            const { rows } = await executeInTransaction(client, query, values);
+            return rows[0];
+        });
 
-    return result;
-}
+        return result;
+    }
     async deleteBranch(data: DeleteBranchParams) {
         const { r_id, remark, company_id } = data
         const result = transaction(async (client) => {
 
-            const isbranch_exist = await isExist(r_id, "branches", "company_id", company_id,client);
+            const isbranch_exist = await isExist(r_id, "branches", "company_id", company_id, client);
             if (!isbranch_exist) {
                 throw new AppError("Branch not found or already deleted", 404);
             }

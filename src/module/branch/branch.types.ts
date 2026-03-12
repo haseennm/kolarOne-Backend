@@ -18,7 +18,8 @@ export interface CreateBranchBody {
   logo?: string | null;
   created_by: string;
   password:string;
-  username:string
+  username:string;
+  role:number[]
 }
 export interface CreateBranchParams
   extends Omit<CreateBranchBody, "created_by" | "status" | "password">  {
@@ -63,6 +64,7 @@ export interface EditBranchBody {
   email?: string | null;
   website?: string | null;
   logo?: string | null;
+  role?:number[] | null
   updated_by: string;
 }
 export interface EditBranchParams

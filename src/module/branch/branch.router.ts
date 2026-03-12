@@ -5,6 +5,7 @@ import { cns, el } from '../../utils/extra';
 import { BranchLoginBody, CreateBranchBody, DeleteBranchBody, EditBranchBody, FetchBranchBody } from './branch.types';
 import BranchController from './branch.controller';
 import path from 'path';
+import { AppError } from '../../utils/AppError';
 
 export async function branchRouter(app: FastifyInstance): Promise<void> {
     app.post("/create", async (request, reply) => {
@@ -46,7 +47,8 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
                 "email",
                 "created_by",
                 "username",
-                "password"
+                "password",
+                "role"
             ];
 
             for (const field of required) {
@@ -58,7 +60,20 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             body.company_id = Number(body.company_id);
             body.state_code = Number(body.state_code);
             body.pincode = Number(body.pincode);
-
+            // if (body.role) {
+            //     console.log("body.role", body.role)
+            //     body.role = body.role
+            //     .split(",")
+            //     .map((r: string) => Number(r.trim()))
+            //     .filter((r: number) => !isNaN(r));
+            // }
+            if (body.role) {
+                try {
+                    body.role = JSON.parse(body.role);
+                } catch {
+                    body.role = [];
+                }
+            }
             const controller = new BranchController();
 
             const result = await controller.createBranch({
@@ -76,7 +91,7 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             if (fullPath && fs.existsSync(fullPath)) {
                 fs.unlinkSync(fullPath);
             }
-                 throw error
+            throw error
         }
     });
     app.post<{ Body: FetchBranchBody }>(
@@ -96,21 +111,21 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
         },
         async (request: FastifyRequest<{ Body: FetchBranchBody }>, reply: FastifyReply) => {
             // try {
-                cns(request.url, request.body)
-                const { page = 1, limit = 10, ...filters } = request.body;
-                const offset = (page - 1) * limit;
-                const controller = new BranchController();
-                const companies = await controller.fetchBranch({
-                    offset,
-                    filters: {
-                        ...filters,
-                        page,
-                        limit
-                    }
-                });
-                console.log(companies)
+            cns(request.url, request.body)
+            const { page = 1, limit = 10, ...filters } = request.body;
+            const offset = (page - 1) * limit;
+            const controller = new BranchController();
+            const companies = await controller.fetchBranch({
+                offset,
+                filters: {
+                    ...filters,
+                    page,
+                    limit
+                }
+            });
+            console.log(companies)
 
-                return reply.code(200).send(companies);
+            return reply.code(200).send(companies);
 
             // } catch (err: any) {
             //     el(err)
@@ -144,23 +159,29 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
                 }
             }
             if (!body.id) {
-                throw new Error("id is required");
+                throw new AppError("id is required",500);
             }
             if (!body.updated_by) {
-                throw new Error("updated_by is required");
+                throw new AppError("updated_by is required",500);
             }
-            delete body.company_id;
-            delete body.id;
-            const branchId = Number(body.id);
-            body.updated_by = Number(body.updated_by);
-
+            if (!body.company_id) {
+                throw new AppError("company_id is required",500);
+            }
+            // delete body.company_id;
+            // delete body.id;
+            if (body.role) {
+                try {
+                    body.role = JSON.parse(body.role);
+                } catch {
+                    body.role = [];
+                }
+            }
             if (logoPath) {
                 body.logo = logoPath;
             }
 
             const controller = new BranchController();
-
-            const result = await controller.editBranch(request.body);
+            const result = await controller.editBranch(body);
 
             return reply.code(200).send({
                 status: "Success",
@@ -172,7 +193,7 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             if (fullPath && fs.existsSync(fullPath)) {
                 fs.unlinkSync(fullPath);
             }
-                 throw error
+            throw error
         }
     });
     app.post<{ Body: DeleteBranchBody }>(
