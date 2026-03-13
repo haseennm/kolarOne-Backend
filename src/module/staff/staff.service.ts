@@ -39,6 +39,41 @@ export default class StaffService {
       throw new AppError("Company not found", 404);
     }
 
+    if (entity_type === "F") {
+
+      const branchFirm = await executeInTransaction(
+        client,
+        `
+    SELECT id
+    FROM firm
+    WHERE branch_id = $1
+    `,
+        [branch_id]
+      );
+
+      if (branchFirm.rowCount === 0) {
+        throw new AppError("No Firm found in this branch", 404);
+      }
+
+      const firmIds = branchFirm.rows.map((f: any) => f.id);
+console.log(firmIds)
+      const isFinger_exist = await executeInTransaction(
+        client,
+        `
+    SELECT id
+    FROM staff
+    WHERE finger_id = $1
+    AND entity_type = 'F'
+    AND entity_id = ANY($2)
+    `,
+        [finger_id, firmIds]
+      );
+
+      if (isFinger_exist.rowCount) {
+        throw new AppError("Finger print already exist in this branch", 400);
+      }
+    }
+
     // Check roles
     for (const roleId of role) {
       const isRoleExist = await isExist(
@@ -55,8 +90,8 @@ export default class StaffService {
     }
 
     // Check entity
-    const column = entity_type === "Firm" ? "branch_id" : "company_id";
-    const value = entity_type === "Firm" ? branch_id : company_id;
+    const column = entity_type === "F" ? "branch_id" : "company_id";
+    const value = entity_type === "F" ? branch_id : company_id;
 
     const isEntityExist = await isExist(
       entity_id,
@@ -238,6 +273,21 @@ OFFSET $${values.length + 2}
 
     if (!isStaffExist) {
       throw new AppError("Staff not found", 404);
+    }
+    const isFinger_exist = await executeInTransaction(
+      client,
+      `
+  SELECT id
+  FROM staff
+  WHERE finger_id = $1
+  AND entity_id = $2
+  AND entity_type = $3
+  `,
+      [finger_id, entity_id, entity_type]
+    );
+
+    if (isFinger_exist.rowCount) {
+      throw new AppError("Finger print already exist", 400);
     }
     if (entity_id) {
       const isEntityExist = await isExist(
