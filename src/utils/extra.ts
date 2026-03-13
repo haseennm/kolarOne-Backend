@@ -51,6 +51,7 @@ export async function isExist(id:number | string, table:string,bussiness_categor
 // if (!allowedTables.includes(table)) {
 //   throw new Error("Invalid table name to check Exist");
 // }
+console.log([id,table,bussiness_category,bussiness_id])
 const  isrowExist = await executeInTransaction(client,
   `SELECT * FROM ${table} WHERE id = $1 AND ${bussiness_category} = $2 AND status != $3`,
   [id,bussiness_id, 0]

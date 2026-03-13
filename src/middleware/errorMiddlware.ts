@@ -104,6 +104,7 @@ export const registerErrorHandler = (app: FastifyInstance) => {
           uq_branch_code_company: "Branch code",
           branches_username_key: "User name",
           firm_username_key: "User name",
+          staff_email_key: "staff email",
         };
 
         if (error.constraint && constraint_map[error.constraint]) {
