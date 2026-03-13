@@ -105,6 +105,7 @@ export const registerErrorHandler = (app: FastifyInstance) => {
           branches_username_key: "User name",
           firm_username_key: "User name",
           staff_email_key: "staff email",
+          unique_branch_holiday: "Holiday",
         };
 
         if (error.constraint && constraint_map[error.constraint]) {

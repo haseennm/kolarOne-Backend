@@ -1,5 +1,6 @@
 import { PoolClient } from "pg"
 import { executeInTransaction, pool, query } from "../config/db"
+import { AppError } from "./AppError"
 
 export const cns = (url: string, values: string | object) => {
 console.log(
@@ -120,3 +121,48 @@ export const PaymentTransactionCodeTypeMap: Record<PaymentTransactionCode, strin
   SY: "salary",
   LT: "ledger_transaction"
 };
+
+
+// 
+// ATTENDANCE
+// 
+export const isValidDay = async (
+  client: PoolClient,
+  today: string,
+  branch_id: number
+): Promise<boolean> => {
+
+  const result = await executeInTransaction(
+    client,
+    `
+    SELECT 1
+    FROM attendance
+    WHERE branch_id = $1
+      AND staff_id = 'HOLIDAY'
+      AND attendance_date = $2
+    LIMIT 1
+    `,
+    [branch_id, today]
+  );
+
+  if (result.rows.length > 0) {
+    throw new AppError(
+      `Attendance cannot be marked on ${today} (Holiday)`,
+      400
+    );
+  }
+
+  return true;
+};
+export function isFutureDay(date: string | Date): boolean {
+  if (!date) return false;
+
+  const target = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(target.getTime())) return false;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+
+  return targetDay > today;
+}

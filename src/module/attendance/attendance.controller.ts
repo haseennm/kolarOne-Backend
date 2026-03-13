@@ -1,0 +1,110 @@
+import { transaction } from "../../config/db";
+import { isValidDay } from "../../utils/extra";
+import AttendanceService from "./attendance.service";
+import { DailyAttendanceBody, DeleteHoliday, FingerprintAttendanceBody, HolidayListBody, MarkHolidayBody, MonthlyAttendanceBody } from "./attendance.types";
+
+export default class AttendanceController {
+
+  async fingerprintAttendance(data: FingerprintAttendanceBody) {
+
+    const { fingerprint_id, branch_id } = data;
+
+    if (!fingerprint_id) {
+      throw new Error("fingerprint_id required");
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    return transaction(async (client) => {
+
+      await isValidDay(client, today, branch_id);
+
+      const service = new AttendanceService();
+
+      return service.fingerprintAttendance(
+        fingerprint_id,
+        branch_id,
+        today,
+        client
+      );
+    });
+  }
+  async markHoliday(data: MarkHolidayBody) {
+
+    const { branch_id, attendance_date, created_by } = data;
+    const holidayDate =
+      attendance_date ??
+      new Date(new Date().setDate(new Date().getDate() + 1))
+        .toISOString()
+        .split("T")[0];
+
+    return transaction(async (client) => {
+
+      const service = new AttendanceService();
+
+      const message = await service.markHoliday(
+        data,
+        holidayDate,
+        client
+      );
+
+      return message;
+    });
+  }
+
+  async getHolidayList(data: HolidayListBody) {
+    const { branch_id } = data;
+
+    return transaction(async (client) => {
+      const service = new AttendanceService();
+      const holidays = await service.getHolidayList(branch_id, client);
+
+      return { data: holidays };
+    });
+  }
+    // ─── Daily report ──────────────────────────────────────────────────
+  async getDailyAttendance(data: DailyAttendanceBody) {
+    const { date, branch_id } = data;
+
+    // if (!date || !branch_id) {
+    //   throw new AppError("date and branch_id are required", 400);
+    // }
+
+    // // Basic date format check (you can add more validation)
+    // if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    //   throw new AppError("date must be in YYYY-MM-DD format", 400);
+    // }
+
+    return transaction(async (client) => {
+      const service = new AttendanceService();
+      const rows = await service.getDailyAttendance(branch_id, date, client);
+      return { data: rows };
+    });
+  }
+
+  // ─── Monthly report ────────────────────────────────────────────────
+  async getMonthlyAttendance(data: MonthlyAttendanceBody) {
+    const { from_date, to_date, branch_id } = data;
+
+    // if (!from_date || !to_date || !branch_id) {
+    //   throw new AppError("from_date, to_date and branch_id are required", 400);
+    // }
+
+    // if (!/^\d{4}-\d{2}-\d{2}$/.test(from_date) || !/^\d{4}-\d{2}-\d{2}$/.test(to_date)) {
+    //   throw new AppError("Dates must be in YYYY-MM-DD format", 400);
+    // }
+
+    return transaction(async (client) => {
+      const service = new AttendanceService();
+      return service.getMonthlyAttendance(branch_id, from_date, to_date, client);
+    });
+  }
+  
+ async deleteHoliday(data: DeleteHoliday) {
+  return transaction(async (client) => {
+    const service = new AttendanceService();
+    const message = await service.deleteHoliday(data, client);
+    return { message };
+  });
+}
+}
