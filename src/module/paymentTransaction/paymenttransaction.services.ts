@@ -1,6 +1,6 @@
 import { executeInTransaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { cns } from "../../utils/extra";
+import { cns, isExist } from "../../utils/extra";
 import { CreatePaymentTransaction, DeletePaymentTransaction, EditPaymentTransaction } from "./paymenttransaction.types";
 
 export class PaymentTransactionService {
@@ -10,6 +10,20 @@ export class PaymentTransactionService {
     client: any
   ) {
     cns("payment inserting", data)
+
+    if (data.payment_method_id) {
+      const isPaymentMethodExist = await isExist(
+        data.payment_method_id,
+        "payment_methods",
+        "company_id",
+        data.company_id,
+        client
+      );
+
+      if (!isPaymentMethodExist) {
+        throw new AppError("Payment method not found", 404);
+      }
+    }
     const query = `
      INSERT INTO payment_transactions (
        ref_id,
@@ -111,20 +125,20 @@ export class PaymentTransactionService {
     }
   }
 
-async deletePaymentTransaction(data: DeletePaymentTransaction, client: any) {
-  const { company_id, ref_id, ref_type } = data;
+  async deletePaymentTransaction(data: DeletePaymentTransaction, client: any) {
+    const { company_id, ref_id, ref_type } = data;
 
-  const result = await executeInTransaction(
-    client,
-    `UPDATE payment_transactions
+    const result = await executeInTransaction(
+      client,
+      `UPDATE payment_transactions
      SET status = 0
      WHERE company_id = $1
      AND ref_type = $2
      AND ref_id = $3
      AND status != 0`,
-    [company_id, ref_type, ref_id]
-  );
+      [company_id, ref_type, ref_id]
+    );
 
-  return result.rowCount;
-}
+    return result.rowCount;
+  }
 }
