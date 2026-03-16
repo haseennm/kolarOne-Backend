@@ -16,6 +16,7 @@ import { staffRouter } from './module/staff/staff.router'
 import { attendanceRouter } from './module/attendance/attendance.router'
 import { salaryRouter } from './module/salary/salary.router'
 import { loanRouter } from './module/loan/loan.router'
+import { partnerRouter } from './module/partner/partnerinfo/partnerinfo.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -34,4 +35,5 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(attendanceRouter, { prefix: '/attendance' })
   app.register(salaryRouter, { prefix: '/salary' })
   app.register(loanRouter, { prefix: '/loan' })
+  app.register(partnerRouter, { prefix: '/partner/personal/info' })
 }
