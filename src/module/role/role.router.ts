@@ -77,6 +77,9 @@ export async function roleRouter(app: FastifyInstance) {
             company_id: {
               type: "number"
             },
+            branch_id: {
+              type: "number"
+            },
 
             // status: {
             //   type: "number"

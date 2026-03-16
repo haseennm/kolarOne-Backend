@@ -72,20 +72,23 @@ export default class RoleService {
       values.push(`%${filters.search}%`);
       where.push(`role ILIKE $${values.length}`);
     }
-
+    if (filters?.branch_id) {
+      values.push(filters.branch_id);
+      where.push(`id = ANY(SELECT unnest(role) FROM branches WHERE id = $${values.length})`);
+    }
     values.push(filters.company_id);
     where.push(`company_id = $${values.length}`);
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-    const roleQuery = `
-      SELECT *
-      FROM role
-      ${whereClause}
-      ORDER BY id DESC
-      LIMIT $${values.length + 1}
-      OFFSET $${values.length + 2}
-    `;
+   const roleQuery = `
+  SELECT *
+  FROM role
+  ${whereClause}
+  ORDER BY id DESC
+  LIMIT $${values.length + 1}
+  OFFSET $${values.length + 2}
+`;
 
     const countQuery = `
       SELECT COUNT(*)

@@ -15,6 +15,7 @@ export interface CreateRoleParams
 
 export interface FetchRoleBody {
   id?: number;
+  branch_id?: number;
   company_id: number;
   // status?: number;
   search?: string;
