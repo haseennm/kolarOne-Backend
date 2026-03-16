@@ -125,15 +125,20 @@ export default class LoanController {
 
     return transaction(async (client) => {
 
-      const { delete_by, ...rest } = data
+      const { delete_by,company_id,id, ...rest } = data
       const service = new LoanService();
       const remark = {
         action: "Deleted",
         delete_by,
         deleted_at: Date.now(),
       };
-      const loan = await service.deleteLoan({ ...rest, remark }, client);
-
+     await service.deleteLoan({ ...rest,id, remark,company_id }, client);
+      const payment_transactions_service = new PaymentTransactionService()
+      await payment_transactions_service.deletePaymentTransaction({
+        company_id: company_id,
+        ref_id: id,
+        ref_type: PaymentTransactionTypeCodeMap["loan"],
+      }, client)
       return `Loan has been deleted successfully.`;
     });
   }

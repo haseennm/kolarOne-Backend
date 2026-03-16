@@ -73,6 +73,7 @@ export interface DeleteLoanBody {
   id: number;
   delete_by:string
   branch_id: number;
+  company_id: number;
 }
 export interface DeleteLoanParams extends Omit<DeleteLoanBody, "delete_by"> {
   remark:object

@@ -184,7 +184,7 @@ export async function loanRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["id", "delete_by", "branch_id"],
+          required: ["id", "delete_by", "branch_id","company_id"],
           properties: {
 
             id: {
@@ -196,6 +196,9 @@ export async function loanRouter(app: FastifyInstance) {
             },
 
             branch_id: {
+              type: "number"
+            },
+            company_id: {
               type: "number"
             }
 
