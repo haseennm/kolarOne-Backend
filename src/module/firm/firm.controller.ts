@@ -35,7 +35,7 @@ export default class FirmController {
   }
 
   async createFirm(data: CreateFirmBody) {
-    const { created_by, status, password,logo, ...rest } = data;
+    const { created_by, status, password, logo, ...rest } = data;
 
     const remark = {
       action: "Created",
@@ -104,24 +104,29 @@ export default class FirmController {
     return firm;
   }
   async loginFirm(data: FirmLoginBody) {
-    const { password ,username} = data
+    const { password, username } = data;
+
     const service = new FirmService();
     const firm = await service.loginFirm(data);
-    console.log("firm in controe",firm)
-    const isValid = await verifyPassword(password, firm.password)
+
+    console.log("firm in controller", firm);
+
+    const isValid = await verifyPassword(password, firm.password);
 
     if (!isValid) {
-      throw new AppError('Invalid credentials', 401)
+      throw new AppError("Invalid credentials", 401);
     }
 
     const token = generateToken({
       id: firm.id,
-      username:username,
-    })
+      username: username,
+    });
 
     return {
       token: token,
-      message: `Firm ${firm.firm_name} Login success`
-    }
+      branch_id: firm.branch_id,
+      company_id: firm.company_id,
+      message: `Firm ${firm.firm_name} Login success`,
+    };
   }
 }

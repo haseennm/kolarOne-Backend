@@ -283,18 +283,40 @@ RETURNING *;
     })
     return result
   }
-  async loginFirm(data: FirmLoginBody) {
-    const { username } = data
-    const result = transaction(async (client) => {
+ async loginFirm(data: FirmLoginBody) {
+  const { username } = data;
 
-      const query = `SELECT id,password,firm_name FROM firm WHERE username = $1 AND status != $2`;
-      const values = [username, 0]
+  const result = await transaction(async (client) => {
 
+    const query = `
+      SELECT id, password, firm_name, branch_id 
+      FROM firm 
+      WHERE username = $1 AND status != $2
+    `;
+    const values = [username, 0];
 
-      const login = await executeInTransaction(client, query, values);
-      console.log(login)
-      return login.rows[0];
-    })
-    return result
-  }
+    const login = await executeInTransaction(client, query, values);
+
+    if (login.rows.length === 0) {
+      throw new AppError("Firm not found", 404);
+    }
+
+    const company_query = `
+      SELECT company_id 
+      FROM branches 
+      WHERE id = $1 AND status != $2
+    `;
+
+    const company_values = [login.rows[0].branch_id, 0];
+
+    const company = await executeInTransaction(client, company_query, company_values);
+
+    return {
+      ...login.rows[0],
+      company_id: company.rows[0]?.company_id
+    };
+  });
+
+  return result;
+}
 }

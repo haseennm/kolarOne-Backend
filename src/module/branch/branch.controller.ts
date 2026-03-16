@@ -106,6 +106,7 @@ export default class BranchController {
 
         return {
             token: token,
+            company_id:branch.company_id,
             message: `branch ${branch.branch_name} Login success`
         }
     }
