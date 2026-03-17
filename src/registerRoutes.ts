@@ -18,6 +18,7 @@ import { salaryRouter } from './module/salary/salary.router'
 import { loanRouter } from './module/loan/loan.router'
 import { partnerRouter } from './module/partner/partnerinfo/partnerinfo.router'
 import { profitShareRouter } from './module/partner/partnerProfitShare/partnerProfitShare.router'
+import { partnerLedgerRouter } from './module/partner/partnersLedger/partnersLedger.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -38,4 +39,5 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(loanRouter, { prefix: '/loan' })
   app.register(partnerRouter, { prefix: '/partner/personal/info' })
   app.register(profitShareRouter, { prefix: '/partner/profit/info' })
+  app.register(partnerLedgerRouter, { prefix: '/partner/ledger/info' })
 }
