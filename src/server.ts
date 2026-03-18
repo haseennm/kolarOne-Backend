@@ -5,6 +5,7 @@ import fastifyStatic from "@fastify/static";
 import path from "path";
 import registerRoutes from './registerRoutes';
 import { registerErrorHandler } from './middleware/errorMiddlware';
+import { cns } from './utils/extra';
 
 const app = Fastify({
     logger: false,
@@ -21,6 +22,10 @@ app.register(fastifyStatic, {
     prefix: "/uploads/",
 });
 // app.register(multipart)
+app.addHook('preHandler', async (request, reply) => {
+  
+        cns(request.url, request.body as object)
+})
 app.register(registerRoutes, { prefix: '/api' });
 registerErrorHandler(app);
 
