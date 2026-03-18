@@ -269,7 +269,6 @@ export default class BranchService {
                 website ?? is_branch_exist.website,
                 logo ?? is_branch_exist.logo,
                 role ?? is_branch_exist.role,
-                JSON.stringify(role),
                 JSON.stringify(remark),
                 id
             ];
