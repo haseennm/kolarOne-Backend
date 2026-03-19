@@ -289,7 +289,7 @@ RETURNING *;
   const result = await transaction(async (client) => {
 
     const query = `
-      SELECT id, password, firm_name, branch_id 
+      SELECT id, password, firm_name, branch_id , role
       FROM firm 
       WHERE username = $1 AND status != $2
     `;
