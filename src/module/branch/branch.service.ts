@@ -212,7 +212,6 @@ export default class BranchService {
                 throw new AppError("Branch not found or deleted", 404);
             }
             if (role) {
-                console.log("role", role)
                 for (const roleId of role) {
                 const isRoleExist = await isExist(roleId, "role", "company_id", company_id, client);
 
@@ -318,7 +317,6 @@ export default class BranchService {
         const values = [username, 0]
 
         const result = await pool.query(query, values);
-        console.log(result)
         return result.rows[0];
     }
 }

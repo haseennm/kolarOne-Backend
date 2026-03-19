@@ -23,8 +23,9 @@ app.register(fastifyStatic, {
 });
 // app.register(multipart)
 app.addHook('preHandler', async (request, reply) => {
-  
-        cns(request.url, request.body as object)
+  if (!request.isMultipart()) {
+    cns(request.url, request.body as object)
+  }
 })
 app.register(registerRoutes, { prefix: '/api' });
 registerErrorHandler(app);
