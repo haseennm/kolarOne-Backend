@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
-  PurchaseCreateBody
+  PurchaseCreateBody,
+  PurchaseFetchBody
 } from "./purchase.types";
 import RoleController from "./purchase.controller";
 import PurchaseController from "./purchase.controller";
@@ -114,70 +115,154 @@ export async function purchaseRouter(app: FastifyInstance) {
 );
 
   // FETCH ROLE
-  // app.post<{ Body: FetchRoleBody }>(
-  //   "/get",
-  //   {
-  //     schema: {
-  //       body: {
-  //         type: "object",
-  //         required: ["company_id"],
-  //         properties: {
+ app.post<{ Body: PurchaseFetchBody }>(
+  "/get/details",
+  {
+    schema: {
+      body: {
+        type: "object",
+        required: ["company_id","id"],
+        properties: {
+          id: {
+            type: "number"
+          },
 
-  //           id: {
-  //             type: "number"
-  //           },
+          company_id: {
+            type: "number"
+          },
 
-  //           company_id: {
-  //             type: "number"
-  //           },
-  //           branch_id: {
-  //             type: "number"
-  //           },
+          branch_id: {
+            type: "number"
+          },
 
-  //           // status: {
-  //           //   type: "number"
-  //           // },
+          firm_id: {
+            type: "number"
+          },
 
-  //           search: {
-  //             type: "string"
-  //           },
+          search: {
+            type: "string"
+          },
 
-  //           page: {
-  //             type: "number",
-  //             minimum: 1
-  //           },
+          start_date: {
+            type: "string",
+            format: "date"
+          },
 
-  //           limit: {
-  //             type: "number",
-  //             minimum: 1
-  //           }
+          end_date: {
+            type: "string",
+            format: "date"
+          },
 
-  //         }
-  //       }
-  //     }
-  //   },
-  //   async (
-  //     request: FastifyRequest<{ Body: FetchRoleBody }>,
-  //     reply: FastifyReply
-  //   ) => {
+          page: {
+            type: "number",
+            minimum: 1,
+            default: 1
+          },
 
-  //     const { page = 1, limit = 10, ...filters } = request.body;
+          limit: {
+            type: "number",
+            minimum: 1,
+            default: 10
+          }
+        }
+      }
+    }
+  },
+  async (
+    request: FastifyRequest<{ Body: PurchaseFetchBody }>,
+    reply: FastifyReply
+  ) => {
 
-  //     const controller = new RoleController();
+    const { page = 1, limit = 10, ...filters } = request.body;
 
-  //     const data = await controller.fetchRole({
-  //       offset: (page - 1) * limit,
-  //       filters: {
-  //         ...filters,
-  //         page,
-  //         limit
-  //       }
-  //     });
+    const controller = new PurchaseController(); // ✅ changed
 
-  //     return reply.code(200).send(data);
+    const data = await controller.fullPurchaseFetch({
+      offset: (page - 1) * limit,
+      filters: {
+        ...filters,
+        page,
+        limit
+      }
+    });
 
-  //   }
-  // );
+    return reply.code(200).send(data);
+  }
+);
+ app.post<{ Body: PurchaseFetchBody }>(
+  "/get",
+  {
+    schema: {
+      body: {
+        type: "object",
+        required: ["company_id"],
+        properties: {
+          id: {
+            type: "number"
+          },
+
+          company_id: {
+            type: "number"
+          },
+
+          branch_id: {
+            type: "number"
+          },
+
+          firm_id: {
+            type: "number"
+          },
+
+          search: {
+            type: "string"
+          },
+
+          start_date: {
+            type: "string",
+            format: "date"
+          },
+
+          end_date: {
+            type: "string",
+            format: "date"
+          },
+
+          page: {
+            type: "number",
+            minimum: 1,
+            default: 1
+          },
+
+          limit: {
+            type: "number",
+            minimum: 1,
+            default: 10
+          }
+        }
+      }
+    }
+  },
+  async (
+    request: FastifyRequest<{ Body: PurchaseFetchBody }>,
+    reply: FastifyReply
+  ) => {
+
+    const { page = 1, limit = 10, ...filters } = request.body;
+
+    const controller = new PurchaseController(); // ✅ changed
+
+    const data = await controller.purchaseFetch({
+      offset: (page - 1) * limit,
+      filters: {
+        ...filters,
+        page,
+        limit
+      }
+    });
+
+    return reply.code(200).send(data);
+  }
+);
 
   // // EDIT ROLE
   // app.post<{ Body: EditRoleBody }>(

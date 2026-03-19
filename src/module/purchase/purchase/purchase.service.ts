@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { isExist } from "../../../utils/extra";
-import { PurchaseCreateParams } from "./purchase.types";
+import { PurchaseCreateParams, PurchaseFetchDb, PurchaseFetchParams } from "./purchase.types";
 
 export default class PurchaseService {
 
@@ -126,147 +126,223 @@ export default class PurchaseService {
     return rows[0];
   }
 
-  //   async fetchRole(data: FetchRoleParams) {
+ async fetchPurchase(data: PurchaseFetchParams) {
+  const { filters, offset } = data;
 
-  //     const { filters, offset } = data;
+  let where: string[] = [];
+  let values: any[] = [];
 
-  //     let where: string[] = [];
-  //     let values: any[] = [];
-  //     where.push(`status != $${values.length + 1}`);
-  //     values.push(0);
-  //     if (filters?.id) {
-  //       values.push(filters.id);
-  //       where.push(`id = $${values.length}`);
-  //     }
+  where.push(`p.status != $${values.length + 1}`);
+  values.push(0);
+  if (filters?.id) {
+    values.push(filters.id);
+    where.push(`p.id = $${values.length}`);
+  }
 
-  //     // if (filters?.status) {
-  //     //   values.push(filters.status);
-  //     //   where.push(`status = $${values.length}`);
-  //     // }
+  if (filters?.company_id) {
+    values.push(filters.company_id);
+   where.push(`b.company_id = $${values.length}`);
+  }
 
-  //     if (filters?.search) {
-  //       values.push(`%${filters.search}%`);
-  //       where.push(`role ILIKE $${values.length}`);
-  //     }
-  //     if (filters?.branch_id) {
-  //       values.push(filters.branch_id);
-  //       where.push(`id = ANY(SELECT unnest(role) FROM branches WHERE id = $${values.length})`);
-  //     }
-  //     values.push(filters.company_id);
-  //     where.push(`company_id = $${values.length}`);
+  if (filters?.branch_id) {
+    values.push(filters.branch_id);
+    where.push(`f.branch_id = $${values.length}`);
+  }
 
-  //     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  if (filters?.firm_id) {
+    values.push(filters.firm_id);
+    where.push(`p.firm_id = $${values.length}`);
+  }
 
-  //    const roleQuery = `
-  //   SELECT *
-  //   FROM role
-  //   ${whereClause}
-  //   ORDER BY id DESC
-  //   LIMIT $${values.length + 1}
-  //   OFFSET $${values.length + 2}
-  // `;
+  if (filters?.start_date) {
+    values.push(filters.start_date);
+    where.push(`p.bill_date >= $${values.length}`);
+  }
 
-  //     const countQuery = `
-  //       SELECT COUNT(*)
-  //       FROM role
-  //       ${whereClause}
-  //     `;
+  if (filters?.end_date) {
+    values.push(filters.end_date);
+    where.push(`p.bill_date <= $${values.length}`);
+  }
 
-  //     const roles = await query<FetchDbRole>(
-  //       roleQuery,
-  //       [...values, filters.limit, offset]
-  //     );
+  if (filters?.search) {
+    values.push(`%${filters.search}%`);
+    where.push(`(
+      p.bill_number ILIKE $${values.length}
+      OR v.vendor_name ILIKE $${values.length}
+    )`);
+  }
 
-  //     const total = await query<RoleCountResult>(countQuery, values);
+  const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  //     return {
-  //       roles,
-  //       pagination: {
-  //         page: filters.page,
-  //         limit: filters.limit,
-  //         total: Number(total[0].count),
-  //         totalPages: Math.ceil(Number(total[0].count) / filters.limit),
-  //       },
-  //     };
-  //   }
+ const purchaseQuery = `
+  SELECT 
+    p.*,
+    v.vendor_name,
+    f.branch_id,
+    b.company_id
+  FROM purchases p
+  LEFT JOIN vendors v ON v.id = p.vendor_id
+  LEFT JOIN firm f ON f.id = p.firm_id
+  LEFT JOIN branches b ON b.id = f.branch_id
+  ${whereClause}
+  ORDER BY p.id DESC
+  LIMIT $${values.length + 1}
+  OFFSET $${values.length + 2}
+`;
 
-  //   async updateRole(data: EditRoleParams, client: any) {
+  const countQuery = `
+  SELECT COUNT(*)
+  FROM purchases p
+  LEFT JOIN vendors v ON v.id = p.vendor_id
+  LEFT JOIN firm f ON f.id = p.firm_id
+  LEFT JOIN branches b ON b.id = f.branch_id
+  ${whereClause}
+`;
 
-  //     const { id, role, description, company_id, statusCode } = data;
+  const purchases = await query(
+    purchaseQuery,
+    [...values, filters.limit, offset]
+  );
 
-  //     const isRoleExist = await isExist(
-  //       id,
-  //       "role",
-  //       "company_id",
-  //       company_id,
-  //       client
-  //     );
+  const total = await query<{ count: string }>(countQuery, values);
 
-  //     if (!isRoleExist) {
-  //       throw new AppError("Role not found", 404);
-  //     }
+  return {
+    purchases,
+    pagination: {
+      page: filters.page,
+      limit: filters.limit,
+      total: Number(total[0].count),
+      totalPages: Math.ceil(Number(total[0].count) / filters.limit),
+    },
+  };
+}
+ async fetchPurchaseFull(data: PurchaseFetchParams) {
+  const { filters, offset } = data;
 
-  //     const status =
-  //       statusCode === 99
-  //         ? isRoleExist.status
-  //         : statusCode;
+  let where: string[] = [];
+  let values: any[] = [];
 
-  //     const updateQuery = `
-  //       UPDATE role
-  //       SET
-  //         role = $1,
-  //         description = $2,
-  //         status = $3
-  //       WHERE id = $4
-  //       RETURNING *;
-  //     `;
+  where.push(`p.status != $${values.length + 1}`);
+  values.push(0);
+  if (filters?.id) {
+    values.push(filters.id);
+    where.push(`p.id = $${values.length}`);
+  }
 
-  //     const values = [
-  //       role ?? isRoleExist.role,
-  //       description ?? isRoleExist.description,
-  //       status,
-  //       id
-  //     ];
+  if (filters.company_id) {
+    values.push(filters.company_id);
+   where.push(`b.company_id = $${values.length}`);
+  }
 
-  //     const { rows } = await executeInTransaction(client, updateQuery, values);
+  if (filters?.branch_id) {
+    values.push(filters.branch_id);
+    where.push(`f.branch_id = $${values.length}`);
+  }
 
-  //     return rows[0];
-  //   }
+  if (filters?.firm_id) {
+    values.push(filters.firm_id);
+    where.push(`p.firm_id = $${values.length}`);
+  }
 
-  //   async deleteRole(data: DeleteRoleBody) {
+  if (filters?.start_date) {
+    values.push(filters.start_date);
+    where.push(`p.bill_date >= $${values.length}`);
+  }
 
-  //     const { id, company_id } = data;
+  if (filters?.end_date) {
+    values.push(filters.end_date);
+    where.push(`p.bill_date <= $${values.length}`);
+  }
 
-  //     const result = transaction(async (client) => {
+  if (filters?.search) {
+    values.push(`%${filters.search}%`);
+    where.push(`(
+      p.bill_number ILIKE $${values.length}
+      OR v.vendor_name ILIKE $${values.length}
+    )`);
+  }
 
-  //       const isRoleExist = await isExist(
-  //         id,
-  //         "role",
-  //         "company_id",
-  //         company_id,
-  //         client
-  //       );
+  const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  //       if (!isRoleExist) {
-  //         throw new AppError("Role not found or already deleted", 404);
-  //       }
+ const purchaseQuery = `
+  SELECT 
+    p.*,
+    v.vendor_name,
+    pm.method_name AS payment_method,
+    f.branch_id,
+    b.company_id,
 
-  //       const deleteQuery = `
-  //         UPDATE role
-  //         SET status = 0
-  //         WHERE id = $1
-  //         RETURNING *;
-  //       `;
+    COALESCE(
+      JSON_AGG(
+        JSON_BUILD_OBJECT(
+          'id', pi.id,
+          'product_id', pi.product_id,
+          'product_name', pr.name,
+          'stock_id', pi.stock_id,
+          'batch_number', s.batch_number,
+          'received_qty', pi.received_qty,
+          'purchased_qty', pi.purchased_qty,
+          'unit', pi.unit,
+          'unit_price', pi.unit_price,
+          'sub_total', pi.sub_total,
+          'total_cgst', pi.total_cgst,
+          'total_sgst', pi.total_sgst,
+          'total_igst', pi.total_igst,
+          'net_amount', pi.net_amount,
+          'status', pi.status
+        )
+      ) FILTER (WHERE pi.id IS NOT NULL),
+      '[]'
+    ) AS items
 
-  //       const { rows } = await executeInTransaction(
-  //         client,
-  //         deleteQuery,
-  //         [id]
-  //       );
+  FROM purchases p
+  LEFT JOIN vendors v ON v.id = p.vendor_id
+  LEFT JOIN payment_methods pm ON pm.id = p.payment_method_id
+  LEFT JOIN firm f ON f.id = p.firm_id
+  LEFT JOIN branches b ON b.id = f.branch_id
 
-  //       return rows[0];
-  //     });
+  LEFT JOIN purchase_items pi ON pi.purchase_id = p.id
+  LEFT JOIN products pr ON pr.id = pi.product_id
+  LEFT JOIN stock s ON s.id = pi.stock_id
 
-  //     return result;
-  //   }
+  ${whereClause}
+
+  GROUP BY 
+    p.id,
+    v.vendor_name,
+    pm.method_name,
+    f.branch_id,
+    b.company_id
+
+  ORDER BY p.id DESC
+  LIMIT $${values.length + 1}
+  OFFSET $${values.length + 2}
+`;
+
+  const countQuery = `
+  SELECT COUNT(*)
+  FROM purchases p
+  LEFT JOIN vendors v ON v.id = p.vendor_id
+  LEFT JOIN firm f ON f.id = p.firm_id
+  LEFT JOIN branches b ON b.id = f.branch_id
+  ${whereClause}
+`;
+
+  const purchases = await query(
+    purchaseQuery,
+    [...values, filters.limit, offset]
+  );
+
+  const total = await query<{ count: string }>(countQuery, values);
+
+  return {
+    purchases,
+    pagination: {
+      page: filters.page,
+      limit: filters.limit,
+      total: Number(total[0].count),
+      totalPages: Math.ceil(Number(total[0].count) / filters.limit),
+    },
+  };
+}
 }

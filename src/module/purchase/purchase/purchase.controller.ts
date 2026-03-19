@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../../config/db";
 import { convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../../utils/extra";
-import { PurchaseCreateBody } from "./purchase.types";
+import { PurchaseCreateBody, PurchaseFetchParams } from "./purchase.types";
 import StockController from "../../stock/stock.controller";
 import PurchaseService from "./purchase.service";
 import PurchaseItemController from "../purchaseitems/purchaseitems.controller";
@@ -113,6 +113,44 @@ export default class PurchaseController {
     });
   }
 
+   async purchaseFetch(data: PurchaseFetchParams) {
+  
+      const service = new PurchaseService();
+  
+      const purchasesWithCode = await service.fetchPurchase(data);
+  
+      const purchases = purchasesWithCode.purchases.map((row) => ({
+        ...row,
+        status: getStatusText(row.status),
+      }));
+  
+      return {
+        purchases,
+        pagination: { ...purchasesWithCode.pagination }
+      };
+    }
+  async fullPurchaseFetch(data: PurchaseFetchParams) {
+
+  const service = new PurchaseService();
+
+  const purchasesWithCode = await service.fetchPurchaseFull(data);
+
+  const purchases = purchasesWithCode.purchases.map((row) => ({
+    ...row,
+
+    status: getStatusText(row.status),
+
+    items: row.items?.map((item: any) => ({
+      ...item,
+      status: getStatusText(item.status),
+    })) || [],
+  }));
+
+  return {
+    purchases,
+    pagination: { ...purchasesWithCode.pagination }
+  };
+}
   // async editRole(data: EditRoleBody) {
 
   //   const { status, ...rest } = data;

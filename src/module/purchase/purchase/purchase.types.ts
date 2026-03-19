@@ -32,16 +32,26 @@ export interface PurchaseCreateParams
 
 export interface PurchaseFetchBody {
   id?: number;
+  firm_id?:number;
   branch_id?: number;
   company_id: number;
-  // status?: number;
   search?: string;
+  start_date?:string;
+  end_date?:string;
   page: number;
   limit: number;
 }
+export type PurchaseFullFetchBody = Omit<PurchaseFetchBody, 'id'> & {
+  id: number;
+};
+export interface PurchaseFullFetchParams {
+  offset: number;
+  filters: PurchaseFullFetchBody; // ✅ id is required here
+}
+
 export interface PurchaseFetchParams {
   offset: number;
-  filters: PurchaseFetchBody;
+  filters: PurchaseFetchBody; // normal optional id
 }
 export interface PurchaseFetchDb {
   id: number;
