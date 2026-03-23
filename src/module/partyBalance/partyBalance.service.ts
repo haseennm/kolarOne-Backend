@@ -1,5 +1,5 @@
 import { PoolClient } from "pg";
-import { CreatePartyBalanceParams, DeletePartyBalanceParams, FetchDbPartyBalance, FetchPartyBalanceParams, PartyBalanceCountResult, RepayPartyBalanceParams } from "./partyBalance.types";
+import { CreatePartyBalanceParams, DeletePartyBalanceParams, EditPartyBalanceParams, FetchDbPartyBalance, FetchPartyBalanceParams, PartyBalanceCountResult, RepayPartyBalanceParams } from "./partyBalance.types";
 import { executeInTransaction, query } from "../../config/db";
 import { getStatusCode, isExist } from "../../utils/extra";
 import { AppError } from "../../utils/AppError";
@@ -37,6 +37,87 @@ export default class PartyBalanceService {
     ];
 
     const { rows } = await executeInTransaction(client, partyQuery, values);
+    return rows[0];
+  }
+  async editPartyBalance(data: EditPartyBalanceParams, client: PoolClient) {
+    const { ref_id, ref_type, balance, flow, action_by, firm_id, statusCode } = data;
+
+    const result = await executeInTransaction(
+      client,
+      `SELECT * FROM party_balance WHERE ref_id = $1 AND firm_id = $2 AND ref_type = $3`,
+      [ref_id, firm_id, ref_type]
+    );
+
+    // ✅ CREATE if not exists
+    if (result.rows.length === 0) {
+      const remark = {
+        action: `Created with ${balance}`,
+        created_by: action_by,
+        created_at: Date.now(),
+      };
+
+      const insertQuery = `
+      INSERT INTO party_balance (
+        ref_id,
+        ref_type,
+        balance,
+        paid,
+        flow,
+        firm_id,
+        status,
+        remarks
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      RETURNING *;
+    `;
+
+      const insertValues = [
+        ref_id,
+        ref_type,
+        balance,
+        0,
+        flow,
+        firm_id,
+        statusCode,
+        JSON.stringify([remark]), // better as array
+      ];
+
+      const { rows } = await executeInTransaction(client, insertQuery, insertValues);
+      return rows[0]; // ✅ return immediately
+    }
+
+    // ✅ UPDATE if exists
+    const remark = {
+      action: `Edited with ${balance}`,
+      updated_by: action_by,
+      created_at: Date.now(),
+    };
+
+    const updateQuery = `
+    UPDATE party_balance
+    SET
+      balance = $1,
+      paid = $2,
+      flow = $3,
+      status = $4,
+      remarks = $5
+    WHERE ref_id = $6 AND firm_id = $7 AND ref_type = $8
+    RETURNING *;
+  `;
+
+    const updateValues = [
+      balance,
+      0,
+      flow,
+      statusCode,
+      JSON.stringify([remark]), // overwriting for now
+      ref_id,
+      firm_id,
+      ref_type,
+    ];
+
+    const { rows } = await executeInTransaction(client, updateQuery, updateValues);
+
     return rows[0];
   }
 
@@ -132,7 +213,7 @@ export default class PartyBalanceService {
     const newBalance = Number(balance.balance) - Number(pay_amount);
 
     const status =
-      Number(newBalance)=== 0
+      Number(newBalance) === 0
         ? getStatusCode("Paid")
         : getStatusCode("Partial");
 
@@ -165,36 +246,27 @@ export default class PartyBalanceService {
 
   async deletePartyBalance(data: DeletePartyBalanceParams, client: PoolClient) {
 
-    const { id, firm_id } = data;
+    const { purchase_id, firm_id } = data;
 
-    const balance = await isExist(
-      id,
-      "party_balance",
-      "firm_id",
-      firm_id,
-      client
+    const result = await executeInTransaction(
+      client,
+      `SELECT * FROM party_balance WHERE ref_id = $1 AND firm_id = $2 AND ref_type =$3`,
+      [purchase_id, firm_id, "P"]
     );
 
-    if (!balance) {
-      throw new AppError("Party balance not found", 404);
+    if (result.rows.length === 0) {
+      return "NO balance to delete"
+    } else {
+
+      const deleteQuery = `
+        UPDATE party_balance
+        SET status = 0
+        WHERE  ref_id = $1 AND firm_id = $2 AND ref_type =$3
+        RETURNING *;
+      `;
+      await executeInTransaction(client, deleteQuery, [purchase_id, firm_id, "P"]);
+
+      return "Deleted balance row";
     }
-
-    if (balance.paid > 0) {
-      throw new AppError(
-        "This record cannot be deleted because payment exists",
-        400
-      );
-    }
-
-    const deleteQuery = `
-      UPDATE party_balance
-      SET status = 0
-      WHERE id = $1 AND firm_id =$2
-      RETURNING *;
-    `;
-
-    const { rows } = await executeInTransaction(client, deleteQuery, [id,firm_id]);
-
-    return rows[0];
   }
 }

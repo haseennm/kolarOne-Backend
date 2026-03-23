@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../../config/db";
 import { cns, getStatusCode, getStatusText } from "../../../utils/extra";
-import { CreatePurchaseItemBody, DeletePurchaseItemBody, FetchPurchaseItemParams } from "./purchaseitems.types";
+import { CreatePurchaseItemBody, DeletePurchaseItemBody, EditPurchaseItemBody, FetchPurchaseItemParams } from "./purchaseitems.types";
 import PurchaseItemService from "./purchaseitems.service";
 import { AppError } from "../../../utils/AppError";
 
@@ -17,12 +17,12 @@ export default class PurchaseItemController {
       action: "Created",
       created_at: Date.now(),
     }
-     if (rest.received_qty > rest.purchased_qty) {
-          throw new AppError(
-            "Received quantity cannot exceed purchased quantity",
-            422
-          );
-        }
+    if (rest.received_qty > rest.purchased_qty) {
+      throw new AppError(
+        "Received quantity cannot exceed purchased quantity",
+        422
+      );
+    }
     const service = new PurchaseItemService();
 
     await service.createPurchaseItems(
@@ -36,6 +36,32 @@ export default class PurchaseItemController {
 
 
     return `purchaseItem has been created successfully.`;
+  }
+  async editPurchaseItem(data: EditPurchaseItemBody, client: PoolClient) {
+    cns("create purchase items", data)
+    const { status, ...rest } = data;
+
+    let statusCode = undefined
+    if (status) statusCode = getStatusCode(status);
+
+    const remark = {
+      action: "Update",
+      created_at: Date.now(),
+    }
+
+    const service = new PurchaseItemService();
+
+    const purchase_item = service.updatePurchaseItem(
+      {
+        ...rest,
+        statusCode,
+        remark
+      },
+      client
+    );
+
+
+    return purchase_item;
   }
   async fetchPurchaseItems(data: FetchPurchaseItemParams) {
 
@@ -53,49 +79,19 @@ export default class PurchaseItemController {
       pagination: { ...rolesWithCode.pagination }
     };
   }
-  async editRole(data: any) {
-
-    const { status, ...rest } = data;
-
-    return transaction(async (client) => {
-
-      let statusCode = null;
-      const remark = {
-        action: "Updated",
-        updated_at: new Date().toISOString(),
-      };
-
-      if (typeof status === "string") {
-        statusCode = getStatusCode(status);
-      }
-
-      const service = new PurchaseItemService();
-
-      await service.updatePurchaseItem(
-        {
-          ...rest,
-          statusCode,
-        },
-        remark,
-        client
-      );
-
-      return `Role has been updated successfully.`;
-    });
-  }
 
 
 
-  async deleteRole(data: DeletePurchaseItemBody, client: PoolClient) {
+
+  async deletePurchaseItem(data: DeletePurchaseItemBody, client: PoolClient) {
 
     const remark = {
       action: "Deleted",
       deleted_at: Date.now(),
     };
     const service = new PurchaseItemService();
+    await service.deletePurchaseItem({...data,remark},  client);
 
-    const role = await service.deletePurchaseItem(data, remark, client);
-
-    return `Role ${role.role} has been deleted successfully.`;
+    return `Purchase item has been deleted successfully.`;
   }
 }

@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { transaction } from "../../config/db";
 import { cns, getStatusCode, getStatusText } from "../../utils/extra";
 import StockService from "./stock.service";
-import { StockCreateBody, StockDelete, StockFetchParams } from "./stock.types";
+import { StockCreateBody, StockDelete, StockEditBody, StockFetchParams } from "./stock.types";
 import { AppError } from "../../utils/AppError";
 
 export default class StockController {
@@ -33,32 +33,27 @@ export default class StockController {
 
     return stock;
   }
+  async editStock(data: StockEditBody, client: PoolClient) {
+    cns("Edit stock", data)
+    const { status, ...rest } = data;
 
-  // async editRole(data: EditRoleBody) {
 
-  //   const { status, ...rest } = data;
+    let statusCode = undefined
+    if (status) {
+      statusCode = getStatusCode(status);
+    }
+    const service = new StockService();
 
-  //   return transaction(async (client) => {
+    const stock = await service.editStock(
+      {
+        ...rest,
+        statusCode
+      },
+      client
+    );
 
-  //     let statusCode = 99;
-
-  //     if (typeof status === "string") {
-  //       statusCode = getStatusCode(status);
-  //     }
-
-  //     const service = new StockService();
-
-  //     await service.updateRole(
-  //       {
-  //         ...rest,
-  //         statusCode
-  //       },
-  //       client
-  //     );
-
-  //     return `Role has been updated successfully.`;
-  //   });
-  // }
+    return stock;
+  }
 
   async fetchStock(data: StockFetchParams) {
 
@@ -77,7 +72,7 @@ export default class StockController {
     };
   }
 
-  async deleteRole(data: StockDelete, client: PoolClient) {
+  async deleteStock(data: StockDelete, client: PoolClient) {
     const service = new StockService();
     await service.deleteStock(data, client);
     return `stock has been deleted successfully.`;

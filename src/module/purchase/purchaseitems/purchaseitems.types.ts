@@ -17,8 +17,31 @@ export interface CreatePurchaseItemBody {
   net_amount: number;
 }
 export interface CreatePurchaseItemParams
-  extends Omit<CreatePurchaseItemBody, "status" > {
+  extends Omit<CreatePurchaseItemBody, "status"> {
   statusCode: number;
+  remark: object;
+}
+export interface EditPurchaseItemBody {
+  item_id: number
+  purchase_id: number;
+  firm_id: number;
+  branch_id: number;
+  status?: string;
+  product_id?: number;
+  stock_id?: number;
+  received_qty?: number;
+  purchased_qty?: number;
+  unit?: string;
+  unit_price?: number;
+  sub_total?: number;
+  total_igst?: number;
+  total_sgst?: number;
+  total_cgst?: number;
+  net_amount?: number;
+}
+export interface EditPurchaseItemParams
+  extends Omit<EditPurchaseItemBody, "status"> {
+  statusCode?: number;
   remark: object;
 }
 
@@ -69,8 +92,12 @@ export interface FetchDbPurchaseItem {
 }
 
 export interface DeletePurchaseItemBody {
-  id: number;
+  purchase_id: number;
   firm_id: number;
+}
+export interface DeletePurchaseItemParams
+  extends DeletePurchaseItemBody {
+  remark: object;
 }
 
 export interface UpdatePurchaseItemParams {

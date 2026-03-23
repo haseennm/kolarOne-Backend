@@ -1,7 +1,7 @@
 import { isExist } from "../../../utils/extra";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { CreatePurchaseItemParams, DeletePurchaseItemBody, FetchDbPurchaseItem, FetchPurchaseItemParams, PurchaseItemCountResult, UpdatePurchaseItemParams } from "./purchaseitems.types";
+import { CreatePurchaseItemParams, DeletePurchaseItemBody, DeletePurchaseItemParams, EditPurchaseItemParams, FetchDbPurchaseItem, FetchPurchaseItemParams, PurchaseItemCountResult, UpdatePurchaseItemParams } from "./purchaseitems.types";
 import { PoolClient } from "pg";
 
 export default class PurchaseItemService {
@@ -27,7 +27,7 @@ export default class PurchaseItemService {
       statusCode
     } = data;
 
-   
+
 
     const purchaseItemQuery = `
     INSERT INTO purchase_items (
@@ -149,9 +149,9 @@ export default class PurchaseItemService {
     };
   }
 
-  async updatePurchaseItem(data: UpdatePurchaseItemParams, remark: object, client: PoolClient) {
+  async updatePurchaseItem(data: EditPurchaseItemParams, client: PoolClient) {
     const {
-      id,
+
       branch_id,
       firm_id,
       purchased_qty,
@@ -163,106 +163,95 @@ export default class PurchaseItemService {
       total_sgst,
       total_igst,
       net_amount,
-      stock_id
+      stock_id,
+      item_id, purchase_id, remark, statusCode, product_id
     } = data;
 
     // 1. Validate firm existence (requirement)
-    const is_firm_exist = await isExist(
-      firm_id,
-      "firm",
+    const is_item_exist = await isExist(
+      item_id,
+      "purchase_items",
       "branch_id",
       branch_id,
       client
     );
-    if (!is_firm_exist) {
-      throw new AppError("Firm not found", 404);
-    }
-
-    // 2. Validate purchase item exists and belongs to the firm
-    const isItemExist = await isExist(
-      id,
-      "purchase_items",
-      "firm_id",
-      firm_id,
-      client
-    );
-    if (!isItemExist) {
+    if (!is_item_exist) {
       throw new AppError("Purchase item not found", 404);
     }
-
-
-    // 4. Parameterized UPDATE query
-    const updateQuery = `
+    const final_received_qty = received_qty ?? is_item_exist.received_qty;
+    const final_purchased_qty = purchased_qty ?? is_item_exist.purchased_qty;
+    if (final_received_qty > final_purchased_qty) {
+      throw new AppError(
+        "Received quantity cannot exceed purchased quantity",
+        422
+      );
+    }
+   const updateQuery= `
       UPDATE purchase_items
-      SET
-        purchased_qty = $1,
-        received_qty   = $2,
-        unit           = $3,
-        unit_price     = $4,
-        sub_total      = $5,
-        total_cgst     = $6,
-        total_sgst     = $7,
-        total_igst     = $8,
-        net_amount     = $9,
-        stock_id       = $10,
-         remarks =
-        CASE
-          WHEN remarks IS NULL THEN $11::jsonb
+    SET
+    purchased_qty = $1,
+      received_qty = $2,
+      unit = $3,
+      unit_price = $4,
+      sub_total = $5,
+      total_cgst = $6,
+      total_sgst = $7,
+      total_igst = $8,
+      net_amount = $9,
+      stock_id = $10,
+      remarks =
+      CASE
+          WHEN remarks IS NULL THEN $11:: jsonb
           WHEN jsonb_typeof(remarks) = 'array'
-            THEN remarks || $11::jsonb
-          ELSE jsonb_build_array(remarks) || $11::jsonb
-        END
-      WHERE id = $12
-      RETURNING *;
+            THEN remarks || $11:: jsonb
+          ELSE jsonb_build_array(remarks) || $11:: jsonb
+    END
+      WHERE id = $12 AND firm_id =$13
+    RETURNING *;
     `;
 
     const values = [
-      purchased_qty ?? isItemExist.purchased_qty,
-      received_qty ?? isItemExist.received_qty,
-      unit ?? isItemExist.unit,
-      unit_price ?? isItemExist.unit_price,
-      sub_total ?? isItemExist.sub_total,
-      total_cgst ?? isItemExist.total_cgst,
-      total_sgst ?? isItemExist.total_sgst,
-      total_igst ?? isItemExist.total_igst,
-      net_amount ?? isItemExist.net_amount,
-      stock_id ?? isItemExist.stock_id,
+      purchased_qty ?? is_item_exist.purchased_qty,
+      received_qty ?? is_item_exist.received_qty,
+      unit ?? is_item_exist.unit,
+      unit_price ?? is_item_exist.unit_price,
+      sub_total ?? is_item_exist.sub_total,
+      total_cgst ?? is_item_exist.total_cgst,
+      total_sgst ?? is_item_exist.total_sgst,
+      total_igst ?? is_item_exist.total_igst,
+      net_amount ?? is_item_exist.net_amount,
+      stock_id ?? is_item_exist.stock_id,
       JSON.stringify(remark),
-      id
+      item_id,
+      firm_id
     ];
 
     const { rows } = await executeInTransaction(client, updateQuery, values);
     return rows[0];
   }
 
-  async deletePurchaseItem(data: DeletePurchaseItemBody, remark: object, client: PoolClient) {
+  async deletePurchaseItem(data: DeletePurchaseItemParams, client: PoolClient) {
 
-    const { id, firm_id } = data;
-
-
-    const isRoleExist = await isExist(
-      id,
-      "role",
-      "firm_id",
-      firm_id,
-      client
-    );
-
-    if (!isRoleExist) {
-      throw new AppError("Purchase item not found or already deleted", 404);
+    const { purchase_id, firm_id,remark } = data;
+    const isItemExist = await executeInTransaction(client,
+      `SELECT * FROM purchase_items WHERE purchase_id =$1 AND firm_id= $2`,
+      [purchase_id,firm_id]
+    )
+    if(isItemExist){
+      throw new AppError("Purchase item not found for this purchase",404)
     }
 
     const deleteQuery = `
         UPDATE purchase_items
         SET status = 0
-        WHERE id = $1 AND firm_id = $2
-        RETURNING *;
-      `;
+        WHERE purchase_id = $1 AND firm_id = $2
+    RETURNING *;
+    `;
 
     const { rows } = await executeInTransaction(
       client,
       deleteQuery,
-      [, firm_id]
+      [purchase_id, firm_id]
     );
 
     return rows[0];

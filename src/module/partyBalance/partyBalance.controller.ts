@@ -3,7 +3,7 @@ import { transaction } from "../../config/db";
 import { convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
 import { PaymentTransactionService } from "../paymentTransaction/paymenttransaction.services";
 import PartyBalanceService from "./partyBalance.service";
-import { CreatePartyBalanceBody, DeletePartyBalanceBody, FetchPartyBalanceParams, RepayPartyBalanceBody } from "./partyBalance.types";
+import { CreatePartyBalanceBody, DeletePartyBalanceBody, EditPartyBalanceBody, FetchPartyBalanceParams, RepayPartyBalanceBody } from "./partyBalance.types";
 
 export default class PartyBalanceController {
 
@@ -50,31 +50,30 @@ export default class PartyBalanceController {
 
   }
 
-  // async editPartyBalance(data: EditPartyBalanceBody) {
+  async editPartyBalance(data: EditPartyBalanceBody,client:PoolClient) {
 
-  //   const { status, ...rest } = data;
+    const { status, ...rest } = data;
 
-  //   return transaction(async (client) => {
 
-  //     let statusCode = 99;
+      let statusCode = undefined;
 
-  //     if (typeof status === "string") {
-  //       statusCode = getStatusCode(status);
-  //     }
+      if (typeof status === "string") {
+        statusCode = getStatusCode(status);
+      }
+      
 
-  //     const service = new PartyBalanceService();
+      const service = new PartyBalanceService();
 
-  //     await service.updatePartyBalance(
-  //       {
-  //         ...rest,
-  //         statusCode
-  //       },
-  //       client
-  //     );
+      await service.editPartyBalance(
+        {
+          ...rest,
+          statusCode
+        },
+        client
+      );
 
-  //     return `PartyBalance has been updated successfully.`;
-  //   });
-  // }
+      return `PartyBalance has been updated successfully.`;
+  }
 
   async fetchPartyBalance(data: FetchPartyBalanceParams) {
 
@@ -122,25 +121,17 @@ export default class PartyBalanceController {
       return `party balance has been paid successfully, Balance:'${party_balance.balance}'`;
     });
   }
-  async deletePartyBalance(data: DeletePartyBalanceBody) {
-
-    return transaction(async (client) => {
-
-      const { delete_by, firm_id, company_id, id, ...rest } = data
+  async deletePartyBalance(data: DeletePartyBalanceBody,client:PoolClient) {
+      const { delete_by, firm_id, purchase_id } = data
       const service = new PartyBalanceService();
       const remark = {
         action: "Deleted",
         delete_by,
         deleted_at: Date.now(),
       };
-      await service.deletePartyBalance({ ...rest, id, remark, firm_id, company_id }, client);
-      const payment_transactions_service = new PaymentTransactionService()
-      await payment_transactions_service.deletePaymentTransaction({
-        company_id: company_id,
-        ref_id: id,
-        ref_type: PaymentTransactionTypeCodeMap["balance"],
-      }, client)
+      await service.deletePartyBalance({ purchase_id, remark, firm_id }, client);
+     
       return `PartyBalance has been deleted successfully.`;
-    });
+  
   }
 }

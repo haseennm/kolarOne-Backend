@@ -9,10 +9,11 @@ export interface CreatePartyBalanceBody {
   firm_id: number;
 }
 export interface CreatePartyBalanceParams
-  extends Omit<CreatePartyBalanceBody, "created_by"> {
+extends Omit<CreatePartyBalanceBody, "created_by"> {
   statusCode: number;
   remark: object
 }
+
 
 export interface FetchPartyBalanceBody {
   firm_id?: string;
@@ -46,16 +47,14 @@ export interface EditPartyBalanceBody {
   balance?: number;
   flow?: "I" | "O";
   firm_id: number;
-  client: PoolClient
   status?: string;
   ref_type: 'S' | 'P' | 'SR' | 'PR';
-  updated_by: string;
+  action_by: string;
 }
 
 export interface EditPartyBalanceParams
-  extends Omit<EditPartyBalanceBody, "status" | "updated_by"> {
-  statusCode: number;
-  remark: object
+  extends Omit<EditPartyBalanceBody, "status"> {
+  statusCode?: number;
 }
 export interface RepayPartyBalanceBody {
   PartyBalance_id: number;
@@ -71,8 +70,7 @@ export interface RepayPartyBalanceParams extends Omit<RepayPartyBalanceBody, "up
 
 }
 export interface DeletePartyBalanceBody {
-  id: number;
-  company_id:number
+  purchase_id: number;
   delete_by: string;
   firm_id: number;
 }

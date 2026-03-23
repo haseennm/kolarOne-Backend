@@ -2,11 +2,11 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { isExist } from "../../utils/extra";
-import { StockCreateBody, StockCreateParams, StockDelete, StockFetchParams } from "./stock.types";
+import { StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams } from "./stock.types";
 
 export default class StockService {
 
-  async createStock(data: StockCreateParams, client: any) {
+  async createStock(data: StockCreateParams, client: PoolClient) {
     const {
       available_qty,
       branch_id,
@@ -46,8 +46,8 @@ export default class StockService {
     }
 
     const lastStock = await executeInTransaction(
-  client,
-  `
+      client,
+      `
   SELECT MAX(batch_num) AS last_batch FROM (
     SELECT CAST(SUBSTRING(batch_number FROM 7) AS INTEGER) AS batch_num
     FROM stock
@@ -55,11 +55,11 @@ export default class StockService {
     FOR UPDATE
   ) AS locked_rows
   `,
-  [branch_id]
-);
+      [branch_id]
+    );
 
-const nextBatch = (lastStock.rows[0]?.last_batch || 0) + 1;
-const batch_number = `BATCH-${nextBatch}`;
+    const nextBatch = (lastStock.rows[0]?.last_batch || 0) + 1;
+    const batch_number = `BATCH-${nextBatch}`;
 
 
     // ✅ Insert into stock table
@@ -116,6 +116,112 @@ const batch_number = `BATCH-${nextBatch}`;
       reason,
       stock_id,
       statusCode
+    ];
+
+    await executeInTransaction(client, movement_query, movement_values);
+    return rows[0]
+  }
+  async editStock(data: StockEditParams, client: PoolClient) {
+    const {
+      available_qty,
+      branch_id,
+      selling_price,
+      firm_id,
+      product_id,
+      purchase_id,
+      purchased_qty,
+      statusCode,
+      movement_type,
+      reason,
+      company_id,
+      stock_id
+    } = data;
+
+    const is_stock_exist = await isExist(
+      stock_id,
+      "stock",
+      "branch_id",
+      branch_id,
+      client
+    );
+
+    if (!is_stock_exist) {
+      throw new AppError("Firm not found", 404);
+    }
+    if (product_id && product_id !== is_stock_exist.product_id) {
+      const is_product_exist = await isExist(
+        product_id,
+        "products",
+        "company_id",
+        company_id,
+        client
+      );
+
+      if (!is_product_exist) {
+        throw new AppError("Product not found", 404);
+      }
+    }
+    const finalAvailableQty = available_qty ?? is_stock_exist.available_qty;
+    const finalPurchasedQty = purchased_qty ?? is_stock_exist.purchased_qty;
+
+    if (finalAvailableQty > finalPurchasedQty) {
+      throw new AppError(
+        "Available quantity cannot exceed purchased quantity",
+        422
+      );
+    }
+    const stockQuery = `
+  UPDATE stock SET
+    available_quantity = $1,
+    status = $2,
+    selling_price = $3,
+    product_id = $5,
+    purchase_id = $6,
+    purchased_qty = $7
+    
+  WHERE id = $8
+  AND firm_id = $11
+    AND branch_id = $10
+  RETURNING *;
+`;
+
+    const values = [
+      available_qty ?? is_stock_exist.available_qty,
+      statusCode ?? is_stock_exist.status,
+      selling_price ?? is_stock_exist.selling_price,
+      firm_id,
+      product_id ?? is_stock_exist.product_id,
+      purchase_id ?? is_stock_exist.purchase_id,
+      purchased_qty ?? is_stock_exist.purchased_qty,
+      stock_id,
+      firm_id,
+      branch_id
+    ];
+
+    const { rows } = await executeInTransaction(client, stockQuery, values);
+
+    const movement_query = `
+  UPDATE stock_movements SET
+    product_id = $1,
+    branch_id = $2,
+    movement_type = $3,
+    quantity = $4,
+    reason = $5,
+    status = $6
+  WHERE stock_id = $7
+    AND branch_id = $8
+  RETURNING *;
+`;
+
+    const movement_values = [
+      product_id,
+      branch_id,
+      movement_type,
+      available_qty,
+      reason,
+      statusCode,
+      stock_id,
+      branch_id
     ];
 
     await executeInTransaction(client, movement_query, movement_values);
@@ -234,7 +340,7 @@ const batch_number = `BATCH-${nextBatch}`;
     };
   }
 
-  // async updateRole(data: EditRoleParams, client: any) {
+  // async updateRole(data: EditRoleParams, client: PoolClient) {
 
   //   const { id, role, description, company_id, statusCode } = data;
 
@@ -277,49 +383,48 @@ const batch_number = `BATCH-${nextBatch}`;
   //   return rows[0];
   // }
 
-  async deleteStock(data: StockDelete, client: PoolClient) {
+async deleteStock(data: StockDelete, client: PoolClient) {
+  const { firm_id, purchase_id } = data;
 
-    const { id, branch_id } = data;
+  const result = await executeInTransaction(
+    client,
+    `SELECT * FROM stock WHERE purchase_id = $1 AND firm_id = $2`,
+    [purchase_id, firm_id]
+  );
 
-
-    const is_stock_exist = await isExist(
-      id,
-      "stock",
-      "branch_id",
-      branch_id,
-      client
-    );
-
-    if (!is_stock_exist) {
-      throw new AppError("Stock not found or already deleted", 404);
-    }
-
-    const deleteQuery = `
-        UPDATE stock
-        SET status = 0
-        WHERE id = $1
-        RETURNING *;
-      `;
-
-    const { rows } = await executeInTransaction(
-      client,
-      deleteQuery,
-      [id]
-    );
-    const delete_movement_query = `
-        UPDATE stock_movements
-        SET status = 0
-        WHERE stock_id = $1
-        RETURNING *;
-      `;
-
-    await executeInTransaction(
-      client,
-      delete_movement_query, [id]
-    );
-
-    return rows[0];
-
-
+  if (result.rows.length === 0) {
+    throw new AppError("Stock not found for this purchase", 404);
   }
+
+  const stocks = result.rows;
+
+  const deleteQuery = `
+    UPDATE stock
+    SET status = 0
+    WHERE purchase_id = $1 AND firm_id = $2
+    RETURNING *;
+  `;
+
+  const { rows } = await executeInTransaction(
+    client,
+    deleteQuery,
+    [purchase_id, firm_id]
+  );
+
+  for (const stock of stocks) {
+    const deleteMovementQuery = `
+      UPDATE stock_movements
+      SET status = 0
+      WHERE stock_id = $1 AND product_id = $2 AND branch_id = $3
+    `;
+
+    await executeInTransaction(client, deleteMovementQuery, [
+      stock.id,
+      stock.product_id,
+      stock.branch_id,
+    ]);
+  }
+
+  return rows[0];
+}
 }
