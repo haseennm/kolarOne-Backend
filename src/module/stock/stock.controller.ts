@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { transaction } from "../../config/db";
 import { cns, getStatusCode, getStatusText } from "../../utils/extra";
 import StockService from "./stock.service";
-import { StockCreateBody, StockDelete, StockEditBody, StockFetchParams } from "./stock.types";
+import { StockChangeBody, StockCreateBody, StockDelete, StockEditBody, StockFetchParams } from "./stock.types";
 import { AppError } from "../../utils/AppError";
 
 export default class StockController {
@@ -49,6 +49,20 @@ export default class StockController {
         ...rest,
         statusCode
       },
+      client
+    );
+
+    return stock;
+  }
+  async reduceStock(data: StockChangeBody, client: PoolClient) {
+    cns("Edit stock", data)
+    const service = new StockService();
+
+    const statusCode = getStatusCode("Good");
+    const stock = await service.changeStock(
+      { statusCode, ...data }
+
+      ,
       client
     );
 

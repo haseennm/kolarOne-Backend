@@ -31,7 +31,20 @@ export interface StockEditBody {
 export interface StockEditParams extends Omit<StockEditBody, "status"> {
   statusCode?: number
 }
+export interface StockChangeBody {
+  stock_id: number
+  company_id: number
+  branch_id: number;
+  firm_id: number;
+  purchase_return_id?: number;
+  qty: number;
+  movement_type?: 'I' | 'O';
+  reason?: string;
+}
 
+export interface StockChangeParams extends StockChangeBody{
+  statusCode?: number
+}
 export interface StockFetchBody {
   page?: number;
   limit?: number;

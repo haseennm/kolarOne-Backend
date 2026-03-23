@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { isExist } from "../../utils/extra";
-import { StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams } from "./stock.types";
+import { StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams } from "./stock.types";
 
 export default class StockService {
 
@@ -227,6 +227,90 @@ export default class StockService {
     await executeInTransaction(client, movement_query, movement_values);
     return rows[0]
   }
+  async changeStock(data: StockChangeParams, client: PoolClient) {
+    const {
+      branch_id,
+      firm_id,
+  statusCode,
+      movement_type,
+      reason,
+      purchase_return_id,
+      stock_id,
+      qty
+    } = data;
+
+    const is_stock_exist = await isExist(
+      stock_id,
+      "stock",
+      "branch_id",
+      branch_id,
+      client
+    );
+
+    if (!is_stock_exist) {
+      throw new AppError("Stock not found", 404);
+    }
+    const calculation = movement_type=== "O" ? -qty : qty;
+
+    const finalAvailableQty = is_stock_exist.available_qty + calculation;
+    const finalPurchasedQty = is_stock_exist.purchased_qty + calculation;
+
+    if (finalAvailableQty > finalPurchasedQty) {
+      throw new AppError(
+        "Available quantity cannot exceed purchased quantity",
+        422
+      );
+    }
+    if (finalAvailableQty < 0) {
+  throw new Error("Stock cannot be negative");
+}
+    const stockQuery = `
+  UPDATE stock SET
+    available_quantity = $1,
+    purchased_qty = $2
+    
+  WHERE id = $3
+  AND firm_id = $4
+    AND branch_id = $5
+  RETURNING *;
+`;
+
+    const values = [
+      finalAvailableQty,
+      finalPurchasedQty,
+      stock_id,
+      firm_id,
+      branch_id
+    ];
+
+    const { rows } = await executeInTransaction(client, stockQuery, values);
+
+    const movement_query = `
+    INSERT INTO stock_movements (
+      product_id,
+      branch_id,
+      movement_type,
+      quantity,
+      reason,
+      stock_id,
+      status
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7)
+    RETURNING *;
+  `;
+
+    const movement_values = [
+      is_stock_exist.product_id,
+      branch_id,
+      movement_type,
+      qty,
+      reason,
+      stock_id,
+      statusCode
+    ];
+    await executeInTransaction(client, movement_query, movement_values);
+    return rows[0]
+  }
 
   async fetchStock(data: StockFetchParams) {
     const { filters, offset } = data;
@@ -383,48 +467,48 @@ export default class StockService {
   //   return rows[0];
   // }
 
-async deleteStock(data: StockDelete, client: PoolClient) {
-  const { firm_id, purchase_id } = data;
+  async deleteStock(data: StockDelete, client: PoolClient) {
+    const { firm_id, purchase_id } = data;
 
-  const result = await executeInTransaction(
-    client,
-    `SELECT * FROM stock WHERE purchase_id = $1 AND firm_id = $2`,
-    [purchase_id, firm_id]
-  );
+    const result = await executeInTransaction(
+      client,
+      `SELECT * FROM stock WHERE purchase_id = $1 AND firm_id = $2`,
+      [purchase_id, firm_id]
+    );
 
-  if (result.rows.length === 0) {
-    throw new AppError("Stock not found for this purchase", 404);
-  }
+    if (result.rows.length === 0) {
+      throw new AppError("Stock not found for this purchase", 404);
+    }
 
-  const stocks = result.rows;
+    const stocks = result.rows;
 
-  const deleteQuery = `
+    const deleteQuery = `
     UPDATE stock
     SET status = 0
     WHERE purchase_id = $1 AND firm_id = $2
     RETURNING *;
   `;
 
-  const { rows } = await executeInTransaction(
-    client,
-    deleteQuery,
-    [purchase_id, firm_id]
-  );
+    const { rows } = await executeInTransaction(
+      client,
+      deleteQuery,
+      [purchase_id, firm_id]
+    );
 
-  for (const stock of stocks) {
-    const deleteMovementQuery = `
+    for (const stock of stocks) {
+      const deleteMovementQuery = `
       UPDATE stock_movements
       SET status = 0
       WHERE stock_id = $1 AND product_id = $2 AND branch_id = $3
     `;
 
-    await executeInTransaction(client, deleteMovementQuery, [
-      stock.id,
-      stock.product_id,
-      stock.branch_id,
-    ]);
-  }
+      await executeInTransaction(client, deleteMovementQuery, [
+        stock.id,
+        stock.product_id,
+        stock.branch_id,
+      ]);
+    }
 
-  return rows[0];
-}
+    return rows[0];
+  }
 }
