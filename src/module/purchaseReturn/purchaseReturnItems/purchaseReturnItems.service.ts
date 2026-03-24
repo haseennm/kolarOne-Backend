@@ -27,8 +27,8 @@ export default class PurchaseReturnItemService {
     const check_exist_return = await isExist(
       purchase_return_id, "purchase_return", "firm_id", firm_id, client
     )
+    if (!check_exist_return) throw new AppError("Purchase return not found.", 404)
     if (stock_id) {
-      if (!check_exist_return) throw new AppError("Purchase return not found.", 404)
       const check_exist_stock = await isExist(
         stock_id, "stock", "firm_id", firm_id, client
       )
