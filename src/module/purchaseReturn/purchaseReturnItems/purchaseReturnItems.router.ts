@@ -1,218 +1,162 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import {
-  CreateRoleBody,
-  DeleteRoleBody,
-  EditRoleBody,
-  FetchRoleBody
-} from "./purchaseReturnItems.types";
-import RoleController from "./purchaseReturnItems.controller";
+// import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
-export async function roleRouter(app: FastifyInstance) {
+// export async function roleRouter(app: FastifyInstance) {
 
-  // CREATE ROLE
-  app.post<{ Body: CreateRoleBody }>(
-    "/create",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: ["role", "company_id", "status"],
-          properties: {
+  
 
-            role: {
-              type: "string",
-              minLength: 1,
-              maxLength: 100
-            },
+//   // FETCH ROLE
+//   app.post<{ Body: FetchRoleBody }>(
+//     "/get",
+//     {
+//       schema: {
+//         body: {
+//           type: "object",
+//           required: ["company_id"],
+//           properties: {
 
-            description: {
-              type: "string",
-              maxLength: 300
+//             id: {
+//               type: "number"
+//             },
 
-            },
+//             company_id: {
+//               type: "number"
+//             },
+//             branch_id: {
+//               type: "number"
+//             },
 
-            company_id: {
-              type: "number"
-            },
+//             // status: {
+//             //   type: "number"
+//             // },
 
-            status: {
-              type: "string",
-              enum: ["Active", "Inactive"]
-            }
+//             search: {
+//               type: "string"
+//             },
 
-          }
-        }
-      }
-    },
-    async (
-      request: FastifyRequest<{ Body: CreateRoleBody }>,
-      reply: FastifyReply
-    ) => {
+//             page: {
+//               type: "number",
+//               minimum: 1
+//             },
 
-      const controller = new RoleController();
-      const data = await controller.createRole(request.body);
+//             limit: {
+//               type: "number",
+//               minimum: 1
+//             }
 
-      return reply.code(201).send({
-        status: "Success",
-        message: data
-      });
+//           }
+//         }
+//       }
+//     },
+//     async (
+//       request: FastifyRequest<{ Body: FetchRoleBody }>,
+//       reply: FastifyReply
+//     ) => {
 
-    }
-  );
+//       const { page = 1, limit = 10, ...filters } = request.body;
 
-  // FETCH ROLE
-  app.post<{ Body: FetchRoleBody }>(
-    "/get",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: ["company_id"],
-          properties: {
+//       const controller = new RoleController();
 
-            id: {
-              type: "number"
-            },
+//       const data = await controller.fetchRole({
+//         offset: (page - 1) * limit,
+//         filters: {
+//           ...filters,
+//           page,
+//           limit
+//         }
+//       });
 
-            company_id: {
-              type: "number"
-            },
-            branch_id: {
-              type: "number"
-            },
+//       return reply.code(200).send(data);
 
-            // status: {
-            //   type: "number"
-            // },
+//     }
+//   );
 
-            search: {
-              type: "string"
-            },
+//   // EDIT ROLE
+//   app.post<{ Body: EditRoleBody }>(
+//     "/edit",
+//     {
+//       schema: {
+//         body: {
+//           type: "object",
+//           required: ["id", "company_id"],
+//           properties: {
 
-            page: {
-              type: "number",
-              minimum: 1
-            },
+//             id: {
+//               type: "number"
+//             },
 
-            limit: {
-              type: "number",
-              minimum: 1
-            }
+//             company_id: {
+//               type: "number"
+//             },
 
-          }
-        }
-      }
-    },
-    async (
-      request: FastifyRequest<{ Body: FetchRoleBody }>,
-      reply: FastifyReply
-    ) => {
+//             role: {
+//               type: "string"
+//             },
 
-      const { page = 1, limit = 10, ...filters } = request.body;
+//             description: {
+//               type: "string"
+//             },
 
-      const controller = new RoleController();
+//             status: {
+//               type: "string",
+//               enum: ["Active", "Inactive"]
+//             }
 
-      const data = await controller.fetchRole({
-        offset: (page - 1) * limit,
-        filters: {
-          ...filters,
-          page,
-          limit
-        }
-      });
+//           }
+//         }
+//       }
+//     },
+//     async (
+//       request: FastifyRequest<{ Body: EditRoleBody }>,
+//       reply: FastifyReply
+//     ) => {
 
-      return reply.code(200).send(data);
+//       const controller = new RoleController();
+//       const data = await controller.editRole(request.body);
 
-    }
-  );
+//       return reply.code(200).send({
+//         status: "Success",
+//         message: data
+//       });
 
-  // EDIT ROLE
-  app.post<{ Body: EditRoleBody }>(
-    "/edit",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: ["id", "company_id"],
-          properties: {
+//     }
+//   );
 
-            id: {
-              type: "number"
-            },
+//   // DELETE ROLE
+//   app.post<{ Body: DeleteRoleBody }>(
+//     "/delete",
+//     {
+//       schema: {
+//         body: {
+//           type: "object",
+//           required: ["id", "company_id"],
+//           properties: {
 
-            company_id: {
-              type: "number"
-            },
+//             id: {
+//               type: "number"
+//             },
 
-            role: {
-              type: "string"
-            },
+//             company_id: {
+//               type: "number"
+//             }
 
-            description: {
-              type: "string"
-            },
+//           }
+//         }
+//       }
+//     },
+//     async (
+//       request: FastifyRequest<{ Body: DeleteRoleBody }>,
+//       reply: FastifyReply
+//     ) => {
 
-            status: {
-              type: "string",
-              enum: ["Active", "Inactive"]
-            }
+//       const controller = new RoleController();
+//       const data = await controller.deleteRole(request.body);
 
-          }
-        }
-      }
-    },
-    async (
-      request: FastifyRequest<{ Body: EditRoleBody }>,
-      reply: FastifyReply
-    ) => {
+//       return reply.code(200).send({
+//         status: "Success",
+//         message: data
+//       });
 
-      const controller = new RoleController();
-      const data = await controller.editRole(request.body);
+//     }
+//   );
 
-      return reply.code(200).send({
-        status: "Success",
-        message: data
-      });
-
-    }
-  );
-
-  // DELETE ROLE
-  app.post<{ Body: DeleteRoleBody }>(
-    "/delete",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: ["id", "company_id"],
-          properties: {
-
-            id: {
-              type: "number"
-            },
-
-            company_id: {
-              type: "number"
-            }
-
-          }
-        }
-      }
-    },
-    async (
-      request: FastifyRequest<{ Body: DeleteRoleBody }>,
-      reply: FastifyReply
-    ) => {
-
-      const controller = new RoleController();
-      const data = await controller.deleteRole(request.body);
-
-      return reply.code(200).send({
-        status: "Success",
-        message: data
-      });
-
-    }
-  );
-
-}
+// }

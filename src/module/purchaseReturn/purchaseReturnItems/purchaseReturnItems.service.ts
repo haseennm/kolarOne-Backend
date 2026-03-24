@@ -21,12 +21,21 @@ export default class PurchaseReturnItemService {
       net_amount,
       stock_id,
       remark,
-      statusCode,returned_qty
+      statusCode, returned_qty, purchase_item_id
     } = data;
 
+    const check_exist_return = await isExist(
+      purchase_return_id, "purchase_return", "firm_id", firm_id, client
+    )
+    if (stock_id) {
+      if (!check_exist_return) throw new AppError("Purchase return not found.", 404)
+      const check_exist_stock = await isExist(
+        stock_id, "stock", "firm_id", firm_id, client
+      )
+      if (!check_exist_stock) throw new AppError("Stock not found.", 404)
+    }
 
-
-    const purchaseItemQuery = `
+    const purchaseReturnItemQuery = `
     INSERT INTO purchase_return_items (
       firm_id,
       purchase_return_id,
@@ -41,10 +50,11 @@ export default class PurchaseReturnItemService {
       net_amount,
       stock_id,
       remarks,
-      status
+      status,
+      purchase_item_id
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
     )
     RETURNING *;
   `;
@@ -63,10 +73,11 @@ export default class PurchaseReturnItemService {
       net_amount,
       stock_id ?? null,
       remark ?? null,
-      statusCode
+      statusCode,
+      purchase_item_id
     ];
 
-    const { rows } = await executeInTransaction(client, purchaseItemQuery, values);
+    const { rows } = await executeInTransaction(client, purchaseReturnItemQuery, values);
 
     return rows[0];
   }

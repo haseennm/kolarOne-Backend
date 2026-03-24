@@ -76,10 +76,12 @@ export async function purchaseRouter(app: FastifyInstance) {
                 "total_igst",
                 "total_sgst",
                 "total_cgst",
-                "net_amount"
+                "net_amount",
+                "purchase_item_id"
               ],
               properties: {
                 product_id: { type: "number" },
+                purchase_item_id: { type: "number" },
                 stock_id: { type: "number" }, 
                 returned_qty: { type: "number" },
                 unit: { type: "string" },

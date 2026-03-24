@@ -14,6 +14,7 @@ export interface CreatePurchaseRetunItemBody {
   total_sgst: number;
   total_cgst: number;
   net_amount: number;
+  purchase_item_id:number
 }
 export interface CreatePurchaseReturnItemParams
   extends Omit<CreatePurchaseRetunItemBody, "status"> {

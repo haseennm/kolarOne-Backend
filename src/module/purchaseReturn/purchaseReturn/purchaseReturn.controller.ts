@@ -66,6 +66,7 @@ export default class PurchaseReturnController {
             total_sgst: item.total_sgst ?? 0,
             total_cgst: item.total_cgst ?? 0,
             net_amount: item.net_amount,
+            purchase_item_id:item.purchase_item_id
           },
           client
         );

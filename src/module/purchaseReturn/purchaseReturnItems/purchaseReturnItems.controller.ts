@@ -3,7 +3,7 @@ import { transaction } from "../../../config/db";
 import { cns, getStatusCode, getStatusText } from "../../../utils/extra";
 import PurchaseReturnItemService from "./purchaseReturnItems.service";
 import { AppError } from "../../../utils/AppError";
-import { CreatePurchaseRetunItemBody, DeletePurchaseReturnItemBody, FetchPurchaseReturnItemFilters } from "./purchaseReturnItems.types";
+import { CreatePurchaseRetunItemBody, DeletePurchaseReturnItemBody, FetchPurchaseReturnItemFilters, FetchPurchaseReturnItemParams } from "./purchaseReturnItems.types";
 
 export default class PurchaseReturnItemController {
 
@@ -57,7 +57,7 @@ export default class PurchaseReturnItemController {
 
   //   return purchase_item;
   // }
-  async fetchPurchaseItems(data: FetchPurchaseReturnItemFilters) {
+  async fetchPurchaseItems(data: FetchPurchaseReturnItemParams) {
 
     const service = new PurchaseReturnItemService();
 
