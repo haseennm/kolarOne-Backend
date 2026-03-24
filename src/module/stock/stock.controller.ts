@@ -61,7 +61,6 @@ export default class StockController {
     const statusCode = getStatusCode("Good");
     const stock = await service.changeStock(
       { statusCode, ...data }
-
       ,
       client
     );
