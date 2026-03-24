@@ -33,7 +33,6 @@ export interface StockEditParams extends Omit<StockEditBody, "status"> {
 }
 export interface StockChangeBody {
   stock_id: number
-  company_id: number
   branch_id: number;
   firm_id: number;
   purchase_return_id?: number;

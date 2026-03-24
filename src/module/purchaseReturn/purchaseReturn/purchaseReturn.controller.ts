@@ -40,7 +40,6 @@ export default class PurchaseReturnController {
         const stock = await stockController.reduceStock(
           {
             stock_id: item.stock_id ?? purchase_return.stock_id,
-            company_id: company_id,
             branch_id: rest.branch_id,
             firm_id: rest.firm_id,
             purchase_return_id: purchase_return.id,
