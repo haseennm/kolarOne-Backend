@@ -250,6 +250,11 @@ export default class StockService {
     if (!is_stock_exist) {
       throw new AppError("Stock not found", 404);
     }
+    if(movement_type === "O"){
+      if(is_stock_exist.available_qty<qty){
+       throw new AppError(`Insufficient stock in ${is_stock_exist.batch_number}`, 409);
+      }
+    }
     const calculation = movement_type=== "O" ? -qty : qty;
 
     const finalAvailableQty = is_stock_exist.available_qty + calculation;
