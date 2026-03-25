@@ -5,6 +5,7 @@ import { cns, el } from "../../utils/extra";
 import ProCatController from "./proCat.controller";
 import path from "path";
 import { DeleteProductCatBody, FetchProductCatBody } from "./proCat.types";
+import { error } from "console";
 
 export async function productCategoryRouter(app: FastifyInstance): Promise<void> {
 
