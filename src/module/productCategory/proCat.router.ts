@@ -5,7 +5,6 @@ import { cns, el } from "../../utils/extra";
 import ProCatController from "./proCat.controller";
 import path from "path";
 import { DeleteProductCatBody, FetchProductCatBody } from "./proCat.types";
-import { error } from "console";
 
 export async function productCategoryRouter(app: FastifyInstance): Promise<void> {
 
@@ -61,7 +60,7 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
 
 
       body.company_id = Number(body.company_id);
-      if (body.parent_id === "null") {
+      if (body.parent_id === "null" || body.parent_id === undefined) {
         body.parent_id = null
       } else {
         body.parent_id = Number(body.parent_id);
@@ -115,23 +114,23 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
       reply: FastifyReply
     ) => {
       // try {
-        cns(request.url, request.body);
+      cns(request.url, request.body);
 
-        const { page = 1, limit = 10, ...filters } = request.body;
-        const offset = (page - 1) * limit;
+      const { page = 1, limit = 10, ...filters } = request.body;
+      const offset = (page - 1) * limit;
 
-        const controller = new ProCatController();
+      const controller = new ProCatController();
 
-        const firms = await controller.fetchProCat({
-          offset,
-          filters: {
-            ...filters,
-            page,
-            limit,
-          },
-        });
+      const firms = await controller.fetchProCat({
+        offset,
+        filters: {
+          ...filters,
+          page,
+          limit,
+        },
+      });
 
-        return reply.code(200).send(firms);
+      return reply.code(200).send(firms);
       // } catch (err: any) {
       //   el(err);
       //   return reply

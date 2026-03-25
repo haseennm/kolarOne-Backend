@@ -53,7 +53,6 @@ export default class ProductCatService {
   $1,$2,$3,$4,$5,$6,$7,$8)
     RETURNING *;
   `;
-      console.log(typeof parent_id)
       const values = [
         name,
         parent_id,
@@ -64,7 +63,7 @@ export default class ProductCatService {
         statusCode,
         JSON.stringify(remark),
       ];
-      cns("insert cat", values)
+    
       const { rows } = await executeInTransaction(client, queryText, values);
       return `${rows[0].name} created`;
     })
