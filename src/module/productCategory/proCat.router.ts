@@ -104,6 +104,7 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
             page: { type: "number", minimum: 1 },
             limit: { type: "number", minimum: 1 },
             id: { type: "number" },
+            parent_id: { type: "number" },
             company_id: { type: "number" },
             search: { type: ["string", "null"] },
           },

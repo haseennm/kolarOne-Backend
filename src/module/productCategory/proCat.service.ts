@@ -63,7 +63,7 @@ export default class ProductCatService {
         statusCode,
         JSON.stringify(remark),
       ];
-    
+
       const { rows } = await executeInTransaction(client, queryText, values);
       return `${rows[0].name} created`;
     })
@@ -104,6 +104,12 @@ export default class ProductCatService {
     if (filters.id) {
       queryParams.push(filters.id);
       whereConditions.push(`pc.id = $${queryParams.length}`);
+    }
+    if (filters.parent_id) {
+      queryParams.push(filters.parent_id);
+      whereConditions.push(`pc.parent_id = $${queryParams.length}`);
+    } else {
+      whereConditions.push(`pc.parent_id IS NULL`);
     }
 
     // Filter by Branch
