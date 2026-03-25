@@ -22,6 +22,7 @@ export interface FetchProductCatBody {
   company_id?: number;
   search?: string | null;
   status?: number;
+  parent_id?: number;
 }
 
 export interface FetchProductCatParams {
