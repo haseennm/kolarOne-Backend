@@ -35,10 +35,10 @@ export interface StockChangeBody {
   stock_id: number
   branch_id: number;
   firm_id: number;
-  purchase_return_id?: number;
   qty: number;
   movement_type?: 'I' | 'O';
   reason?: string;
+  is_relate_purchase:boolean;
 }
 
 export interface StockChangeParams extends StockChangeBody{

@@ -1,6 +1,6 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../../config/db";
-import { convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../../utils/extra";
+import { convertEntityType, EntityKey, getStatusCode, getStatusText, getTransactionCode, PaymentTransactionTypeCodeMap } from "../../../utils/extra";
 import { SaleCreateBody, SaleDeleteBody, SaleEditBody, SaleFetchParams } from "./sale.types";
 import StockController from "../../stock/stock.controller";
 import SaleService from "./sale.service";
@@ -46,7 +46,8 @@ export default class PurchaseController {
             firm_id: rest.firm_id,
             qty: item.saled_qty,
             movement_type: 'O',
-            reason: "PR"
+            reason: getTransactionCode("sale"),
+            is_relate_purchase: false
           },
           client
         );
@@ -182,7 +183,7 @@ export default class PurchaseController {
 
   //             status: "Good",
   //             movement_type: "I",
-  //             reason: "P"
+  //             reason:getTransactionCode("purchase")
   //           },
   //           client
   //         );
@@ -263,7 +264,7 @@ export default class PurchaseController {
     };
   }
   async saleDelete(data: SaleDeleteBody) {
-    const { deleted_by,branch_id, ...rest } = data
+    const { deleted_by, branch_id, ...rest } = data
     transaction(async (client) => {
 
       const remark = {
@@ -278,7 +279,7 @@ export default class PurchaseController {
       const payment_transactions_service = new PaymentTransactionService()
 
       const sale = await saleService.deleteSale({ remark, ...rest }, client);
-      const sale_item =await itemService.deleteSaleItem(
+      const sale_item = await itemService.deleteSaleItem(
         {
           sale_id: rest.id,
           firm_id: rest.firm_id,
@@ -286,16 +287,17 @@ export default class PurchaseController {
         client
       );
       await stockController.reduceStock(
-          {
-            stock_id: sale_item.stock_id,
-            branch_id:branch_id,
-            firm_id: rest.firm_id,
-            qty: sale_item.saled_qty,
-            movement_type: 'I',
-            reason: "SR"
-          },
-          client
-        );
+        {
+          stock_id: sale_item.stock_id,
+          branch_id: branch_id,
+          firm_id: rest.firm_id,
+          qty: sale_item.saled_qty,
+          movement_type: 'I',
+          reason: getTransactionCode("sale"),
+          is_relate_purchase: false
+        },
+        client
+      );
       await partyBalanceService.deletePartyBalance(
         {
           delete_by: deleted_by, firm_id: rest.firm_id, purchase_id: rest.id

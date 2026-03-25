@@ -126,6 +126,81 @@ export const PaymentTransactionCodeTypeMap: Record<PaymentTransactionCode, strin
 
 
 // 
+// STOCK
+// 
+// 🔹 Transaction Codes (DB)
+export enum StockTransactionCode {
+  SALE = "SL",
+  PURCHASE = "PS",
+  SALE_RETURN = "SR",
+  PURCHASE_RETURN = "PR",
+  SALE_RETURN_DELETE = "SRD",
+  PURCHASE_RETURN_DELETE = "PRD",
+  ADDITION = "AT",
+  SALE_DELETE = "SD",
+  PURCHASE_DELETE = "PD",
+}
+
+// 🔹 Transaction Types (App/API)
+export type StockTransactionType =
+  | "sale"
+  | "purchase"
+  | "sale_return"
+  | "purchase_return"
+  | "sale_delete"
+  | "purchase_delete"
+  | "sale_return_delete"
+  | "purchase_return_delete"
+  | "addition";
+
+// 🔹 Type → Code (Single Source of Truth)
+export const StockTransactionTypeCodeMap: Record<
+  StockTransactionType,
+  StockTransactionCode
+> = {
+  sale: StockTransactionCode.SALE,
+  sale_return: StockTransactionCode.SALE_RETURN,
+  purchase: StockTransactionCode.PURCHASE,
+  purchase_return: StockTransactionCode.PURCHASE_RETURN,
+  addition: StockTransactionCode.ADDITION,
+  purchase_delete:StockTransactionCode.PURCHASE_DELETE,
+  purchase_return_delete:StockTransactionCode.PURCHASE_RETURN_DELETE,
+  sale_delete:StockTransactionCode.SALE_DELETE,
+  sale_return_delete:StockTransactionCode.SALE_RETURN_DELETE
+};
+
+// 🔹 Code → Type (Auto Generated)
+export const StockTransactionCodeTypeMap: Record<
+  StockTransactionCode,
+  StockTransactionType
+> = Object.fromEntries(
+  Object.entries(StockTransactionTypeCodeMap).map(([type, code]) => [
+    code,
+    type
+  ])
+) as Record<StockTransactionCode, StockTransactionType>;
+// ✅ Convert type → code
+export const getTransactionCode = (
+  type: StockTransactionType
+): StockTransactionCode => {
+  return StockTransactionTypeCodeMap[type];
+};
+
+// ✅ Convert code → type
+export const getTransactionType = (
+  code: StockTransactionCode
+): StockTransactionType => {
+  return StockTransactionCodeTypeMap[code];
+};
+
+// ✅ Safe parser (for API input)
+export const isValidTransactionType = (
+  value: string
+): value is StockTransactionType => {
+  return value in StockTransactionTypeCodeMap;
+};
+
+// 
 // ATTENDANCE
 // 
 export const isValidDay = async (

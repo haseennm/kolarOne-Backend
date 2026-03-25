@@ -1,6 +1,6 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../../config/db";
-import { convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../../utils/extra";
+import { convertEntityType, EntityKey, getStatusCode, getStatusText, getTransactionCode, PaymentTransactionTypeCodeMap } from "../../../utils/extra";
 import { PurchaseCreateBody, PurchaseDeleteBody, PurchaseEditBody, PurchaseFetchParams } from "./purchase.types";
 import StockController from "../../stock/stock.controller";
 import PurchaseService from "./purchase.service";
@@ -48,7 +48,7 @@ export default class PurchaseController {
             purchased_qty: item.purchased_qty,
             status: "Good", // optional dynamic
             movement_type: "I",
-            reason: "P",
+            reason: getTransactionCode("purchase"),
             company_id
           },
           client
@@ -179,7 +179,7 @@ export default class PurchaseController {
 
               status: "Good",
               movement_type: "I",
-              reason: "P"
+              reason:getTransactionCode("purchase ")
             },
             client
           );

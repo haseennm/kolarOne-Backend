@@ -1,6 +1,6 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../../config/db";
-import { convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../../utils/extra";
+import { convertEntityType, EntityKey, getStatusCode, getStatusText, getTransactionCode, PaymentTransactionTypeCodeMap } from "../../../utils/extra";
 import { PurchaseReturnCreateBody, PurchaseReturnDeleteBody, PurchaseReturnFetchParams } from "./purchaseReturn.types";
 import StockController from "../../stock/stock.controller";
 // import PartyBalanceController from "../../partyBalance/partyBalance.controller";
@@ -42,10 +42,10 @@ export default class PurchaseReturnController {
             stock_id: item.stock_id ?? purchase_return.stock_id,
             branch_id: rest.branch_id,
             firm_id: rest.firm_id,
-            purchase_return_id: purchase_return.id,
             qty: item.returned_qty,
             movement_type: 'O',
-            reason: "PR"
+            reason: getTransactionCode("purchase_return"),
+            is_relate_purchase:true
           },
           client
         );
@@ -174,7 +174,7 @@ export default class PurchaseReturnController {
 
   //             status: "Good",
   //             movement_type: "I",
-  //             reason: "P"
+  //             reason:getTransactionCode("purchase")
   //           },
   //           client
   //         );

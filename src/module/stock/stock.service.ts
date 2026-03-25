@@ -231,12 +231,12 @@ export default class StockService {
     const {
       branch_id,
       firm_id,
-  statusCode,
+      statusCode,
       movement_type,
       reason,
-      purchase_return_id,
       stock_id,
-      qty
+      qty,
+      is_relate_purchase
     } = data;
 
     const is_stock_exist = await isExist(
@@ -250,15 +250,15 @@ export default class StockService {
     if (!is_stock_exist) {
       throw new AppError("Stock not found", 404);
     }
-    if(movement_type === "O"){
-      if(is_stock_exist.available_qty<qty){
-       throw new AppError(`Insufficient stock in ${is_stock_exist.batch_number}`, 409);
+    if (movement_type === "O") {
+      if (is_stock_exist.available_qty < qty) {
+        throw new AppError(`Insufficient stock in ${is_stock_exist.batch_number}`, 409);
       }
     }
-    const calculation = movement_type=== "O" ? -qty : qty;
+    const calculation = movement_type === "O" ? -qty : qty;
 
     const finalAvailableQty = is_stock_exist.available_qty + calculation;
-    const finalPurchasedQty = is_stock_exist.purchased_qty + calculation;
+    const finalPurchasedQty = is_relate_purchase ? is_stock_exist.purchased_qty + calculation : is_stock_exist.purchased_qty;
 
     if (finalAvailableQty > finalPurchasedQty) {
       throw new AppError(
@@ -267,8 +267,8 @@ export default class StockService {
       );
     }
     if (finalAvailableQty < 0) {
-  throw new Error("Stock cannot be negative");
-}
+      throw new Error("Stock cannot be negative");
+    }
     const stockQuery = `
   UPDATE stock SET
     available_quantity = $1,
