@@ -20,6 +20,9 @@ import { partnerRouter } from './module/partner/partnerinfo/partnerinfo.router'
 import { profitShareRouter } from './module/partner/partnerProfitShare/partnerProfitShare.router'
 import { partnerLedgerRouter } from './module/partner/partnersLedger/partnersLedger.router'
 import { purchaseRouter } from './module/purchase/purchase/purchase.router'
+import { saleReturnRouter } from './module/saleReturn/saleReturn/saleReturn.router'
+import { saleRouter } from './module/sale/sale/sale.router'
+import { purchaseReturnRouter } from './module/purchaseReturn/purchaseReturn/purchaseReturn.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -42,4 +45,7 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(profitShareRouter, { prefix: '/partner/profit/info' })
   app.register(partnerLedgerRouter, { prefix: '/partner/ledger/info' })
   app.register(purchaseRouter, { prefix: '/purchase' })
+  app.register(purchaseReturnRouter, { prefix: '/purchase/return' })
+  app.register(saleRouter, { prefix: '/sale' })
+  app.register(saleReturnRouter, { prefix: '/sale/return' })
 }

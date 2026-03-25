@@ -7,7 +7,7 @@ import {
 } from "./sale.types";
 import SaleController from "./sale.controller";
 
-export async function purchaseRouter(app: FastifyInstance) {
+export async function saleRouter(app: FastifyInstance) {
 
   app.post<{ Body: SaleCreateBody }>(
     "/create",

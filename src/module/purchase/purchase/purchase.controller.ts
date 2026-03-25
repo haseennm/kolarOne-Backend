@@ -179,7 +179,7 @@ export default class PurchaseController {
 
               status: "Good",
               movement_type: "I",
-              reason:getTransactionCode("purchase ")
+              reason:getTransactionCode("purchase")
             },
             client
           );

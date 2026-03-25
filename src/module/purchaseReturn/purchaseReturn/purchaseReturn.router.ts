@@ -8,11 +8,11 @@ import {
 import PurchaseController from "./purchaseReturn.controller";
 import PurchaseReturnController from "./purchaseReturn.controller";
 
-export async function purchaseRouter(app: FastifyInstance) {
+export async function purchaseReturnRouter(app: FastifyInstance) {
 
   // CREATE PURCHASE
  app.post<{ Body: PurchaseReturnCreateBody }>(
-  "/purchase-return/create",
+  "/create",
   {
     schema: {
       body: {
