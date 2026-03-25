@@ -1,6 +1,6 @@
 import { executeInTransaction, pool, query, transaction } from "../../config/db"
 import { AppError } from "../../utils/AppError";
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import { BranchLoginBody, CountResult, CreateBranchParams, DeleteBranchParams, EditBranchParams, FetchBranchParams, FetchDbBranch } from "./branch.types";
 
 export default class BranchService {
@@ -32,13 +32,13 @@ export default class BranchService {
         } = data;
         const result = transaction(async (client) => {
 
-            const isCompanyExist = await isExist(company_id, "company", "id", company_id, client);
+            const isCompanyExist = await getRecord(company_id, "company", "id", company_id, client);
             if (!isCompanyExist) {
                 throw new AppError("Company not found", 404);
             }
 
             for (const roleId of role) {
-                const isRoleExist = await isExist(roleId, "role", "company_id", company_id, client);
+                const isRoleExist = await getRecord(roleId, "role", "company_id", company_id, client);
 
                 if (!isRoleExist) {
                     throw new AppError("One or more roles do not exist", 404);
@@ -206,14 +206,14 @@ export default class BranchService {
         const result = transaction(async (client) => {
 
             // ✅ Only check by id
-            const is_branch_exist = await isExist(id, "branches", "id", id, client);
+            const is_branch_exist = await getRecord(id, "branches", "id", id, client);
 
             if (!is_branch_exist) {
                 throw new AppError("Branch not found or deleted", 404);
             }
             if (role) {
                 for (const roleId of role) {
-                const isRoleExist = await isExist(roleId, "role", "company_id", company_id, client);
+                const isRoleExist = await getRecord(roleId, "role", "company_id", company_id, client);
 
                 if (!isRoleExist) {
                     throw new AppError("One or more roles do not exist", 404);
@@ -282,7 +282,7 @@ export default class BranchService {
         const { r_id, remark, company_id } = data
         const result = transaction(async (client) => {
 
-            const isbranch_exist = await isExist(r_id, "branches", "company_id", company_id, client);
+            const isbranch_exist = await getRecord(r_id, "branches", "company_id", company_id, client);
             if (!isbranch_exist) {
                 throw new AppError("Branch not found or already deleted", 404);
             }

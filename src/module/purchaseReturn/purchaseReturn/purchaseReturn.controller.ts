@@ -257,7 +257,7 @@ export default class PurchaseReturnController {
     transaction(async (client) => {
 
       const remark = {
-        action: `Deleted purchase`,
+        action: `Deleted purchase return`,
         deleted_by,
         created_at: Date.now(),
       };
@@ -291,10 +291,10 @@ export default class PurchaseReturnController {
       payment_transactions_service.deletePaymentTransaction({
         company_id: purchase.company_id,
         ref_id: rest.id,
-        ref_type: PaymentTransactionTypeCodeMap["purchase"],
+        ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
       }, client)
 
-      return "purchase deleted successfully"
+      return "purchase return deleted successfully"
     })
   }
 }

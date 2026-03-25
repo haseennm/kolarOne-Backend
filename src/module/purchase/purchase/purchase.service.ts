@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { isExist } from "../../../utils/extra";
+import { getRecord } from "../../../utils/extra";
 import { PurchaseCreateParams, PurchaseDeleteParams, PurchaseEditParams, PurchaseFetchParams } from "./purchase.types";
 
 export default class PurchaseService {
@@ -30,7 +30,7 @@ export default class PurchaseService {
     } = data;
 
     // Check firm existence
-    const is_firm_exist = await isExist(
+    const is_firm_exist = await getRecord(
       firm_id,
       "firm",
       "branch_id",
@@ -41,7 +41,7 @@ export default class PurchaseService {
     if (!is_firm_exist) {
       throw new AppError("Firm not found", 404);
     }
-    const is_payment_method_exist = await isExist(
+    const is_payment_method_exist = await getRecord(
       payment_method_id,
       "payment_methods",
       "company_id",
@@ -52,7 +52,7 @@ export default class PurchaseService {
     if (!is_payment_method_exist) {
       throw new AppError("payment method not found", 404);
     }
-    const is_vendor_exist = await isExist(
+    const is_vendor_exist = await getRecord(
       vendor_id,
       "vendors",
       "company_id",
@@ -150,7 +150,7 @@ export default class PurchaseService {
     } = data;
 
     // Check firm existence
-    const is_purchase_exist = await isExist(
+    const is_purchase_exist = await getRecord(
       purchase_id,
       "purchases",
       "firm_id",
@@ -162,7 +162,7 @@ export default class PurchaseService {
       throw new AppError("Firm not found", 404);
     }
     if (payment_method_id && payment_method_id !== is_purchase_exist.payment_method_id) {
-      const is_payment_method_exist = await isExist(
+      const is_payment_method_exist = await getRecord(
         payment_method_id,
         "payment_methods",
         "company_id",
@@ -175,7 +175,7 @@ export default class PurchaseService {
       }
     }
     if (vendor_id && vendor_id !== is_purchase_exist.vendor_id) {
-      const is_vendor_exist = await isExist(
+      const is_vendor_exist = await getRecord(
         vendor_id,
         "vendors",
         "company_id",
@@ -472,7 +472,7 @@ export default class PurchaseService {
   }
   async deletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
     const { id, remark, firm_id } = data;
-    const isPurchaseExist = await isExist(
+    const isPurchaseExist = await getRecord(
       id,
       "purchases",
       "firm_id",
@@ -519,7 +519,7 @@ export default class PurchaseService {
   }
   // async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
   //   const { id, firm_id } = data;
-  //   const isPurchaseExist = await isExist(
+  //   const isPurchaseExist = await getRecord(
   //     id,
   //     "purchases",
   //     "firm_id",

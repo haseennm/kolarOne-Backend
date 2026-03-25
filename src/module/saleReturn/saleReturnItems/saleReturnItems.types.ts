@@ -14,8 +14,8 @@ export interface CreateSaleRetunItemBody {
   total_sgst: number;
   total_cgst: number;
   net_amount: number;
-  sale_item_id:number;
-  return_mode:string
+  sale_item_id: number;
+  return_mode: "to_stock" | "to_damage"
 }
 export interface CreateSaleReturnItemParams
   extends Omit<CreateSaleRetunItemBody, "status"> {
@@ -92,7 +92,7 @@ export interface FetchDbSaleReturnItem {
 }
 
 export interface DeleteSaleReturnItemBody {
-  purchase_id: number;
+  sale_return_id: number;
   firm_id: number;
 }
 export interface DeleteSaleReturnItemParams

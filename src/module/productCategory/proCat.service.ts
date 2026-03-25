@@ -1,6 +1,6 @@
 import { Result } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
-import { cns, isExist } from "../../utils/extra";
+import { cns, getRecord } from "../../utils/extra";
 import {
   CountResult,
   CreateProductCatParams,
@@ -26,12 +26,12 @@ export default class ProductCatService {
     } = data;
     const result = transaction(async (client) => {
 
-      const isBranchExist = await isExist(company_id, "company", "id", company_id, client);
+      const isBranchExist = await getRecord(company_id, "company", "id", company_id, client);
       if (!isBranchExist) {
         throw new AppError("Company not found", 404);
       }
       if (parent_id) {
-        const isProduct_cat_exist = await isExist(parent_id, "product_categories", "company_id", company_id, client);
+        const isProduct_cat_exist = await getRecord(parent_id, "product_categories", "company_id", company_id, client);
 
         if (!isProduct_cat_exist) {
           throw new AppError("parent category not found or deleted", 404);
@@ -197,7 +197,7 @@ export default class ProductCatService {
 
     } = data;
     const result = transaction(async (client) => {
-      const isProduct_cat_exist = await isExist(id, "product_categories", "company_id", company_id, client);
+      const isProduct_cat_exist = await getRecord(id, "product_categories", "company_id", company_id, client);
 
       if (!isProduct_cat_exist) {
         throw new AppError("product categories not found or deleted", 404);
@@ -243,7 +243,7 @@ RETURNING *;
   async deleteProductCat(data: DeleteProductCatParams) {
     const { r_id, remark, company_id } = data;
     const result = transaction(async (client) => {
-      const isProduct_cat_exist = await isExist(r_id, "product_categories", "company_id", company_id, client);
+      const isProduct_cat_exist = await getRecord(r_id, "product_categories", "company_id", company_id, client);
 
       if (!isProduct_cat_exist) {
         throw new AppError("product category not found or deleted", 404);

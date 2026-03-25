@@ -1,5 +1,5 @@
 import { query, transaction, executeInTransaction } from "../../../config/db";
-import { isExist } from "../../../utils/extra";
+import { getRecord } from "../../../utils/extra";
 import { AppError } from "../../../utils/AppError";
 import { 
   CreatePartnerParams, 
@@ -11,7 +11,7 @@ import {
 export default class PartnerService {
   async createPartner(data: CreatePartnerParams) {
     return transaction(async (client) => {
-      const company = await isExist(data.company_id, "company", "id", data.company_id, client);
+      const company = await getRecord(data.company_id, "company", "id", data.company_id, client);
       if (!company) throw new AppError("Company not found", 404);
 
       const queryText = `
@@ -56,7 +56,7 @@ export default class PartnerService {
 
   async updatePartner(data: EditPartnerParams) {
     return transaction(async (client) => {
-      const partner = await isExist(data.id, "partners_info", "company_id", data.company_id, client);
+      const partner = await getRecord(data.id, "partners_info", "company_id", data.company_id, client);
       if (!partner) throw new AppError("Partner not found", 404);
 
       const queryText = `
@@ -81,7 +81,7 @@ export default class PartnerService {
 
   async deletePartner(data: DeletePartnerParams) {
     return transaction(async (client) => {
-      const partner = await isExist(data.id, "partners_info", "company_id", data.company_id, client);
+      const partner = await getRecord(data.id, "partners_info", "company_id", data.company_id, client);
       if (!partner) throw new AppError("Partner not found", 404);
 
       const queryText = `UPDATE partners_info SET status = 0, remarks = remarks || $1::jsonb WHERE id = $2`;

@@ -1,5 +1,5 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import {
   Brand,
   CountResult,
@@ -27,7 +27,7 @@ export default class BrandService {
       if (existing.length) {
         throw new AppError("Brand already exists", 400);
       }
-      const existing_company = await isExist(company_id, "company", "id", company_id, client);
+      const existing_company = await getRecord(company_id, "company", "id", company_id, client);
     
       if (!existing_company) {
         throw new AppError("Company not found or deleted", 404);
@@ -111,7 +111,7 @@ export default class BrandService {
 
     const result = transaction(async (client) => {
 
-      const existing = await isExist(id, "brand", "company_id", company_id, client);
+      const existing = await getRecord(id, "brand", "company_id", company_id, client);
 
       if (!existing) {
         throw new AppError("Brand not found or deleted", 404);
@@ -155,7 +155,7 @@ export default class BrandService {
 
     const result = transaction(async (client) => {
 
-      const existing = await isExist(id, "brand", "company_id", company_id, client);
+      const existing = await getRecord(id, "brand", "company_id", company_id, client);
 
       if (!existing) {
         throw new AppError("Brand not found or already deleted", 404);

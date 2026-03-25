@@ -1,4 +1,4 @@
-import { isExist } from "../../../utils/extra";
+import { getRecord } from "../../../utils/extra";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { PoolClient } from "pg";
@@ -24,17 +24,38 @@ export default class PurchaseReturnItemService {
       statusCode, returned_qty, purchase_item_id
     } = data;
 
-    const check_exist_return = await isExist(
+    const check_exist_return = await getRecord(
       purchase_return_id, "purchase_return", "firm_id", firm_id, client
     )
     if (!check_exist_return) throw new AppError("Purchase return not found.", 404)
     if (stock_id) {
-      const check_exist_stock = await isExist(
+      const check_exist_stock = await getRecord(
         stock_id, "stock", "firm_id", firm_id, client
       )
       if (!check_exist_stock) throw new AppError("Stock not found.", 404)
     }
+    const check_exist_purchase_item = await getRecord(
+      purchase_item_id, "purchase_items", "firm_id", firm_id, client
+    )
 
+
+    if (!check_exist_purchase_item) throw new AppError("Purchase return not found.", 404)
+
+    const purchased_qty = Number(check_exist_purchase_item.received_qty);
+    const returnedQtyQuery = `
+  SELECT COALESCE(SUM(returned_qty), 0) AS total_returned
+  FROM purchase_return_items
+  WHERE purchase_item_id = $1 AND firm_id = $2 AND status =$3
+`;
+    const returnedQtyRes = await client.query(returnedQtyQuery, [purchase_item_id, firm_id, 0]);
+
+    const already_returned = Number(returnedQtyRes.rows[0].total_returned);
+    if (returned_qty + already_returned > purchased_qty) {
+      throw new AppError(
+        `Returned quantity exceeds purchased quantity. Max allowed: ${purchased_qty - already_returned}`,
+        400
+      );
+    }
     const purchaseReturnItemQuery = `
     INSERT INTO purchase_return_items (
       firm_id,
@@ -174,7 +195,7 @@ export default class PurchaseReturnItemService {
   //   } = data;
 
   //   // 1. Validate firm existence (requirement)
-  //   const is_item_exist = await isExist(
+  //   const is_item_exist = await getRecord(
   //     item_id,
   //     "purchase_items",
   //     "branch_id",

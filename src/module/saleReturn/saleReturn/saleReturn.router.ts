@@ -81,7 +81,11 @@ export async function saleReturnRouter(app: FastifyInstance) {
                   total_sgst: { type: "number" },
                   total_cgst: { type: "number" },
                   net_amount: { type: "number" },
-                  return_mode: { type: "string" }
+                  return_mode: {
+                    type: "string",
+                    enum: ["to_stock", "to_damage"]
+
+                  }
                 }
               }
             }

@@ -1,6 +1,6 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 
 import {
   CreatePaymentMethodParams,
@@ -25,7 +25,7 @@ export default class PaymentMethodService {
 
     const result = transaction(async (client) => {
 
-      const isCompanyExist = await isExist(
+      const isCompanyExist = await getRecord(
         company_id,
         "company",
         "id",
@@ -144,7 +144,7 @@ export default class PaymentMethodService {
 
     const result = transaction(async (client) => {
 
-      const isPaymentMethodExist = await isExist(
+      const isPaymentMethodExist = await getRecord(
         id,
         "payment_methods",
         "company_id",
@@ -192,7 +192,7 @@ export default class PaymentMethodService {
 
     const result = transaction(async (client) => {
 
-      const isPaymentMethodExist = await isExist(
+      const isPaymentMethodExist = await getRecord(
         r_id,
         "payment_methods",
         "company_id",

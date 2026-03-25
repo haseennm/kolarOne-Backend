@@ -1,6 +1,6 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { cns, isExist } from "../../utils/extra";
+import { cns, getRecord } from "../../utils/extra";
 import { CreateStaffParams, DeleteStaffParams, EditStaffParams, FetchDbStaff, FetchStaffParams, StaffCountResult, StaffLoginBody } from "./staff.types";
 
 
@@ -27,7 +27,7 @@ export default class StaffService {
     } = data;
 
     // Check company
-    const isCompanyExist = await isExist(
+    const isCompanyExist = await getRecord(
       company_id,
       "company",
       "id",
@@ -76,7 +76,7 @@ console.log(firmIds)
 
     // Check roles
     for (const roleId of role) {
-      const isRoleExist = await isExist(
+      const isRoleExist = await getRecord(
         roleId,
         "role",
         "company_id",
@@ -93,7 +93,7 @@ console.log(firmIds)
     const column = entity_type === "F" ? "branch_id" : "company_id";
     const value = entity_type === "F" ? branch_id : company_id;
 
-    const isEntityExist = await isExist(
+    const isEntityExist = await getRecord(
       entity_id,
       entity_table,
       column,
@@ -263,7 +263,7 @@ OFFSET $${values.length + 2}
       entity_table
     } = data;
 
-    const isStaffExist = await isExist(
+    const isStaffExist = await getRecord(
       id,
       "staff",
       "company_id",
@@ -290,7 +290,7 @@ OFFSET $${values.length + 2}
       throw new AppError("Finger print already exist", 400);
     }
     if (entity_id) {
-      const isEntityExist = await isExist(
+      const isEntityExist = await getRecord(
         entity_id,
         entity_table,
         "company_id",
@@ -354,7 +354,7 @@ OFFSET $${values.length + 2}
     const { r_id, remark, company_id, entity_id } = data;
 
 
-    const isStaffExist = await isExist(
+    const isStaffExist = await getRecord(
       r_id,
       "staff",
       "company_id",

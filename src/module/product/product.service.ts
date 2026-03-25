@@ -1,5 +1,5 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import {
   CountResult,
   CreateProductParams,
@@ -35,7 +35,7 @@ export default class ProductService {
 
     return transaction(async (client) => {
       // Validate company
-      const companyExist = await isExist(
+      const companyExist = await getRecord(
         company_id,
         "company",
         "id",
@@ -45,7 +45,7 @@ export default class ProductService {
       if (!companyExist) throw new AppError("Company not found", 404);
 
       // Validate category
-      const categoryExist = await isExist(
+      const categoryExist = await getRecord(
         category_id,
         "product_categories",
         "company_id",
@@ -56,7 +56,7 @@ export default class ProductService {
         throw new AppError("Product category not found", 404);
       if (brand_id) {
 
-        const brandExist = await isExist(
+        const brandExist = await getRecord(
           brand_id,
           "brand",
           "company_id",
@@ -218,7 +218,7 @@ export default class ProductService {
     const { id, company_id, remarks, statusCode, category_id, brand_id, ...rest } = data;
 
     return transaction(async (client) => {
-      const existing = await isExist(
+      const existing = await getRecord(
         id,
         "products",
         "company_id",
@@ -230,7 +230,7 @@ export default class ProductService {
         throw new AppError("Product not found", 404);
 
       if (category_id && category_id !== existing.category_id) {
-        const categoryExist = await isExist(
+        const categoryExist = await getRecord(
           category_id,
           "product_categories",
           "company_id",
@@ -241,7 +241,7 @@ export default class ProductService {
           throw new AppError("Product category not found", 404);
       }
       if (brand_id && brand_id !== existing.brand_id) {
-        const brandExist = await isExist(
+        const brandExist = await getRecord(
           brand_id,
           "brand",
           "company_id",
@@ -313,7 +313,7 @@ export default class ProductService {
     const { r_id, company_id, remarks } = data;
 
     return transaction(async (client) => {
-      const existing = await isExist(
+      const existing = await getRecord(
         r_id,
         "products",
         "company_id",

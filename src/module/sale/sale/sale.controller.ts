@@ -8,7 +8,7 @@ import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 import { PaymentTransactionService } from "../../paymentTransaction/paymenttransaction.services";
 import SaleItemController from "../saleItems/saleitems.controller";
 
-export default class PurchaseController {
+export default class SaleController {
 
   async saleCreate(data: SaleCreateBody) {
     const { paid, final_amount, status, company_id, created_by, items, payments, ...rest } = data;
@@ -113,7 +113,7 @@ export default class PurchaseController {
         )
       );
 
-      return `purchase ${sale.invoice_number} has been created successfully.`;
+      return `Sale ${sale.invoice_number} has been created successfully.`;
     });
   }
   // async saleEdit(data: SaleEditBody) {
@@ -229,25 +229,25 @@ export default class PurchaseController {
 
     const service = new SaleService();
 
-    const purchasesWithCode = await service.fetchSale(data);
+    const salesWithCode = await service.fetchSale(data);
 
-    const purchases = purchasesWithCode.sales.map((row) => ({
+    const sales = salesWithCode.sales.map((row) => ({
       ...row,
       status: getStatusText(row.status),
     }));
 
     return {
-      purchases,
-      pagination: { ...purchasesWithCode.pagination }
+      sales,
+      pagination: { ...salesWithCode.pagination }
     };
   }
   async fullsaleFetch(data: SaleFetchParams) {
 
     const service = new SaleService();
 
-    const purchasesWithCode = await service.fetchSaleFull(data);
+    const salesWithCode = await service.fetchSaleFull(data);
 
-    const purchases = purchasesWithCode.sales.map((row) => ({
+    const sales = salesWithCode.sales.map((row) => ({
       ...row,
 
       status: getStatusText(row.status),
@@ -259,8 +259,8 @@ export default class PurchaseController {
     }));
 
     return {
-      purchases,
-      pagination: { ...purchasesWithCode.pagination }
+      sales,
+      pagination: { ...salesWithCode.pagination }
     };
   }
   async saleDelete(data: SaleDeleteBody) {

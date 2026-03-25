@@ -1,7 +1,7 @@
 
 import { query, transaction, executeInTransaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { isExist } from "../../../utils/extra";
+import { getRecord } from "../../../utils/extra";
 import { CapitalLedgerEntry, CreateCapitalLedgerParams, DeleteCapitalLedgerParams, EditCapitalLedgerBody, EditCapitalLedgerParams, FetchCapitalLedgerFilters, PaginatedCapitalLedger } from "./partnersLedger.types";
 
 export default class CapitalLedgerService {
@@ -112,7 +112,7 @@ export default class CapitalLedgerService {
     const { id, amount, description, statusCode, remark, entity_id, entity_type } = data;
 
     return transaction(async (client) => {
-      const existing = await isExist(
+      const existing = await getRecord(
         id, "partner_capital_ledger", "entity_id", entity_id, client
       )
       if (!existing) throw new AppError("Entry not found", 404);
@@ -137,7 +137,7 @@ export default class CapitalLedgerService {
   async deleteEntry(data: DeleteCapitalLedgerParams) {
     return transaction(async (client) => {
 
-      const existing = await isExist(
+      const existing = await getRecord(
         data.id, "partner_capital_ledger", "entity_id", data.entity_id, client
       )
       if (!existing) throw new AppError("Entry not found", 404);

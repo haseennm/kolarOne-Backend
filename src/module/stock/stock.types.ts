@@ -37,11 +37,13 @@ export interface StockChangeBody {
   firm_id: number;
   qty: number;
   movement_type?: 'I' | 'O';
-  reason?: string;
-  is_relate_purchase:boolean;
+  reason: string;
+  is_relate_purchase: boolean;
+  return_mode?: "to_stock"|"to_damage"
+
 }
 
-export interface StockChangeParams extends StockChangeBody{
+export interface StockChangeParams extends StockChangeBody {
   statusCode?: number
 }
 export interface StockFetchBody {

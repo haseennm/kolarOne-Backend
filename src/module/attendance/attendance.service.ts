@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { AttendanceRow, DailyAttendanceRow, DeleteHoliday, HolidayEntry, HolidayListItem, MarkHolidayBody, MonthlyStaffSummary, StaffRow } from "./attendance.types";
-import { cns, isExist, isFutureDay } from "../../utils/extra";
+import { cns, getRecord, isFutureDay } from "../../utils/extra";
 
 export default class AttendanceService {
 
@@ -123,7 +123,7 @@ export default class AttendanceService {
   ) {
 
     const { branch_id, created_by, description, company_id } = data;
-    const is_branch_exist = await isExist(branch_id, "branches", "company_id", company_id, client);
+    const is_branch_exist = await getRecord(branch_id, "branches", "company_id", company_id, client);
     if (!is_branch_exist) {
       throw new AppError("Branch not found or deleted", 404);
     }

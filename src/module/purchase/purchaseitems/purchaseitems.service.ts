@@ -1,4 +1,4 @@
-import { isExist } from "../../../utils/extra";
+import { getRecord } from "../../../utils/extra";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { CreatePurchaseItemParams, DeletePurchaseItemBody, DeletePurchaseItemParams, EditPurchaseItemParams, FetchDbPurchaseItem, FetchPurchaseItemParams, PurchaseItemCountResult, UpdatePurchaseItemParams } from "./purchaseitems.types";
@@ -168,7 +168,7 @@ export default class PurchaseItemService {
     } = data;
 
     // 1. Validate firm existence (requirement)
-    const is_item_exist = await isExist(
+    const is_item_exist = await getRecord(
       item_id,
       "purchase_items",
       "branch_id",

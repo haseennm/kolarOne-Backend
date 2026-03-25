@@ -1,6 +1,6 @@
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { isExist } from "../../../utils/extra";
+import { getRecord } from "../../../utils/extra";
 import { CreateProfitShareParams, DeletePartnerProfitParams, EditProfitShareParams, ProfitShareFilters } from "./partnerProfitShare.types";
 
 
@@ -23,7 +23,7 @@ export default class ProfitShareService {
         company_id = parent_id
       }
       console.log(company_id)
-      const check_partner = await isExist(
+      const check_partner = await getRecord(
         partner_id,
         "partners_info",
         "company_id",
@@ -44,7 +44,7 @@ export default class ProfitShareService {
 
       const config = TABLE_MAP[entity_type as EntityType];
 
-      const check_exist = await isExist(
+      const check_exist = await getRecord(
         entity_id,
         config.table,
         config.parent,
@@ -83,7 +83,7 @@ export default class ProfitShareService {
 
       const config = TABLE_MAP[entity_type as EntityType];
 
-      const check_exist = await isExist(
+      const check_exist = await getRecord(
         id,
         "partner_profit_shares",
         "entity_id",

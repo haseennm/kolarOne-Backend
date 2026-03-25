@@ -1,5 +1,5 @@
 import { query, transaction, executeInTransaction } from "../../config/db";
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import { AppError } from "../../utils/AppError";
 import {
   CountResult,
@@ -30,7 +30,7 @@ export default class VendorService {
 
     const result = transaction(async (client) => {
 
-      const company = await isExist(company_id, "company", "id", company_id, client);
+      const company = await getRecord(company_id, "company", "id", company_id, client);
 
       if (!company) {
         throw new AppError("Company not found", 404);
@@ -165,7 +165,7 @@ export default class VendorService {
 
     const result = transaction(async (client) => {
 
-      const vendor = await isExist(id, "vendors", "company_id", company_id, client);
+      const vendor = await getRecord(id, "vendors", "company_id", company_id, client);
 
       if (!vendor) {
         throw new AppError("Vendor not found", 404);
@@ -222,7 +222,7 @@ export default class VendorService {
 
     const result = transaction(async (client) => {
 
-      const vendor = await isExist(r_id, "vendors", "company_id", company_id, client);
+      const vendor = await getRecord(r_id, "vendors", "company_id", company_id, client);
 
       if (!vendor) {
         throw new AppError("Vendor not found", 404);

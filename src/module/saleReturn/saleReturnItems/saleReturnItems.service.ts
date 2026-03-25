@@ -1,5 +1,5 @@
-import { isExist } from "../../../utils/extra";
-import { executeInTransaction, query, transaction } from "../../../config/db";
+import { getRecord } from "../../../utils/extra";
+import { executeInTransaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { PoolClient } from "pg";
 import { CreateSaleReturnItemParams, DeleteSaleReturnItemParams, FetchDbSaleReturnItem, FetchSaleReturnItemParams, SaleReturnItemCountResult } from "./saleReturnItems.types";
@@ -27,18 +27,49 @@ export default class SaleReturnItemService {
       return_mode
     } = data;
 
-    const check_exist_return = await isExist(
+    const check_exist_return = await getRecord(
       sale_return_id, "sale_return", "firm_id", firm_id, client
     )
     if (!check_exist_return) throw new AppError("Sale return not found.", 404)
     if (stock_id) {
-      const check_exist_stock = await isExist(
+      const check_exist_stock = await getRecord(
         stock_id, "stock", "firm_id", firm_id, client
       )
       if (!check_exist_stock) throw new AppError("Stock not found.", 404)
     }
+  const saleItem = await getRecord(
+  sale_item_id,
+  "sales_items",
+  "firm_id",
+  firm_id,
+  client
+);
 
-    const purchaseReturnItemQuery = `
+if (!saleItem) {
+  throw new AppError("Sale item not found.", 404);
+}
+
+const sold_qty = Number(saleItem.saled_qty ?? saleItem.quantity);
+const returnedQtyQuery = `
+  SELECT COALESCE(SUM(returned_qty), 0) AS total_returned
+  FROM sale_return_items
+  WHERE sale_item_id = $1 AND firm_id = $2 AND status = $3
+`;
+
+const { rows: returnedRows } = await client.query(returnedQtyQuery, [
+  sale_item_id,
+  firm_id,
+  0
+]);
+
+const already_returned = Number(returnedRows[0].total_returned);
+if (returned_qty + already_returned > sold_qty) {
+  throw new AppError(
+    `Return exceeds sold quantity. Max allowed: ${sold_qty - already_returned}`,
+    400
+  );
+}
+    const saleReturnItemQuery = `
     INSERT INTO sale_return_items (
       firm_id,
       sale_return_id,
@@ -55,7 +86,7 @@ export default class SaleReturnItemService {
       remarks,
       status,
       sale_item_id,
-      return_mode,
+      return_mode
     )
     VALUES (
       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, $16
@@ -81,84 +112,85 @@ export default class SaleReturnItemService {
       sale_item_id,
       return_mode
     ];
-
-    const { rows } = await executeInTransaction(client, purchaseReturnItemQuery, values);
+console.log("first")
+const { rows } = await executeInTransaction(client, saleReturnItemQuery, values);
+console.log("second")
 
     return rows[0];
   }
 
-  async fetchPurchaseReturnItems(data: FetchPurchaseReturnItemParams) {
+//   async fetchPurchaseReturnItems(data: FetchSaleReturnItemParams) {
 
-    const { filters, offset } = data;
+//     const { filters, offset } = data;
 
-    let where: string[] = [];
-    let values: any[] = [];
+//     let where: string[] = [];
+//     let values: any[] = [];
 
-    // ignore deleted
-    where.push(`status != $${values.length + 1}`);
-    values.push(0);
+//     // ignore deleted
+//     where.push(`status != $${values.length + 1}`);
+//     values.push(0);
 
-    if (filters?.id) {
-      values.push(filters.id);
-      where.push(`id = $${values.length}`);
-    }
+//     if (filters?.id) {
+//       values.push(filters.id);
+//       where.push(`id = $${values.length}`);
+//     }
 
-    if (filters?.purchase_id) {
-      values.push(filters.purchase_id);
-      where.push(`purchase_id = $${values.length}`);
-    }
+//     if (filters?.purchase_id) {
+//       values.push(filters.purchase_id);
+//       where.push(`purchase_id = $${values.length}`);
+//     }
 
-    if (filters?.firm_id) {
-      values.push(filters.firm_id);
-      where.push(`firm_id = $${values.length}`);
-    }
+//     if (filters?.firm_id) {
+//       values.push(filters.firm_id);
+//       where.push(`firm_id = $${values.length}`);
+//     }
 
-    if (filters?.branch_id) {
-      values.push(filters.branch_id);
-      where.push(`branch_id = $${values.length}`);
-    }
+//     if (filters?.branch_id) {
+//       values.push(filters.branch_id);
+//       where.push(`branch_id = $${values.length}`);
+//     }
 
-    const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+//     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-    const purchaseItemQuery = `
-  SELECT 
-    pi.*,
-    p.name AS product_name,
-    pu.bill_number,
-    s.batch_number
-  FROM purchase_items pi
-  LEFT JOIN products p ON p.id = pi.product_id
-  LEFT JOIN purchases pu ON pu.id = pi.purchase_id
-  LEFT JOIN stock s ON s.id = pi.stock_id
-  ${whereClause}
-  ORDER BY pi.id DESC
-  LIMIT $${values.length + 1}
-  OFFSET $${values.length + 2}
-`;
+//     const saleItemQuery = `
+//   SELECT 
+//     pi.*,
+//     p.name AS product_name,
+//     pu.bill_number,
+//     s.batch_number
+//   FROM sale_return_items pi
+//   LEFT JOIN products p ON p.id = pi.product_id
+//   LEFT JOIN purchases pu ON pu.id = pi.purchase_id
+//   LEFT JOIN stock s ON s.id = pi.stock_id
+//   ${whereClause}
+//   ORDER BY pi.id DESC
+//   LIMIT $${values.length + 1}
+//   OFFSET $${values.length + 2}
+// `;
 
-    const countQuery = `
-    SELECT COUNT(*)
-    FROM purchase_items
-    ${whereClause}
-  `;
+//     const countQuery = `
+//     SELECT COUNT(*)
+//     FROM sale_return_items
+//     ${whereClause}
+//   `;
 
-    const items = await query<FetchDbPurchaseReturnItem>(
-      purchaseItemQuery,
-      [...values, filters.limit, offset]
-    );
+//     const items = await query<FetchDbSaleReturnItem>(
+//       SaleItemQuery,
+//       [...values, filters.limit, offset]
+//     );
 
-    const total = await query<PurchaseReturnItemCountResult>(countQuery, values);
+//     const total = await query<SaleReturnItemCountResult>(countQuery, values);
 
-    return {
-      items,
-      pagination: {
-        page: filters.page,
-        limit: filters.limit,
-        total: Number(total[0].count),
-        totalPages: Math.ceil(Number(total[0].count) / filters.limit),
-      },
-    };
-  }
+//     return {
+//       items,
+//       pagination: {
+//         page: filters.page,
+//         limit: filters.limit,
+//         total: Number(total[0].count),
+//         totalPages: Math.ceil(Number(total[0].count) / filters.limit),
+//       },
+//     };
+//   }
 
   // async updatePurchaseItem(data: EditPurchaseItemParams, client: PoolClient) {
   //   const {
@@ -179,9 +211,9 @@ export default class SaleReturnItemService {
   //   } = data;
 
   //   // 1. Validate firm existence (requirement)
-  //   const is_item_exist = await isExist(
+  //   const is_item_exist = await getRecord(
   //     item_id,
-  //     "purchase_items",
+  //     "sale_return_items",
   //     "branch_id",
   //     branch_id,
   //     client
@@ -198,7 +230,7 @@ export default class SaleReturnItemService {
   //     );
   //   }
   //   const updateQuery = `
-  //     UPDATE purchase_items
+  //     UPDATE sale_return_items
   //   SET
   //   purchased_qty = $1,
   //     received_qty = $2,
@@ -241,27 +273,27 @@ export default class SaleReturnItemService {
   //   return rows[0];
   // }
 
-  async deletePurchaseReturnItem(data: DeletePurchaseReturnItemParams, client: PoolClient) {
-    const { purchase_id, firm_id, remark } = data;
+  async deleteSaleReturnItem(data: DeleteSaleReturnItemParams, client: PoolClient) {
+    const { sale_return_id, firm_id, remark } = data;
     const isItemExist = await executeInTransaction(client,
-      `SELECT * FROM purchase_items WHERE purchase_id =$1 AND firm_id= $2`,
-      [purchase_id, firm_id]
+      `SELECT * FROM sale_return_items WHERE sale_return_id =$1 AND firm_id= $2`,
+      [sale_return_id, firm_id]
     )
     if (isItemExist) {
-      throw new AppError("Purchase item not found for this purchase", 404)
+      throw new AppError("Sale item not found for this Sale", 404)
     }
 
     const deleteQuery = `
-        UPDATE purchase_items
+        UPDATE sale_return_items
         SET status = 0
-        WHERE purchase_id = $1 AND firm_id = $2
+        WHERE sale_return_id = $1 AND firm_id = $2
     RETURNING *;
     `;
 
     const { rows } = await executeInTransaction(
       client,
       deleteQuery,
-      [purchase_id, firm_id]
+      [sale_return_id, firm_id]
     );
 
     return rows[0];

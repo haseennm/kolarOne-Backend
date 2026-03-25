@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { CreatePartyBalanceParams, DeletePartyBalanceParams, EditPartyBalanceParams, FetchDbPartyBalance, FetchPartyBalanceParams, PartyBalanceCountResult, RepayPartyBalanceParams } from "./partyBalance.types";
 import { executeInTransaction, query } from "../../config/db";
-import { getStatusCode, isExist } from "../../utils/extra";
+import { getStatusCode, getRecord } from "../../utils/extra";
 import { AppError } from "../../utils/AppError";
 
 export default class PartyBalanceService {
@@ -191,7 +191,7 @@ export default class PartyBalanceService {
 
     const { PartyBalance_id, pay_amount, firm_id, remarks } = data;
 
-    const balance = await isExist(
+    const balance = await getRecord(
       PartyBalance_id,
       "party_balance",
       "firm_id",

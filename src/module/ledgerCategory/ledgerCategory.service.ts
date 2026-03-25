@@ -1,6 +1,6 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import { CreateLedgerCategoryParams, DeleteLedgerCategoryParams, CountResult, EditLedgerCategoryParams, FetchLedgerCategoryParams, FetchDbLedgerCategory } from "./ledgerCategory.types";
 export default class LedgerCategoryService {
 
@@ -16,7 +16,7 @@ export default class LedgerCategoryService {
 
     const result = transaction(async (client) => {
 
-      const isCompanyExist = await isExist(
+      const isCompanyExist = await getRecord(
         company_id,
         "company",
         "id",
@@ -139,7 +139,7 @@ export default class LedgerCategoryService {
 
     const result = transaction(async (client) => {
 
-      const isLedgerCategoryExist = await isExist(
+      const isLedgerCategoryExist = await getRecord(
         id,
         "ledger_categories",
         "company_id",
@@ -193,7 +193,7 @@ export default class LedgerCategoryService {
 
     const result = transaction(async (client) => {
 
-      const isLedgerCategoryExist = await isExist(
+      const isLedgerCategoryExist = await getRecord(
         r_id,
         "ledger_categories",
         "company_id",

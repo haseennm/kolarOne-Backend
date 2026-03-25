@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { isExist } from "../../../utils/extra";
+import { getRecord } from "../../../utils/extra";
 import { SaleReturnCreateParams, SaleReturnDeleteParams, SaleReturnFetchParams } from "./saleReturn.types";
 
 export default class SaleReturnService {
@@ -26,7 +26,7 @@ export default class SaleReturnService {
     } = data;
 
     // Check firm existence
-    const is_firm_exist = await isExist(
+    const is_firm_exist = await getRecord(
       firm_id,
       "firm",
       "branch_id",
@@ -37,7 +37,7 @@ export default class SaleReturnService {
     if (!is_firm_exist) {
       throw new AppError("Firm not found", 404);
     }
-    const is_sale_exist = await isExist(
+    const is_sale_exist = await getRecord(
       sale_id,
       "sales",
       "firm_id",
@@ -48,7 +48,7 @@ export default class SaleReturnService {
     if (!is_sale_exist) {
       throw new AppError("Sale not found", 404);
     }
-    const is_payment_method_exist = await isExist(
+    const is_payment_method_exist = await getRecord(
       payment_method_id,
       "payment_methods",
       "company_id",
@@ -65,7 +65,7 @@ export default class SaleReturnService {
       `
   SELECT return_number
   FROM sale_return
-  WHERE firm_id = ?
+  WHERE firm_id = $1
   ORDER BY id DESC
   LIMIT 1
   FOR UPDATE
@@ -158,7 +158,7 @@ export default class SaleReturnService {
 //     } = data;
 
 //     // Check firm existence
-//     const is_purchase_exist = await isExist(
+//     const is_purchase_exist = await getRecord(
 //       purchase_id,
 //       "purchases",
 //       "firm_id",
@@ -170,7 +170,7 @@ export default class SaleReturnService {
 //       throw new AppError("Firm not found", 404);
 //     }
 //     if (payment_method_id && payment_method_id !== is_purchase_exist.payment_method_id) {
-//       const is_payment_method_exist = await isExist(
+//       const is_payment_method_exist = await getRecord(
 //         payment_method_id,
 //         "payment_methods",
 //         "company_id",
@@ -183,7 +183,7 @@ export default class SaleReturnService {
 //       }
 //     }
 //     if (vendor_id && vendor_id !== is_purchase_exist.vendor_id) {
-//       const is_vendor_exist = await isExist(
+//       const is_vendor_exist = await getRecord(
 //         vendor_id,
 //         "vendors",
 //         "company_id",
@@ -503,7 +503,7 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
   const { id, remark, firm_id } = data;
 
   // ✅ Check existence
-  const isExistPR = await isExist(
+  const getRecordPR = await getRecord(
     id,
     "sale_return",
     "firm_id",
@@ -511,7 +511,7 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
     client
   );
 
-  if (!isExistPR) {
+  if (!getRecordPR) {
     throw new AppError("sale return not found or already deleted", 404);
   }
 
@@ -548,7 +548,7 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
 }
   // async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
   //   const { id, firm_id } = data;
-  //   const isPurchaseExist = await isExist(
+  //   const isPurchaseExist = await getRecord(
   //     id,
   //     "purchases",
   //     "firm_id",

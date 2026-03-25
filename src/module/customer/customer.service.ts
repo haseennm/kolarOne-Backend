@@ -1,5 +1,5 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import {
   CountResult,
   CreateCustomerParams,
@@ -39,7 +39,7 @@ export default class CustomerService {
 
     const result = transaction(async (client) => {
 
-      const isCompanyExist = await isExist(
+      const isCompanyExist = await getRecord(
         company_id,
         "company",
         "id",
@@ -214,7 +214,7 @@ export default class CustomerService {
 
     const result = transaction(async (client) => {
 
-      const isCustomerExist = await isExist(
+      const isCustomerExist = await getRecord(
         id,
         "customers",
         "company_id",
@@ -295,7 +295,7 @@ export default class CustomerService {
 
     const result = transaction(async (client) => {
 
-      const isCustomerExist = await isExist(
+      const isCustomerExist = await getRecord(
         r_id,
         "customers",
         "company_id",

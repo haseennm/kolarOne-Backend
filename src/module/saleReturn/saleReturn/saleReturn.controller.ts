@@ -258,20 +258,20 @@ export default class SaleReturnController {
     transaction(async (client) => {
 
       const remark = {
-        action: `Deleted purchase`,
+        action: `Deleted sale return`,
         deleted_by,
         created_at: Date.now(),
       };
-      const purchaseService = new SaleReturnService();
+      const saleReturnService = new SaleReturnService();
       const itemService = new SaleReturnItemController();
       const stockService = new StockController();
       // const partyBalanceService = new PartyBalanceController();
       const payment_transactions_service = new PaymentTransactionService()
 
-      const purchase = await purchaseService.deleteSaleReturn({ remark, ...rest }, client);
+      const saleReturn = await saleReturnService.deleteSaleReturn({ remark, ...rest }, client);
       await itemService.deleteSaleItem(
         {
-          purchase_id: rest.id,
+          sale_return_id: rest.id,
           firm_id: rest.firm_id,
         },
         client
@@ -285,17 +285,17 @@ export default class SaleReturnController {
       );
       // await partyBalanceService.deletePartyBalance(
       //   {
-      //     delete_by: deleted_by, firm_id: rest.firm_id, purchase_id: rest.id
+      //     delete_by: deleted_by, firm_id: rest.firm_id, sale_return_id: rest.id
       //   },
       //   client
       // );
       payment_transactions_service.deletePaymentTransaction({
-        company_id: purchase.company_id,
+        company_id: saleReturn.company_id,
         ref_id: rest.id,
-        ref_type: PaymentTransactionTypeCodeMap["purchase"],
+        ref_type: PaymentTransactionTypeCodeMap["sale_return"],
       }, client)
 
-      return "purchase deleted successfully"
+      return "sale return deleted successfully"
     })
   }
 }

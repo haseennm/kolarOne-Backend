@@ -47,7 +47,7 @@ export interface EditSaleItemParams
 
 export interface FetchSaleItemFilters {
   id?: number;
-  Sale_id?: number;
+  sale_id?: number;
   firm_id?: number;
   branch_id?: number;
   page: number;

@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { AppError } from "../../utils/AppError";
 import { executeInTransaction } from "../../config/db";
 import { ConfirmSalaryParams, CreateSalaryParams, GenerateSalaryBody, SalaryGenerationRow } from "./salary.types";
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 
 const FULL_DAY_MINUTES = 360;
 const HALF_DAY_MINUTES = 210;
@@ -221,14 +221,14 @@ GROUP BY staff_id
   async confirmSalary(data: ConfirmSalaryParams, client: any) {
 
     const { r_id, branch_id, final_salary, remark, statusCode } = data;
-    const branch_exist = await isExist(
+    const branch_exist = await getRecord(
       branch_id, "branches", "id", branch_id, client
     )
     if (!branch_exist) {
       throw new AppError("Branch not found", 404);
     }
     const company_id = branch_exist.company_id
-    const is_salary_exist = await isExist(
+    const is_salary_exist = await getRecord(
       r_id,
       "salary_generations",
       "branch_id",

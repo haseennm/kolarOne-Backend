@@ -11,107 +11,107 @@ import PurchaseReturnController from "./purchaseReturn.controller";
 export async function purchaseReturnRouter(app: FastifyInstance) {
 
   // CREATE PURCHASE
- app.post<{ Body: PurchaseReturnCreateBody }>(
-  "/create",
-  {
-    schema: {
-      body: {
-        type: "object",
-        required: [
-          "purchase_id",
-          "return_date",
-          "firm_id",
-          "branch_id",
-          "company_id",
-          "created_by",
-          "subtotal",
-          "net_amount",
-          "total_cgst",
-          "total_sgst",
-          "total_igst",
-          "final_amount",
-          "payment_amount",
-          "payment_method_id",
-          "items"
-        ],
-        properties: {
-          purchase_id: { type: "number" },
-          return_date: { type: ["string", "object"], format: "date" },
+  app.post<{ Body: PurchaseReturnCreateBody }>(
+    "/create",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: [
+            "purchase_id",
+            "return_date",
+            "firm_id",
+            "branch_id",
+            "company_id",
+            "created_by",
+            "subtotal",
+            "net_amount",
+            "total_cgst",
+            "total_sgst",
+            "total_igst",
+            "final_amount",
+            "payment_amount",
+            "payment_method_id",
+            "items"
+          ],
+          properties: {
+            purchase_id: { type: "number" },
+            return_date: { type: ["string", "object"], format: "date" },
 
-          firm_id: { type: "number" },
-          branch_id: { type: "number" },
-          company_id: { type: "number" },
+            firm_id: { type: "number" },
+            branch_id: { type: "number" },
+            company_id: { type: "number" },
 
-          created_by: { type: "string", minLength: 1 },
+            created_by: { type: "string", minLength: 1 },
 
-          subtotal: { type: "number" },
-          net_amount: { type: "number" },
-          total_cgst: { type: "number" },
-          total_sgst: { type: "number" },
-          total_igst: { type: "number" },
-          final_amount: { type: "number" },
-          payment_amount: { type: "number" },
+            subtotal: { type: "number" },
+            net_amount: { type: "number" },
+            total_cgst: { type: "number" },
+            total_sgst: { type: "number" },
+            total_igst: { type: "number" },
+            final_amount: { type: "number" },
+            payment_amount: { type: "number" },
 
-          reason: { type: ["string", "null"] },
+            reason: { type: ["string", "null"] },
 
-          transaction_reference: { type: ["string", "null"] },
-          payment_method_id: { type: "number" },
+            transaction_reference: { type: ["string", "null"] },
+            payment_method_id: { type: "number" },
 
-          status: {
-            type: "string",
-            enum: ["Completed", "Confirm", "Cancelled"]
-          },
+            status: {
+              type: "string",
+              enum: ["Completed", "Confirm", "Cancelled"]
+            },
 
-          items: {
-            type: "array",
-            minItems: 1,
             items: {
-              type: "object",
-              required: [
-                "product_id",
-                "returned_qty",
-                "unit",
-                "unit_price",
-                "sub_total",
-                "total_igst",
-                "total_sgst",
-                "total_cgst",
-                "net_amount",
-                "purchase_item_id"
-              ],
-              properties: {
-                product_id: { type: "number" },
-                purchase_item_id: { type: "number" },
-                stock_id: { type: "number" }, 
-                returned_qty: { type: "number" },
-                unit: { type: "string" },
-                unit_price: { type: "number" },
-                sub_total: { type: "number" },
-                total_igst: { type: "number" },
-                total_sgst: { type: "number" },
-                total_cgst: { type: "number" },
-                net_amount: { type: "number" }
+              type: "array",
+              minItems: 1,
+              items: {
+                type: "object",
+                required: [
+                  "product_id",
+                  "returned_qty",
+                  "unit",
+                  "unit_price",
+                  "sub_total",
+                  "total_igst",
+                  "total_sgst",
+                  "total_cgst",
+                  "net_amount",
+                  "purchase_item_id"
+                ],
+                properties: {
+                  product_id: { type: "number" },
+                  purchase_item_id: { type: "number" },
+                  stock_id: { type: "number" },
+                  returned_qty: { type: "number" },
+                  unit: { type: "string" },
+                  unit_price: { type: "number" },
+                  sub_total: { type: "number" },
+                  total_igst: { type: "number" },
+                  total_sgst: { type: "number" },
+                  total_cgst: { type: "number" },
+                  net_amount: { type: "number" }
+                }
               }
             }
           }
         }
       }
+    },
+    async (
+      request: FastifyRequest<{ Body: PurchaseReturnCreateBody }>,
+      reply: FastifyReply
+    ) => {
+      const controller = new PurchaseReturnController();
+
+      const data = await controller.purchaseReturnCreate(request.body);
+
+      return reply.code(201).send({
+        status: "Success",
+        message: data
+      });
     }
-  },
-  async (
-    request: FastifyRequest<{ Body: PurchaseReturnCreateBody }>,
-    reply: FastifyReply
-  ) => {
-    const controller = new PurchaseReturnController();
-
-    const data = await controller.purchaseReturnCreate(request.body);
-
-    return reply.code(201).send({
-      status: "Success",
-      message: data
-    });
-  }
-);
+  );
 
   // FETCH PURCHASE LIST
   app.post<{ Body: PurchaseReturnFetchBody }>(

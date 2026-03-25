@@ -1,7 +1,6 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../../config/db";
 import { cns, getStatusCode, getStatusText } from "../../../utils/extra";
-import PurchaseReturnItemService from "./saleReturnItems.service";
 import { AppError } from "../../../utils/AppError";
 import { CreateSaleRetunItemBody, DeleteSaleReturnItemBody, FetchSaleReturnItemFilters, FetchSaleReturnItemParams } from "./saleReturnItems.types";
 import SaleReturnItemService from "./saleReturnItems.service";
@@ -82,9 +81,9 @@ export default class SaleReturnItemController {
       action: "Deleted",
       deleted_at: Date.now(),
     };
-    const service = new PurchaseReturnItemService();
-    await service.deletePurchaseReturnItem({...data,remark},  client);
+    const service = new SaleReturnItemService();
+    await service.deleteSaleReturnItem({...data,remark},  client);
 
-    return `Purchase item has been deleted successfully.`;
+    return `Sale item has been deleted successfully.`;
   }
 }

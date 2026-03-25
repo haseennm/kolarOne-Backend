@@ -1,6 +1,6 @@
 import { Result } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import {
   CountResult,
   CreateFirmParams,
@@ -34,12 +34,12 @@ export default class FirmService {
     } = data;
     const result = transaction(async (client) => {
 
-      const isBranchExist = await isExist(branch_id, "branches", "company_id", company_id, client);
+      const isBranchExist = await getRecord(branch_id, "branches", "company_id", company_id, client);
       if (!isBranchExist) {
         throw new AppError("Branch not found", 404);
       }
       for (const roleId of role) {
-        const isRoleExist = await isExist(roleId, "role", "company_id", company_id, client);
+        const isRoleExist = await getRecord(roleId, "role", "company_id", company_id, client);
 
         if (!isRoleExist) {
           throw new AppError("One or more roles do not exist", 404);
@@ -186,14 +186,14 @@ export default class FirmService {
       company_id
     } = data;
     const result = transaction(async (client) => {
-      const isFirmExist = await isExist(id, "firm", "branch_id", branch_id, client);
+      const isFirmExist = await getRecord(id, "firm", "branch_id", branch_id, client);
 
       if (!isFirmExist) {
         throw new AppError("Firm not found or deleted", 404);
       }
       if (role) {
         for (const roleId of role) {
-          const isRoleExist = await isExist(roleId, "role", "company_id", company_id, client);
+          const isRoleExist = await getRecord(roleId, "role", "company_id", company_id, client);
 
           if (!isRoleExist) {
             throw new AppError("One or more roles do not exist", 404);
@@ -251,7 +251,7 @@ RETURNING *;
   async deleteFirm(data: DeleteFirmParams) {
     const { r_id, remark, branch_id } = data;
     const result = transaction(async (client) => {
-      const isFirmExist = await isExist(r_id, "firm", "branch_id", branch_id, client);
+      const isFirmExist = await getRecord(r_id, "firm", "branch_id", branch_id, client);
 
       if (!isFirmExist) {
         throw new AppError("Firm not found or already deleted", 404);

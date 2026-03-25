@@ -1,6 +1,6 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import {
   CreateRoleParams,
   DeleteRoleBody,
@@ -16,7 +16,7 @@ export default class RoleService {
 
     const { role, description, company_id, statusCode } = data;
 
-    const isCompanyExist = await isExist(
+    const isCompanyExist = await getRecord(
       company_id,
       "company",
       "id",
@@ -118,7 +118,7 @@ export default class RoleService {
 
     const { id, role, description, company_id, statusCode } = data;
 
-    const isRoleExist = await isExist(
+    const isRoleExist = await getRecord(
       id,
       "role",
       "company_id",
@@ -163,7 +163,7 @@ export default class RoleService {
 
     const result = transaction(async (client) => {
 
-      const isRoleExist = await isExist(
+      const isRoleExist = await getRecord(
         id,
         "role",
         "company_id",

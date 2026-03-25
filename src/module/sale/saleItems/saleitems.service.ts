@@ -1,4 +1,4 @@
-import { isExist } from "../../../utils/extra";
+import { getRecord } from "../../../utils/extra";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { CreateSaleItemParams, DeleteSaleItemBody, DeleteSaleItemParams, EditSaleItemParams, FetchDbSaleItem, FetchSaleItemParams, SaleItemCountResult, UpdateSaleItemParams } from "./saleitems.types";
@@ -30,7 +30,7 @@ export default class SaleItemService {
 
 
     const saleItemQuery = `
-    INSERT INTO purchase_items (
+    INSERT INTO sales_items (
       firm_id,
       sale_id,
       product_id,
@@ -94,9 +94,9 @@ export default class SaleItemService {
       where.push(`id = $${values.length}`);
     }
 
-    if (filters?.purchase_id) {
-      values.push(filters.purchase_id);
-      where.push(`purchase_id = $${values.length}`);
+    if (filters?.sale_id) {
+      values.push(filters.sale_id);
+      where.push(`sale_id = $${values.length}`);
     }
 
     if (filters?.firm_id) {
@@ -151,86 +151,86 @@ export default class SaleItemService {
     };
   }
 
-  async updateSaleItem(data: EditSaleItemParams, client: PoolClient) {
-    const {
+  // async updateSaleItem(data: EditSaleItemParams, client: PoolClient) {
+  //   const {
 
-      branch_id,
-      firm_id,
-      purchased_qty,
-      received_qty,
-      unit,
-      unit_price,
-      sub_total,
-      total_cgst,
-      total_sgst,
-      total_igst,
-      net_amount,
-      stock_id,
-      item_id, purchase_id, remark, statusCode, product_id
-    } = data;
+  //     branch_id,
+  //     firm_id,
+  //     purchased_qty,
+  //     received_qty,
+  //     unit,
+  //     unit_price,
+  //     sub_total,
+  //     total_cgst,
+  //     total_sgst,
+  //     total_igst,
+  //     net_amount,
+  //     stock_id,
+  //     item_id, purchase_id, remark, statusCode, product_id
+  //   } = data;
 
-    // 1. Validate firm existence (requirement)
-    const is_item_exist = await isExist(
-      item_id,
-      "purchase_items",
-      "branch_id",
-      branch_id,
-      client
-    );
-    if (!is_item_exist) {
-      throw new AppError("Purchase item not found", 404);
-    }
-    const final_received_qty = received_qty ?? is_item_exist.received_qty;
-    const final_purchased_qty = purchased_qty ?? is_item_exist.purchased_qty;
-    if (final_received_qty > final_purchased_qty) {
-      throw new AppError(
-        "Received quantity cannot exceed purchased quantity",
-        422
-      );
-    }
-    const updateQuery = `
-      UPDATE purchase_items
-    SET
-    purchased_qty = $1,
-      received_qty = $2,
-      unit = $3,
-      unit_price = $4,
-      sub_total = $5,
-      total_cgst = $6,
-      total_sgst = $7,
-      total_igst = $8,
-      net_amount = $9,
-      stock_id = $10,
-      remarks =
-      CASE
-          WHEN remarks IS NULL THEN $11:: jsonb
-          WHEN jsonb_typeof(remarks) = 'array'
-            THEN remarks || $11:: jsonb
-          ELSE jsonb_build_array(remarks) || $11:: jsonb
-    END
-      WHERE id = $12 AND firm_id =$13
-    RETURNING *;
-    `;
+  //   // 1. Validate firm existence (requirement)
+  //   const is_item_exist = await getRecord(
+  //     item_id,
+  //     "purchase_items",
+  //     "branch_id",
+  //     branch_id,
+  //     client
+  //   );
+  //   if (!is_item_exist) {
+  //     throw new AppError("Purchase item not found", 404);
+  //   }
+  //   const final_received_qty = received_qty ?? is_item_exist.received_qty;
+  //   const final_purchased_qty = purchased_qty ?? is_item_exist.purchased_qty;
+  //   if (final_received_qty > final_purchased_qty) {
+  //     throw new AppError(
+  //       "Received quantity cannot exceed purchased quantity",
+  //       422
+  //     );
+  //   }
+  //   const updateQuery = `
+  //     UPDATE purchase_items
+  //   SET
+  //   purchased_qty = $1,
+  //     received_qty = $2,
+  //     unit = $3,
+  //     unit_price = $4,
+  //     sub_total = $5,
+  //     total_cgst = $6,
+  //     total_sgst = $7,
+  //     total_igst = $8,
+  //     net_amount = $9,
+  //     stock_id = $10,
+  //     remarks =
+  //     CASE
+  //         WHEN remarks IS NULL THEN $11:: jsonb
+  //         WHEN jsonb_typeof(remarks) = 'array'
+  //           THEN remarks || $11:: jsonb
+  //         ELSE jsonb_build_array(remarks) || $11:: jsonb
+  //   END
+  //     WHERE id = $12 AND firm_id =$13
+  //   RETURNING *;
+  //   `;
 
-    const values = [
-      purchased_qty ?? is_item_exist.purchased_qty,
-      received_qty ?? is_item_exist.received_qty,
-      unit ?? is_item_exist.unit,
-      unit_price ?? is_item_exist.unit_price,
-      sub_total ?? is_item_exist.sub_total,
-      total_cgst ?? is_item_exist.total_cgst,
-      total_sgst ?? is_item_exist.total_sgst,
-      total_igst ?? is_item_exist.total_igst,
-      net_amount ?? is_item_exist.net_amount,
-      stock_id ?? is_item_exist.stock_id,
-      JSON.stringify(remark),
-      item_id,
-      firm_id
-    ];
+  //   const values = [
+  //     purchased_qty ?? is_item_exist.purchased_qty,
+  //     received_qty ?? is_item_exist.received_qty,
+  //     unit ?? is_item_exist.unit,
+  //     unit_price ?? is_item_exist.unit_price,
+  //     sub_total ?? is_item_exist.sub_total,
+  //     total_cgst ?? is_item_exist.total_cgst,
+  //     total_sgst ?? is_item_exist.total_sgst,
+  //     total_igst ?? is_item_exist.total_igst,
+  //     net_amount ?? is_item_exist.net_amount,
+  //     stock_id ?? is_item_exist.stock_id,
+  //     JSON.stringify(remark),
+  //     item_id,
+  //     firm_id
+  //   ];
 
-    const { rows } = await executeInTransaction(client, updateQuery, values);
-    return rows[0];
-  }
+  //   const { rows } = await executeInTransaction(client, updateQuery, values);
+  //   return rows[0];
+  // }
 
   async deleteSaleItem(data: DeleteSaleItemParams, client: PoolClient) {
 
@@ -244,7 +244,7 @@ export default class SaleItemService {
     }
 
     const deleteQuery = `
-        UPDATE sale_items
+        UPDATE sales_items
         SET status = 0
         WHERE sale_id = $1 AND firm_id = $2
     RETURNING *;

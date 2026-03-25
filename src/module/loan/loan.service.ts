@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { getStatusCode, isExist } from "../../utils/extra";
+import { getStatusCode, getRecord } from "../../utils/extra";
 import { CreateLoanParams, DeleteLoanBody, DeleteLoanParams, FetchDbLoan, FetchLoanParams, LoanCountResult, RepayLoanParams } from "./loan.types";
 
 
@@ -11,7 +11,7 @@ export default class LoanService {
 
     const { branch_id, loan_amount, remark, staff_id, statusCode, company_id } = data;
 
-    const is_staff_exist = await isExist(
+    const is_staff_exist = await getRecord(
       staff_id,
       "staff",
       "company_id",
@@ -157,7 +157,7 @@ export default class LoanService {
 
   //   const { id, loan, description, company_id, statusCode } = data;
 
-  //   const isloanExist = await isExist(
+  //   const isloanExist = await getRecord(
   //     id,
   //     "loan",
   //     "company_id",
@@ -200,7 +200,7 @@ export default class LoanService {
     const { loan_id, pay_amount, branch_id, company_id, remarks } = data;
 
     // Get loan details
-    const loan = await isExist(loan_id, "staff_loans", "branch_id", branch_id, client)
+    const loan = await getRecord(loan_id, "staff_loans", "branch_id", branch_id, client)
 
     if (!loan) {
       throw new AppError("Loan not found", 404);
@@ -245,7 +245,7 @@ export default class LoanService {
     const { id, branch_id } = data;
 
 
-    const isLoan_exist = await isExist(
+    const isLoan_exist = await getRecord(
       id,
       "staff_loans",
       "branch_id",

@@ -1,6 +1,6 @@
 import { Client } from "pg";
 import { executeInTransaction, pool, query, transaction } from "../../config/db"
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import { CompanyLoginBody, CountResult, CreateCompanyParams, DeleteCompanyParams, EditCompanyParams, GetCompanyParams, getDbCompany } from "./company.types";
 import { AppError } from "../../utils/AppError";
 
@@ -239,7 +239,7 @@ export default class CompanyService {
         const { r_id, remark } = data
         const result = transaction(async (client) => {
 
-            const isCompanyExist = await isExist(r_id, "company", "id", r_id, client);
+            const isCompanyExist = await getRecord(r_id, "company", "id", r_id, client);
             if (!isCompanyExist) {
                 throw new AppError("Company not found or already deleted", 404);
             }

@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { isExist } from "../../../utils/extra";
+import { getRecord } from "../../../utils/extra";
 import { SaleCreateParams, SaleDeleteParams, SaleEditParams, SaleFetchParams } from "./sale.types";
 
 export default class SaleService {
@@ -28,7 +28,7 @@ export default class SaleService {
     } = data;
 
     // ✅ Firm check
-    const is_firm_exist = await isExist(
+    const is_firm_exist = await getRecord(
       firm_id,
       "firm",
       "branch_id",
@@ -40,7 +40,7 @@ export default class SaleService {
     }
 
     // ✅ Customer check
-    const is_customer_exist = await isExist(
+    const is_customer_exist = await getRecord(
       customer_id,
       "customers",
       "company_id",
@@ -54,7 +54,7 @@ export default class SaleService {
     // ✅ Validate all payment methods
     if (payments && payments.length > 0) {
       for (const p of payments) {
-        const is_payment_method_exist = await isExist(
+        const is_payment_method_exist = await getRecord(
           p.payment_method_id,
           "payment_methods",
           "company_id",
@@ -178,7 +178,7 @@ export default class SaleService {
   //     } = data;
 
   //     // Check firm existence
-  //     const is_purchase_exist = await isExist(
+  //     const is_purchase_exist = await getRecord(
   //       purchase_id,
   //       "purchases",
   //       "firm_id",
@@ -190,7 +190,7 @@ export default class SaleService {
   //       throw new AppError("Firm not found", 404);
   //     }
   //     if (payment_method_id && payment_method_id !== is_purchase_exist.payment_method_id) {
-  //       const is_payment_method_exist = await isExist(
+  //       const is_payment_method_exist = await getRecord(
   //         payment_method_id,
   //         "payment_methods",
   //         "company_id",
@@ -203,7 +203,7 @@ export default class SaleService {
   //       }
   //     }
   //     if (vendor_id && vendor_id !== is_purchase_exist.vendor_id) {
-  //       const is_vendor_exist = await isExist(
+  //       const is_vendor_exist = await getRecord(
   //         vendor_id,
   //         "vendors",
   //         "company_id",
@@ -460,7 +460,7 @@ export default class SaleService {
     LEFT JOIN firm f ON f.id = s.firm_id
     LEFT JOIN branches b ON b.id = f.branch_id
 
-    LEFT JOIN sale_items si ON si.sale_id = s.id
+    LEFT JOIN sales_items si ON si.sale_id = s.id
     LEFT JOIN products pr ON pr.id = si.product_id
     LEFT JOIN stock st ON st.id = si.stock_id
 
@@ -505,7 +505,7 @@ export default class SaleService {
   }
   async deleteSale(data: SaleDeleteParams, client: PoolClient) {
     const { id, remark, firm_id } = data;
-    const isPurchaseExist = await isExist(
+    const isPurchaseExist = await getRecord(
       id,
       "purchases",
       "firm_id",
@@ -552,7 +552,7 @@ export default class SaleService {
   }
   // async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
   //   const { id, firm_id } = data;
-  //   const isPurchaseExist = await isExist(
+  //   const isPurchaseExist = await getRecord(
   //     id,
   //     "purchases",
   //     "firm_id",

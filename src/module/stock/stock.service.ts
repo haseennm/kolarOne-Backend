@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { isExist } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import { StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams } from "./stock.types";
 
 export default class StockService {
@@ -22,7 +22,7 @@ export default class StockService {
     } = data;
 
     // ✅ Validate firm exists
-    const isFirmExist = await isExist(
+    const isFirmExist = await getRecord(
       firm_id,
       "firm",
       "branch_id",
@@ -33,7 +33,7 @@ export default class StockService {
     if (!isFirmExist) {
       throw new AppError("Firm not found", 404);
     }
-    const is_product_exist = await isExist(
+    const is_product_exist = await getRecord(
       product_id,
       "products",
       "company_id",
@@ -137,7 +137,7 @@ export default class StockService {
       stock_id
     } = data;
 
-    const is_stock_exist = await isExist(
+    const is_stock_exist = await getRecord(
       stock_id,
       "stock",
       "branch_id",
@@ -149,7 +149,7 @@ export default class StockService {
       throw new AppError("Firm not found", 404);
     }
     if (product_id && product_id !== is_stock_exist.product_id) {
-      const is_product_exist = await isExist(
+      const is_product_exist = await getRecord(
         product_id,
         "products",
         "company_id",
@@ -161,7 +161,7 @@ export default class StockService {
         throw new AppError("Product not found", 404);
       }
     }
-    const finalAvailableQty = available_qty ?? is_stock_exist.available_qty;
+    const finalAvailableQty = available_qty ?? is_stock_exist.available_quantity;
     const finalPurchasedQty = purchased_qty ?? is_stock_exist.purchased_qty;
 
     if (finalAvailableQty > finalPurchasedQty) {
@@ -186,7 +186,7 @@ export default class StockService {
 `;
 
     const values = [
-      available_qty ?? is_stock_exist.available_qty,
+      available_qty ?? is_stock_exist.available_quantity,
       statusCode ?? is_stock_exist.status,
       selling_price ?? is_stock_exist.selling_price,
       firm_id,
@@ -228,69 +228,88 @@ export default class StockService {
     return rows[0]
   }
   async changeStock(data: StockChangeParams, client: PoolClient) {
-    const {
-      branch_id,
-      firm_id,
-      statusCode,
-      movement_type,
-      reason,
-      stock_id,
-      qty,
-      is_relate_purchase
-    } = data;
+  const {
+    branch_id,
+    firm_id,
+    statusCode,
+    movement_type,
+    reason,
+    stock_id,
+    qty,
+    is_relate_purchase,
+    return_mode
+  } = data;
 
-    const is_stock_exist = await isExist(
-      stock_id,
-      "stock",
-      "branch_id",
-      branch_id,
-      client
+  const stock = await getRecord(
+    stock_id,
+    "stock",
+    "branch_id",
+    branch_id,
+    client
+  );
+
+  if (!stock) {
+    throw new AppError("Stock not found", 404);
+  }
+
+  if (movement_type === "O" && stock.available_quantity < qty) {
+    throw new AppError(
+      `Insufficient stock in ${stock.batch_number}`,
+      409
+    );
+  }
+
+  const calculation = movement_type === "O" ? -qty : qty;
+
+  const finalAvailableQty =
+    Number(stock.available_quantity) + calculation;
+
+  const finalPurchasedQty = is_relate_purchase
+    ? Number(stock.purchased_qty) + calculation
+    : Number(stock.purchased_qty);
+
+  if (finalAvailableQty > finalPurchasedQty) {
+    throw new AppError(
+      "Available quantity cannot exceed purchased quantity",
+      422
+    );
+  }
+
+  if (finalAvailableQty < 0) {
+    throw new AppError("Stock cannot be negative", 422);
+  }
+
+  let updatedStock = stock; // 👈 default return
+
+  // ✅ Update only if NOT damaged
+  if (return_mode !== "to_damage") {
+    const { rows } = await executeInTransaction(
+      client,
+      `
+      UPDATE stock SET
+        available_quantity = $1,
+        purchased_qty = $2
+      WHERE id = $3
+        AND firm_id = $4
+        AND branch_id = $5
+      RETURNING *;
+      `,
+      [
+        finalAvailableQty,
+        finalPurchasedQty,
+        stock_id,
+        firm_id,
+        branch_id
+      ]
     );
 
-    if (!is_stock_exist) {
-      throw new AppError("Stock not found", 404);
-    }
-    if (movement_type === "O") {
-      if (is_stock_exist.available_qty < qty) {
-        throw new AppError(`Insufficient stock in ${is_stock_exist.batch_number}`, 409);
-      }
-    }
-    const calculation = movement_type === "O" ? -qty : qty;
+    updatedStock = rows[0]; // 👈 override only if updated
+  }
 
-    const finalAvailableQty = is_stock_exist.available_qty + calculation;
-    const finalPurchasedQty = is_relate_purchase ? is_stock_exist.purchased_qty + calculation : is_stock_exist.purchased_qty;
-
-    if (finalAvailableQty > finalPurchasedQty) {
-      throw new AppError(
-        "Available quantity cannot exceed purchased quantity",
-        422
-      );
-    }
-    if (finalAvailableQty < 0) {
-      throw new Error("Stock cannot be negative");
-    }
-    const stockQuery = `
-  UPDATE stock SET
-    available_quantity = $1,
-    purchased_qty = $2
-    
-  WHERE id = $3
-  AND firm_id = $4
-    AND branch_id = $5
-  RETURNING *;
-`;
-
-    const values = [
-      finalAvailableQty,
-      finalPurchasedQty,
-      stock_id,
-      firm_id,
-      branch_id
-    ];
-
-    const { rows } = await executeInTransaction(client, stockQuery, values);
-
-    const movement_query = `
+  // ✅ Always insert movement
+  await executeInTransaction(
+    client,
+    `
     INSERT INTO stock_movements (
       product_id,
       branch_id,
@@ -301,21 +320,22 @@ export default class StockService {
       status
     )
     VALUES ($1,$2,$3,$4,$5,$6,$7)
-    RETURNING *;
-  `;
-
-    const movement_values = [
-      is_stock_exist.product_id,
+    `,
+    [
+      stock.product_id,
       branch_id,
       movement_type,
       qty,
       reason,
       stock_id,
       statusCode
-    ];
-    await executeInTransaction(client, movement_query, movement_values);
-    return rows[0]
-  }
+    ]
+  );
+
+  console.log("stock section done");
+
+  return updatedStock; // ✅ ALWAYS returns something
+}
 
   async fetchStock(data: StockFetchParams) {
     const { filters, offset } = data;
@@ -358,12 +378,12 @@ export default class StockService {
     // ✅ Available Qty range
     if (filters?.available_qty_min !== undefined) {
       values.push(filters.available_qty_min);
-      where.push(`available_qty >= $${values.length}`);
+      where.push(`available_quantity >= $${values.length}`);
     }
 
     if (filters?.available_qty_max !== undefined) {
       values.push(filters.available_qty_max);
-      where.push(`available_qty <= $${values.length}`);
+      where.push(`available_quantity <= $${values.length}`);
     }
 
     // ✅ Purchased Qty range
@@ -433,7 +453,7 @@ export default class StockService {
 
   //   const { id, role, description, company_id, statusCode } = data;
 
-  //   const isRoleExist = await isExist(
+  //   const isRoleExist = await getRecord(
   //     id,
   //     "role",
   //     "company_id",

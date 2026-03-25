@@ -6,6 +6,7 @@ import {
   SaleFetchBody
 } from "./sale.types";
 import SaleController from "./sale.controller";
+import { format } from "node:path";
 
 export async function saleRouter(app: FastifyInstance) {
 
@@ -39,7 +40,7 @@ export async function saleRouter(app: FastifyInstance) {
             company_id: { type: "number" },
             created_by: { type: "string", minLength: 1 },
 
-            customer_id: { type: "string" },
+            customer_id: { type: "string",format:"uuid" },
             invoice_date: { type: "string", format: "date" },
 
             subtotal: { type: "number" },

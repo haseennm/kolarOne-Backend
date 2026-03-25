@@ -1,6 +1,6 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { cns, isExist } from "../../utils/extra";
+import { cns, getRecord } from "../../utils/extra";
 import { CreateLedgerTransactionParams, DeleteLedgerTransactionParams, LedgerTransactionCountResult, EditLedgerTransactionParams, FetchLedgerTransactionParams, FetchDbLedgerTransaction } from "./ledgertransaction.types";
 export default class LedgerTransactionService {
 
@@ -12,7 +12,7 @@ export default class LedgerTransactionService {
     } = data;
 
 
-    const isCompanyExist = await isExist(
+    const isCompanyExist = await getRecord(
       company_id,
       "company",
       "id",
@@ -23,7 +23,7 @@ export default class LedgerTransactionService {
     if (!isCompanyExist) {
       throw new AppError("Company not found", 404);
     }
-    const isCategory_exist = await isExist(
+    const isCategory_exist = await getRecord(
       category_id,
       "ledger_categories",
       "company_id",
@@ -45,7 +45,7 @@ export default class LedgerTransactionService {
       throw new Error("Invalid entity type");
     }
 
-    const isEntityExist = await isExist(
+    const isEntityExist = await getRecord(
       entity_id,
       entity_table,
       "company_id",
@@ -182,7 +182,7 @@ export default class LedgerTransactionService {
     } = data;
 
 
-    const isLedgerTransactionExist = await isExist(
+    const isLedgerTransactionExist = await getRecord(
       id,
       "ledger_transactions",
       "company_id",
@@ -242,7 +242,7 @@ export default class LedgerTransactionService {
 
     const result = transaction(async (client) => {
 
-      const isLedgerTransactionExist = await isExist(
+      const isLedgerTransactionExist = await getRecord(
         r_id,
         "ledger_transactions",
         "company_id",
