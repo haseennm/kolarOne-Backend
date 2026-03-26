@@ -188,22 +188,21 @@ export default class PartyBalanceService {
   }
 
   async repayPartyBalance(data: RepayPartyBalanceParams, client: PoolClient) {
+    const { ref_id, ref_type, pay_amount, firm_id, remarks } = data;
 
-    const { PartyBalance_id, pay_amount, firm_id, remarks } = data;
-
-    const balance = await getRecord(
-      PartyBalance_id,
-      "party_balance",
-      "firm_id",
-      firm_id,
-      client
+    const balance_row = await executeInTransaction(
+      client,
+      `SELECT * FROM party_balance 
+     WHERE ref_id = $1 AND ref_type = $2 AND firm_id = $3`,
+      [ref_id, ref_type, firm_id]
     );
 
-    if (!balance) {
+    if (!balance_row || balance_row.rows.length === 0) {
       throw new AppError("Party balance not found", 404);
     }
 
-    const remaining = Number(balance.balance) //- Number(balance.paid);
+    const balance = balance_row.rows[0];
+    const remaining = Number(balance.balance);
 
     if (pay_amount > remaining) {
       throw new AppError("Payment exceeds balance", 400);
@@ -211,34 +210,37 @@ export default class PartyBalanceService {
 
     const newPaid = Number(balance.paid) + Number(pay_amount);
     const newBalance = Number(balance.balance) - Number(pay_amount);
-
     const status =
-      Number(newBalance) === 0
+      newBalance === 0
         ? getStatusCode("Paid")
         : getStatusCode("Partial");
 
     const updateQuery = `
-      UPDATE party_balance
-      SET 
-        paid = $1,
-        remarks = CASE
-          WHEN remarks IS NULL THEN $2::jsonb
-          WHEN jsonb_typeof(remarks) = 'array'
-            THEN remarks || $2::jsonb
-          ELSE jsonb_build_array(remarks) || $2::jsonb
-        END,
-        status = $3,
-        balance =$4
-      WHERE id = $5
-      RETURNING *;
-    `;
+    UPDATE party_balance
+    SET 
+      paid = $1,
+      remarks = CASE
+        WHEN remarks IS NULL THEN $2::jsonb
+        WHEN jsonb_typeof(remarks) = 'array'
+          THEN remarks || $2::jsonb
+        ELSE jsonb_build_array(remarks) || $2::jsonb
+      END,
+      status = $3,
+      balance = $4
+    WHERE ref_id = $5 
+      AND ref_type = $6 
+      AND firm_id = $7
+    RETURNING *;
+  `;
 
     const { rows } = await executeInTransaction(client, updateQuery, [
       newPaid,
-      JSON.stringify(remarks),
+      JSON.stringify(remarks || []),
       status,
       newBalance,
-      PartyBalance_id,
+      ref_id,
+      ref_type,
+      firm_id,
     ]);
 
     return rows[0];

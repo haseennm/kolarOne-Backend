@@ -41,16 +41,18 @@ export default class PurchaseService {
     if (!is_firm_exist) {
       throw new AppError("Firm not found", 404);
     }
-    const is_payment_method_exist = await getRecord(
-      payment_method_id,
-      "payment_methods",
-      "company_id",
-      company_id,
-      client
-    );
+    if (payment_method_id) {
+      const is_payment_method_exist = await getRecord(
+        payment_method_id,
+        "payment_methods",
+        "company_id",
+        company_id,
+        client
+      );
 
-    if (!is_payment_method_exist) {
-      throw new AppError("payment method not found", 404);
+      if (!is_payment_method_exist) {
+        throw new AppError("payment method not found", 404);
+      }
     }
     const is_vendor_exist = await getRecord(
       vendor_id,
@@ -220,16 +222,16 @@ export default class PurchaseService {
     remarks = COALESCE(remarks, '[]'::jsonb) || $14::jsonb,
     payment_method_id = $15,
     transaction_reference = $16 WHERE
-    firm_id = $17
+    firm_id = $17 AND
    id = $18
   RETURNING *;
 `;
 
     const values = [
-      vendor_id,
-      bill_number,
-      bill_date,
-      subtotal ?? is_purchase_exist.sub_total,
+      vendor_id ?? is_purchase_exist.vendor_id,
+      bill_number ?? is_purchase_exist.bill_number,
+      bill_date ?? is_purchase_exist.bill_date,
+      subtotal ?? is_purchase_exist.subtotal,
       discount ?? is_purchase_exist.discount,
       net_amount ?? is_purchase_exist.net_amount,
       total_cgst ?? is_purchase_exist.total_cgst,
@@ -238,15 +240,14 @@ export default class PurchaseService {
       final_amount ?? is_purchase_exist.final_amount,
       payment_amount ?? is_purchase_exist.payment_amount,
       notes ?? is_purchase_exist.notes,
-      statusCode,
+      statusCode ?? is_purchase_exist.status,
       JSON.stringify([remark]),
-
       payment_method_id ?? is_purchase_exist.payment_method_id,
       transaction_reference ?? is_purchase_exist.transaction_reference,
       firm_id,
       purchase_id
     ];
-
+console.log(values)
     const { rows } = await executeInTransaction(client, purchaseQuery, values);
     return rows[0];
   }
@@ -488,7 +489,7 @@ export default class PurchaseService {
     // if (!this.canDeletePurchase) {
     //   throw new AppError("Can't delete purchase now ", 500)
     // }
-   const queryText = `
+    const queryText = `
   UPDATE purchases p
   SET
     status = $1,
@@ -498,7 +499,7 @@ export default class PurchaseService {
           THEN p.remarks || $2::jsonb
         ELSE jsonb_build_array(p.remarks) || $2::jsonb
       END
-  FROM firms f
+  FROM firm f
   JOIN branches b ON f.branch_id = b.id
   WHERE 
     p.id = $3 

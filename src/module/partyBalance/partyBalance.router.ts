@@ -132,13 +132,19 @@ export async function partyBalanceRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["PartyBalance_id", "firm_id", "pay_amount", "updated_by"],
+          required: ["ref_id", "ref_type", "firm_id", "pay_amount", "updated_by","company_id"],
           properties: {
 
-            PartyBalance_id: {
+            payment_amount: {
+              type: "number"
+            },
+            ref_id: {
               type: "number"
             },
 
+            comnpany_id: {
+              type: "number"
+            },
             firm_id: {
               type: "number"
             },
@@ -149,6 +155,15 @@ export async function partyBalanceRouter(app: FastifyInstance) {
 
             updated_by: {
               type: "string"
+            },
+            ref_type: {
+              type: "string"
+            },
+            transaction_reference: {
+              type: "string"
+            },
+            payment_method_id: {
+              type: "number"
             }
 
           }
@@ -161,7 +176,6 @@ export async function partyBalanceRouter(app: FastifyInstance) {
     ) => {
 
       const controller = new PartyBalanceController();
-
       const data = await controller.rePayPartyBalance(request.body);
 
       return reply.code(200).send({
@@ -175,46 +189,46 @@ export async function partyBalanceRouter(app: FastifyInstance) {
 
 
   // DELETE PARTY BALANCE
-  app.post<{ Body: DeletePartyBalanceBody }>(
-    "/delete",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: ["id", "delete_by", "firm_id"],
-          properties: {
+  // app.post<{ Body: DeletePartyBalanceBody }>(
+  //   "/delete",
+  //   {
+  //     schema: {
+  //       body: {
+  //         type: "object",
+  //         required: ["id", "delete_by", "firm_id"],
+  //         properties: {
 
-            id: {
-              type: "number"
-            },
+  //           id: {
+  //             type: "number"
+  //           },
 
-            delete_by: {
-              type: "string"
-            },
+  //           delete_by: {
+  //             type: "string"
+  //           },
 
-            firm_id: {
-              type: "number"
-            }
+  //           firm_id: {
+  //             type: "number"
+  //           }
 
-          }
-        }
-      }
-    },
-    async (
-      request: FastifyRequest<{ Body: DeletePartyBalanceBody }>,
-      reply: FastifyReply
-    ) => {
+  //         }
+  //       }
+  //     }
+  //   },
+  //   async (
+  //     request: FastifyRequest<{ Body: DeletePartyBalanceBody }>,
+  //     reply: FastifyReply
+  //   ) => {
 
-      const controller = new PartyBalanceController();
+  //     const controller = new PartyBalanceController();
 
-      const data = await controller.deletePartyBalance(request.body);
+  //     const data = await controller.deletePartyBalance(request.body);
 
-      return reply.code(200).send({
-        status: "Success",
-        message: data
-      });
+  //     return reply.code(200).send({
+  //       status: "Success",
+  //       message: data
+  //     });
 
-    }
-  );
+  //   }
+  // );
 
 }

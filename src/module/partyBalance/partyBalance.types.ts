@@ -57,7 +57,9 @@ export interface EditPartyBalanceParams
   statusCode?: number;
 }
 export interface RepayPartyBalanceBody {
-  PartyBalance_id: number;
+  payment_amount: number;
+  ref_id: number;
+  ref_type: string;
   firm_id: number;
   pay_amount: number
   updated_by: string;
@@ -65,7 +67,7 @@ export interface RepayPartyBalanceBody {
   transaction_reference: string;
   company_id: number
 }
-export interface RepayPartyBalanceParams extends Omit<RepayPartyBalanceBody, "updated_by" | "payment_method_id" | "transaction_reference" | "company_id"> {
+export interface RepayPartyBalanceParams extends Omit<RepayPartyBalanceBody,"payment_amount"| "updated_by" | "payment_method_id" | "transaction_reference" | "company_id"> {
   remarks: object;
 
 }
