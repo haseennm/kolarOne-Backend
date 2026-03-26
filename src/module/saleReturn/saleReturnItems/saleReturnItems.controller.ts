@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { transaction } from "../../../config/db";
 import { cns, getStatusCode, getStatusText } from "../../../utils/extra";
 import { AppError } from "../../../utils/AppError";
-import { CreateSaleRetunItemBody, DeleteSaleReturnItemBody, FetchSaleReturnItemFilters, FetchSaleReturnItemParams } from "./saleReturnItems.types";
+import { CreateSaleRetunItemBody, DeleteSaleReturnItemBody, EditSaleRetunItemBody, FetchSaleReturnItemFilters, FetchSaleReturnItemParams } from "./saleReturnItems.types";
 import SaleReturnItemService from "./saleReturnItems.service";
 
 export default class SaleReturnItemController {
@@ -29,48 +29,31 @@ export default class SaleReturnItemController {
 
     return `SaleItem has been created successfully.`;
   }
-  // async editPurchaseItem(data: EditPurchaseReturnItemBody, client: PoolClient) {
-  //   cns("create purchase items", data)
-  //   const { status, ...rest } = data;
 
-  //   let statusCode = undefined
-  //   if (status) statusCode = getStatusCode(status);
+  async editSaleReturnItem(data: EditSaleRetunItemBody, client: PoolClient) {
+    const { status, ...rest } = data;
+    
+    let statusCode = undefined;
+    if (status) statusCode = getStatusCode(status);
 
-  //   const remark = {
-  //     action: "Update",
-  //     created_at: Date.now(),
-  //   }
+    const remark = {
+      action: "Updated",
+      updated_at: Date.now(),
+    };
 
-  //   const service = new PurchaseReturnItemService();
+    const service = new SaleReturnItemService();
 
-  //   const purchase_item = service.updatePurchaseItem(
-  //     {
-  //       ...rest,
-  //       statusCode,
-  //       remark
-  //     },
-  //     client
-  //   );
+    const sale_return_item = await service.updateSaleReturnItem(
+      {
+        ...rest,
+        statusCode,
+        remark
+      },
+      client
+    );
 
-
-  //   return purchase_item;
-  // }
-  // async fetchPurchaseItems(data: FetchPurchaseReturnItemParams) {
-
-  //   const service = new PurchaseReturnItemService();
-
-  //   const rolesWithCode = await service.fetchPurchaseReturnItems(data);
-
-  //   const roles = rolesWithCode.items.map((row) => ({
-  //     ...row,
-  //     status: getStatusText(row.status),
-  //   }));
-
-  //   return {
-  //     roles,
-  //     pagination: { ...rolesWithCode.pagination }
-  //   };
-  // }
+    return sale_return_item;
+  }
 
 
 

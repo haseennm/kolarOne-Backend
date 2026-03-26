@@ -151,86 +151,88 @@ export default class SaleItemService {
     };
   }
 
-  // async updateSaleItem(data: EditSaleItemParams, client: PoolClient) {
-  //   const {
+  async updateSaleItem(data: EditSaleItemParams, client: PoolClient) {
+    const {
+      branch_id,
+      firm_id,
+      saled_qty,
+      unit,
+      unit_price,
+      sub_total,
+      total_cgst,
+      total_sgst,
+      total_igst,
+      net_amount,
+      stock_id,
+      discount,
+      final_amount,
+      item_id,
+      sale_id,
+      remark,
+      statusCode,
+      product_id
+    } = data;
 
-  //     branch_id,
-  //     firm_id,
-  //     purchased_qty,
-  //     received_qty,
-  //     unit,
-  //     unit_price,
-  //     sub_total,
-  //     total_cgst,
-  //     total_sgst,
-  //     total_igst,
-  //     net_amount,
-  //     stock_id,
-  //     item_id, purchase_id, remark, statusCode, product_id
-  //   } = data;
+    // ✅ Validation: Check sale item existence
+    const is_item_exist = await getRecord(
+      item_id,
+      "sales_items",
+      "firm_id",
+      firm_id,
+      client
+    );
+    if (!is_item_exist) {
+      throw new AppError("Sale item not found", 404);
+    }
 
-  //   // 1. Validate firm existence (requirement)
-  //   const is_item_exist = await getRecord(
-  //     item_id,
-  //     "purchase_items",
-  //     "branch_id",
-  //     branch_id,
-  //     client
-  //   );
-  //   if (!is_item_exist) {
-  //     throw new AppError("Purchase item not found", 404);
-  //   }
-  //   const final_received_qty = received_qty ?? is_item_exist.received_qty;
-  //   const final_purchased_qty = purchased_qty ?? is_item_exist.purchased_qty;
-  //   if (final_received_qty > final_purchased_qty) {
-  //     throw new AppError(
-  //       "Received quantity cannot exceed purchased quantity",
-  //       422
-  //     );
-  //   }
-  //   const updateQuery = `
-  //     UPDATE purchase_items
-  //   SET
-  //   purchased_qty = $1,
-  //     received_qty = $2,
-  //     unit = $3,
-  //     unit_price = $4,
-  //     sub_total = $5,
-  //     total_cgst = $6,
-  //     total_sgst = $7,
-  //     total_igst = $8,
-  //     net_amount = $9,
-  //     stock_id = $10,
-  //     remarks =
-  //     CASE
-  //         WHEN remarks IS NULL THEN $11:: jsonb
-  //         WHEN jsonb_typeof(remarks) = 'array'
-  //           THEN remarks || $11:: jsonb
-  //         ELSE jsonb_build_array(remarks) || $11:: jsonb
-  //   END
-  //     WHERE id = $12 AND firm_id =$13
-  //   RETURNING *;
-  //   `;
+    // ✅ Validation: Quantity validation
+    if (saled_qty && saled_qty <= 0) {
+      throw new AppError("Saled quantity must be greater than 0", 422);
+    }
 
-  //   const values = [
-  //     purchased_qty ?? is_item_exist.purchased_qty,
-  //     received_qty ?? is_item_exist.received_qty,
-  //     unit ?? is_item_exist.unit,
-  //     unit_price ?? is_item_exist.unit_price,
-  //     sub_total ?? is_item_exist.sub_total,
-  //     total_cgst ?? is_item_exist.total_cgst,
-  //     total_sgst ?? is_item_exist.total_sgst,
-  //     total_igst ?? is_item_exist.total_igst,
-  //     net_amount ?? is_item_exist.net_amount,
-  //     stock_id ?? is_item_exist.stock_id,
-  //     JSON.stringify(remark),
-  //     item_id,
-  //     firm_id
-  //   ];
+    const updateQuery = `
+      UPDATE sales_items
+      SET
+        product_id = $1,
+        saled_qty = $2,
+        unit = $3,
+        unit_price = $4,
+        sub_total = $5,
+        discount = $6,
+        net_amount = $7,
+        total_cgst = $8,
+        total_sgst = $9,
+        total_igst = $10,
+        final_amount = $11,
+        stock_id = $12,
+        remarks = COALESCE(remarks, '[]'::jsonb) || $13::jsonb,
+        status = $14
+      WHERE id = $15 AND firm_id = $16
+      RETURNING *;
+    `;
 
-  //   const { rows } = await executeInTransaction(client, updateQuery, values);
-  //   return rows[0];
-  // }
+    const values = [
+      product_id ?? is_item_exist.product_id,
+      saled_qty ?? is_item_exist.saled_qty,
+      unit ?? is_item_exist.unit,
+      unit_price ?? is_item_exist.unit_price,
+      sub_total ?? is_item_exist.sub_total,
+      discount ?? is_item_exist.discount,
+      net_amount ?? is_item_exist.net_amount,
+      total_cgst ?? is_item_exist.total_cgst,
+      total_sgst ?? is_item_exist.total_sgst,
+      total_igst ?? is_item_exist.total_igst,
+      final_amount ?? is_item_exist.final_amount,
+      stock_id ?? is_item_exist.stock_id,
+      JSON.stringify([remark]),
+      statusCode ?? is_item_exist.status,
+      item_id,
+      firm_id
+    ];
+
+    const { rows } = await executeInTransaction(client, updateQuery, values);
+    return rows[0];
+  }
 
   async deleteSaleItem(data: DeleteSaleItemParams, client: PoolClient) {
 

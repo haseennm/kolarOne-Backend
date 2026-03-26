@@ -30,14 +30,13 @@ export interface SaleCreateParams
   remark:object
 }
 export interface SaleEditBody {
-  Sale_id:number
+  Sale_id: number;
+  customer_id?: string;
   updated_by: string;
   firm_id: number;
-  branch_id:number
-  company_id:number
-  vendor_id?: string;
-  bill_number?: string;
-  bill_date?: Date | string;
+  branch_id: number;
+  company_id: number;
+  invoice_date?: Date | string;
   subtotal?: number;
   discount?: number;
   net_amount?: number;
@@ -45,17 +44,16 @@ export interface SaleEditBody {
   total_sgst?: number;
   total_igst?: number;
   final_amount?: number;
-  payment_amount?: number;
+  paid?: number;
   notes?: string | null;
-  status?: string; 
-  transaction_reference?: string | null;
-  payment_method_id?: number;
+  status?: string;
+  payments?: Payments[];
   items?: EditSaleItemBody[];
 }
 export interface SaleEditParams
-  extends Omit<SaleEditBody, "status" |"updated_by" |"items"> {
-  statusCode: number;
-  remark:object
+  extends Omit<SaleEditBody, "status" | "updated_by" | "items"> {
+  statusCode?: number;
+  remark: object;
 }
 
 

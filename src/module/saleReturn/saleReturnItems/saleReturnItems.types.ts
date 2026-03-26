@@ -22,16 +22,16 @@ export interface CreateSaleReturnItemParams
   statusCode: number;
   remark: object;
 }
-export interface EditSaleItemBody {
-  item_id: number
-  purchase_id: number;
+
+export interface EditSaleRetunItemBody {
+  item_id: number;
+  sale_return_id: number;
   firm_id: number;
   branch_id: number;
   status?: string;
   product_id?: number;
   stock_id?: number;
-  received_qty?: number;
-  purchased_qty?: number;
+  returned_qty: number;
   unit?: string;
   unit_price?: number;
   sub_total?: number;
@@ -39,9 +39,12 @@ export interface EditSaleItemBody {
   total_sgst?: number;
   total_cgst?: number;
   net_amount?: number;
+  sale_item_id?: number;
+  return_mode?: "to_stock" | "to_damage";
 }
-export interface EditSaleItemParams
-  extends Omit<EditSaleItemBody, "status"> {
+
+export interface EditSaleReturnItemParams
+  extends Omit<EditSaleRetunItemBody, "status"> {
   statusCode?: number;
   remark: object;
 }

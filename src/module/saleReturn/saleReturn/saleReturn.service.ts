@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { getRecord } from "../../../utils/extra";
-import { SaleReturnCreateParams, SaleReturnDeleteParams, SaleReturnFetchParams } from "./saleReturn.types";
+import { SaleReturnCreateParams, SaleReturnDeleteParams, SaleReturnEditParams, SaleReturnFetchParams } from "./saleReturn.types";
 
 export default class SaleReturnService {
 
@@ -133,71 +133,108 @@ export default class SaleReturnService {
     const { rows } = await executeInTransaction(client, query, values);
     return rows[0];
   }
-//   async editPurchase(data: PurchaseEditParams, client: PoolClient) {
-//     const {
-//       bill_date,
-//       bill_number,
-//       discount,
-//       final_amount,
-//       firm_id,
-//       net_amount,
-//       payment_amount,
-//       payment_method_id,
-//       remark,
-//       statusCode,
-//       subtotal,
-//       total_cgst,
-//       total_igst,
-//       total_sgst,
-//       vendor_id,
-//       notes,
-//       transaction_reference,
-//       branch_id,
-//       company_id,
-//       purchase_id
-//     } = data;
 
-//     // Check firm existence
-//     const is_purchase_exist = await getRecord(
-//       purchase_id,
-//       "purchases",
-//       "firm_id",
-//       firm_id,
-//       client
-//     );
+  async editSaleReturn(data: SaleReturnEditParams, client: PoolClient) {
+    const {
+      sale_return_id,
+      sale_id,
+      return_date,
+      reason,
+      subtotal,
+      total_cgst,
+      total_igst,
+      total_sgst,
+      final_amount,
+      payment_method_id,
+      firm_id,
+      statusCode,
+      transaction_reference,
+      branch_id,
+      company_id,
+      remark,
+    } = data;
 
-//     if (!is_purchase_exist) {
-//       throw new AppError("Firm not found", 404);
-//     }
-//     if (payment_method_id && payment_method_id !== is_purchase_exist.payment_method_id) {
-//       const is_payment_method_exist = await getRecord(
-//         payment_method_id,
-//         "payment_methods",
-//         "company_id",
-//         company_id,
-//         client
-//       );
+    // ✅ Validation: Check sale_return existence
+    const is_sale_return_exist = await getRecord(
+      sale_return_id,
+      "sale_return",
+      "firm_id",
+      firm_id,
+      client
+    );
 
-//       if (!is_payment_method_exist) {
-//         throw new AppError("payment method not found", 404);
-//       }
-//     }
-//     if (vendor_id && vendor_id !== is_purchase_exist.vendor_id) {
-//       const is_vendor_exist = await getRecord(
-//         vendor_id,
-//         "vendors",
-//         "company_id",
-//         company_id,
-//         client
-//       );
+    if (!is_sale_return_exist) {
+      throw new AppError("Sale return not found", 404);
+    }
 
-//       if (!is_vendor_exist) {
-//         throw new AppError("Vendor not found", 404);
-//       }
-//     }
-//     if (bill_number && bill_number !== is_purchase_exist.bill_number) {
+    // ✅ Validation: Check sale existence (if updating sale_id)
+    if (sale_id && sale_id !== is_sale_return_exist.sale_id) {
+      const is_sale_exist = await getRecord(
+        sale_id,
+        "sales",
+        "firm_id",
+        firm_id,
+        client
+      );
 
-//       const is_bill_exist = await executeInTransaction(
+      if (!is_sale_exist) {
+        throw new AppError("Sale not found", 404);
+      }
+    }
+
+    // ✅ Validation: Check payment method existence (if updating payment_method_id)
+    if (payment_method_id && payment_method_id !== is_sale_return_exist.payment_method_id) {
+      const is_payment_method_exist = await getRecord(
+        payment_method_id,
+        "payment_methods",
+        "company_id",
+        company_id,
+        client
+      );
+
+      if (!is_payment_method_exist) {
+        throw new AppError("Payment method not found", 404);
+      }
+    }
+
+    const updateQuery = `
+      UPDATE sale_return SET
+        sale_id = $1,
+        return_date = $2,
+        reason = $3,
+        sub_total = $4,
+        total_cgst = $5,
+        total_sgst = $6,
+        total_igst = $7,
+        final_amount = $8,
+        payment_method_id = $9,
+        reference_number = $10,
+        status = $11,
+        remarks = COALESCE(remarks, '[]'::jsonb) || $12::jsonb
+      WHERE firm_id = $13 AND id = $14
+      RETURNING *;
+    `;
+
+    const values = [
+      sale_id ?? is_sale_return_exist.sale_id,
+      return_date ?? is_sale_return_exist.return_date,
+      reason ?? is_sale_return_exist.reason,
+      subtotal ?? is_sale_return_exist.sub_total,
+      total_cgst ?? is_sale_return_exist.total_cgst,
+      total_sgst ?? is_sale_return_exist.total_sgst,
+      total_igst ?? is_sale_return_exist.total_igst,
+      final_amount ?? is_sale_return_exist.final_amount,
+      payment_method_id ?? is_sale_return_exist.payment_method_id,
+      transaction_reference ?? is_sale_return_exist.reference_number,
+      statusCode ?? is_sale_return_exist.status,
+      JSON.stringify([remark]),
+      firm_id,
+      sale_return_id
+    ];
+
+    const { rows } = await executeInTransaction(client, updateQuery, values);
+    return rows[0];
+  }
 //         client,
 //         `SELECT id FROM purchases 
 //    WHERE bill_number = $1 

@@ -116,114 +116,130 @@ export default class SaleController {
       return `Sale ${sale.invoice_number} has been created successfully.`;
     });
   }
-  // async saleEdit(data: SaleEditBody) {
-  //   const { payment_amount, final_amount, status, company_id, updated_by, items, ...rest } = data;
 
-  //   const remark = {
-  //     action: "Updated",
-  //     updated_by,
-  //     created_at: new Date(),
-  //   };
+  async saleEdit(data: SaleEditBody) {
+    const { paid, final_amount, status, company_id, updated_by, items, payments, ...rest } = data;
 
-  //   return transaction(async (client: PoolClient) => {
-  //     const statusCode = getStatusCode(status ?? "Completed");
+    const remark = {
+      action: "Updated",
+      updated_by,
+      updated_at: new Date(),
+    };
 
-  //     const service = new SaleService();
-  //     const purchase = await service.editSale(
-  //       {
-  //         ...rest,
-  //         payment_amount, final_amount,
-  //         remark,
-  //         statusCode,
-  //         company_id
-  //       },
-  //       client
-  //     );
+    return transaction(async (client: PoolClient) => {
+      const statusCode = getStatusCode(status ?? "Completed");
 
-  //     const stockController = new StockController();
-  //     const purchaseItem = new PurchaseItemController();
-  //     if (items) {
-  //       for (const item of items) {
+      const service = new SaleService();
+      const sale = await service.editSale(
+        {
+          ...rest,
+          paid,
+          final_amount,
+          remark,
+          statusCode,
+          company_id,
+          payments
+        },
+        client
+      );
 
-  //         const purchase_item = await purchaseItem.editPurchaseItem(
-  //           {
-  //             item_id: item.item_id, // ✅ add this
-  //             purchase_id: purchase.id,
-  //             firm_id: rest.firm_id,
-  //             branch_id: rest.branch_id,
-  //             status: status ?? "Completed",
-  //             product_id: item.product_id,
-  //             stock_id: item.stock_id,
-  //             received_qty: item.received_qty,
-  //             purchased_qty: item.purchased_qty,
-  //             unit: item.unit,
-  //             unit_price: item.unit_price,
-  //             sub_total: item.sub_total,
-  //             total_igst: item.total_igst ?? 0,
-  //             total_sgst: item.total_sgst ?? 0,
-  //             total_cgst: item.total_cgst ?? 0,
-  //             net_amount: item.net_amount,
-  //           },
-  //           client
-  //         );
-  //         const stock = await stockController.editStock(
-  //           {
-  //             stock_id: purchase_item.stock_id,
-  //             firm_id: rest.firm_id,
-  //             branch_id: rest.branch_id,
-  //             company_id,
+      const stockController = new StockController();
+      const saleItem = new SaleItemController();
+      
+      // ✅ Edit existing items
+      if (items && items.length > 0) {
+        for (const item of items) {
+          const saleItemData = await saleItem.editSaleItem(
+            {
+              item_id: item.item_id,
+              sale_id: sale.id,
+              firm_id: rest.firm_id,
+              branch_id: rest.branch_id,
+              status: status ?? "Completed",
+              product_id: item.product_id,
+              stock_id: item.stock_id,
+              saled_qty: item.saled_qty,
+              unit: item.unit,
+              unit_price: item.unit_price,
+              sub_total: item.sub_total,
+              discount: item.discount ?? 0,
+              total_igst: item.total_igst ?? 0,
+              total_sgst: item.total_sgst ?? 0,
+              total_cgst: item.total_cgst ?? 0,
+              net_amount: item.net_amount,
+              final_amount: item.final_amount
+                ?? (item.net_amount
+                  - (item.discount ?? 0)
+                  + (item.total_igst ?? 0)
+                  + (item.total_sgst ?? 0)
+                  + (item.total_cgst ?? 0))
+            },
+            client
+          );
 
-  //             purchase_id: purchase.id,
+          // ✅ Update stock accordingly
+          await stockController.editStock(
+            {
+              stock_id: item.stock_id,
+              branch_id: rest.branch_id,
+              firm_id: rest.firm_id,
+              qty: item.saled_qty,
+              movement_type: 'O',
+              reason: getTransactionCode("sale"),
+              is_relate_purchase: false,
+              product_id: item.product_id
+            },
+            client
+          );
+        }
+      }
 
-  //             product_id: item.product_id,
-  //             selling_price: 0,
+      // ✅ Update party balance if payment difference changed
+      const party_balance_controller = new PartyBalanceController();
+      const difference = paid - final_amount;
 
-  //             available_qty: item.received_qty,
-  //             purchased_qty: item.purchased_qty,
+      if (difference !== 0) {
+        const isAdvance = difference > 0;
 
-  //             status: "Good",
-  //             movement_type: "I",
-  //             reason:getTransactionCode("purchase")
-  //           },
-  //           client
-  //         );
-  //       }
-  //     }
-  //     const difference = (payment_amount ?? 0) - (final_amount ?? 0);
-  //     const party_balance_controller = new PartyBalanceController();
+        await party_balance_controller.editPartyBalance(
+          {
+            ref_id: sale.id,
+            ref_type: "S",
+            action_by: updated_by,
+            balance: Math.abs(difference),
+            flow: isAdvance ? "O" : "I",
+            firm_id: rest.firm_id,
+          },
+          client
+        );
+      }
 
+      // ✅ Update payment transactions
+      const payment_transactions_service = new PaymentTransactionService();
+      if (payments && payments.length > 0) {
+        await Promise.all(
+          payments.map((p) =>
+            payment_transactions_service.editPaymentTransaction(
+              {
+                ref_id: sale.id,
+                amount: p.amount,
+                ref_type: PaymentTransactionTypeCodeMap["sale"],
+                status: getStatusCode("Paid"),
+                payment_method_id: p.payment_method_id ?? null,
+                transaction_reference: p.reference ?? null,
+                business_id: rest.firm_id,
+                business_ref: convertEntityType("Firm" as EntityKey),
+                company_id,
+              },
+              client
+            )
+          )
+        );
+      }
 
-  //     if (difference !== 0) {
-  //       const isAdvance = difference > 0;
-
-  //       await party_balance_controller.editPartyBalance(
-  //         {
-  //           ref_id: purchase.id,
-  //           ref_type: "P",
-  //           action_by: updated_by,
-  //           balance: Math.abs(difference),
-  //           flow: isAdvance ? "O" : "I",
-  //           firm_id: rest.firm_id,
-  //         },
-  //         client
-  //       );
-  //     }
-  //     const payment_transactions_service = new PaymentTransactionService()
-  //     await payment_transactions_service.editPaymentTransaction({
-  //       company_id,
-  //       amount: payment_amount,
-  //       payment_method_id: null,
-  //       ref_id: rest.purchase_id,
-  //       ref_type: PaymentTransactionTypeCodeMap["ledger_transaction"],
-  //       status: statusCode,
-  //       transaction_reference: null,
-  //       business_id: rest.firm_id,
-  //       business_ref: "F"
-  //     }, client)
-
-  //     return `purchase ${purchase.bill_number} has been created successfully.`;
-  //   });
-  // }
+      return `Sale ${sale.invoice_number} has been updated successfully.`;
+    });
+  }
 
   async saleFetch(data: SaleFetchParams) {
 

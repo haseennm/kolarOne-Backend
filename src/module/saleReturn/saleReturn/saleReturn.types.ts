@@ -1,4 +1,4 @@
-import { CreateSaleRetunItemBody, EditSaleItemBody } from "../saleReturnItems/saleReturnItems.types";
+import { CreateSaleRetunItemBody, EditSaleRetunItemBody } from "../saleReturnItems/saleReturnItems.types";
 
 export interface SaleReturnCreateBody {
   sale_id: number
@@ -23,33 +23,31 @@ export interface SaleReturnCreateParams
   statusCode: number;
   remark: object
 }
+
 export interface SaleReturnEditBody {
-  purchase_id: number
-  updated_by: string;
-  firm_id: number;
-  branch_id: number
-  company_id: number
-  vendor_id?: string;
-  bill_number?: string;
-  bill_date?: Date | string;
+  sale_return_id: number;
+  sale_id?: number;
+  return_date?: Date | string;
   subtotal?: number;
-  discount?: number;
-  net_amount?: number;
   total_cgst?: number;
   total_sgst?: number;
   total_igst?: number;
   final_amount?: number;
-  payment_amount?: number;
-  notes?: string | null;
+  reason?: string | null;
   status?: string;
+  updated_by: string;
+  firm_id: number;
+  branch_id: number;
+  company_id: number;
   transaction_reference?: string | null;
   payment_method_id?: number;
-  items?: EditSaleItemBody[];
+  items?: EditSaleRetunItemBody[];
 }
+
 export interface SaleReturnEditParams
   extends Omit<SaleReturnEditBody, "status" | "updated_by" | "items"> {
-  statusCode: number;
-  remark: object
+  statusCode?: number;
+  remark: object;
 }
 
 

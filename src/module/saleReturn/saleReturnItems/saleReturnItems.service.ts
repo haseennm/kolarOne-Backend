@@ -2,7 +2,7 @@ import { getRecord } from "../../../utils/extra";
 import { executeInTransaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { PoolClient } from "pg";
-import { CreateSaleReturnItemParams, DeleteSaleReturnItemParams, FetchDbSaleReturnItem, FetchSaleReturnItemParams, SaleReturnItemCountResult } from "./saleReturnItems.types";
+import { CreateSaleReturnItemParams, DeleteSaleReturnItemParams, EditSaleReturnItemParams, FetchDbSaleReturnItem, FetchSaleReturnItemParams, SaleReturnItemCountResult } from "./saleReturnItems.types";
 
 export default class SaleReturnItemService {
 
@@ -119,7 +119,84 @@ console.log("second")
     return rows[0];
   }
 
-//   async fetchPurchaseReturnItems(data: FetchSaleReturnItemParams) {
+  async updateSaleReturnItem(data: EditSaleReturnItemParams, client: PoolClient) {
+    const {
+      firm_id,
+      item_id,
+      sale_return_id,
+      product_id,
+      unit,
+      unit_price,
+      sub_total,
+      total_cgst,
+      total_sgst,
+      total_igst,
+      net_amount,
+      stock_id,
+      returned_qty,
+      sale_item_id,
+      return_mode,
+      remark,
+      statusCode
+    } = data;
+
+    // ✅ Validation: Check sale return item existence
+    const item_row = await executeInTransaction(client,`
+      SELECT * sale_return_items WHERE id = $1 AND firm_id $2 AND sale_return_id =$3 AND status =$4`,
+    [item_id,firm_id,sale_return_id,0])
+    const is_item_exist = item_row.rows[0]
+    if (!is_item_exist) {
+      throw new AppError("Sale return item not found", 404);
+    }
+
+    // ✅ Validation: Check returned quantity if updating
+    if (returned_qty && returned_qty <= 0) {
+      throw new AppError("Returned quantity must be greater than 0", 422);
+    }
+
+    const updateQuery = `
+      UPDATE sale_return_items
+      SET
+        product_id = $1,
+        returned_qty = $2,
+        unit = $3,
+        unit_price = $4,
+        sub_total = $5,
+        total_cgst = $6,
+        total_sgst = $7,
+        total_igst = $8,
+        net_amount = $9,
+        stock_id = $10,
+        sale_item_id = $11,
+        return_mode = $12,
+        remarks = COALESCE(remarks, '[]'::jsonb) || $13::jsonb,
+        status = $14
+      WHERE id = $15 AND firm_id = $16
+      RETURNING *;
+    `;
+
+    const values = [
+      product_id ?? is_item_exist.product_id,
+      returned_qty ?? is_item_exist.returned_qty,
+      unit ?? is_item_exist.unit,
+      unit_price ?? is_item_exist.unit_price,
+      sub_total ?? is_item_exist.sub_total,
+      total_cgst ?? is_item_exist.total_cgst,
+      total_sgst ?? is_item_exist.total_sgst,
+      total_igst ?? is_item_exist.total_igst,
+      net_amount ?? is_item_exist.net_amount,
+      stock_id ?? is_item_exist.stock_id,
+      sale_item_id ?? is_item_exist.sale_item_id,
+      return_mode ?? is_item_exist.return_mode,
+      JSON.stringify([remark]),
+      statusCode ?? is_item_exist.status,
+      item_id,
+      firm_id
+    ];
+
+    const { rows } = await executeInTransaction(client, updateQuery, values);
+    return rows[0];
+  }
 
 //     const { filters, offset } = data;
 

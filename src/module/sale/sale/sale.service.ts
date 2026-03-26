@@ -153,131 +153,125 @@ export default class SaleService {
 
     return rows[0];
   }
-  //   async editSale(data: SaleEditParams, client: PoolClient) {
-  //     const {
-  //       bill_date,
-  //       bill_number,
-  //       discount,
-  //       final_amount,
-  //       firm_id,
-  //       net_amount,
-  //       payment_amount,
-  //       payment_method_id,
-  //       remark,
-  //       statusCode,
-  //       subtotal,
-  //       total_cgst,
-  //       total_igst,
-  //       total_sgst,
-  //       vendor_id,
-  //       notes,
-  //       transaction_reference,
-  //       branch_id,
-  //       company_id,
-  //       purchase_id
-  //     } = data;
 
-  //     // Check firm existence
-  //     const is_purchase_exist = await getRecord(
-  //       purchase_id,
-  //       "purchases",
-  //       "firm_id",
-  //       firm_id,
-  //       client
-  //     );
+  async editSale(data: SaleEditParams, client: PoolClient) {
+    const {
+      Sale_id,
+      customer_id,
+      invoice_date,
+      discount,
+      final_amount,
+      firm_id,
+      net_amount,
+      paid,
+      remark,
+      statusCode,
+      subtotal,
+      total_cgst,
+      total_igst,
+      total_sgst,
+      notes,
+      branch_id,
+      company_id,
+      payments
+    } = data;
 
-  //     if (!is_purchase_exist) {
-  //       throw new AppError("Firm not found", 404);
-  //     }
-  //     if (payment_method_id && payment_method_id !== is_purchase_exist.payment_method_id) {
-  //       const is_payment_method_exist = await getRecord(
-  //         payment_method_id,
-  //         "payment_methods",
-  //         "company_id",
-  //         company_id,
-  //         client
-  //       );
+    // ✅ Validation: Check sale existence
+    const is_sale_exist = await getRecord(
+      Sale_id,
+      "sales",
+      "firm_id",
+      firm_id,
+      client
+    );
+    if (!is_sale_exist) {
+      throw new AppError("Sale not found", 404);
+    }
 
-  //       if (!is_payment_method_exist) {
-  //         throw new AppError("payment method not found", 404);
-  //       }
-  //     }
-  //     if (vendor_id && vendor_id !== is_purchase_exist.vendor_id) {
-  //       const is_vendor_exist = await getRecord(
-  //         vendor_id,
-  //         "vendors",
-  //         "company_id",
-  //         company_id,
-  //         client
-  //       );
+    // ✅ Validation: Check customer existence (if updating customer)
+    if (customer_id && customer_id !== is_sale_exist.customer_id) {
+      const is_customer_exist = await getRecord(
+        customer_id,
+        "customers",
+        "company_id",
+        company_id,
+        client
+      );
+      if (!is_customer_exist) {
+        throw new AppError("Customer not found", 404);
+      }
+    }
 
-  //       if (!is_vendor_exist) {
-  //         throw new AppError("Vendor not found", 404);
-  //       }
-  //     }
-  //     if (bill_number && bill_number !== is_purchase_exist.bill_number) {
+    // ✅ Validation: Validate all payment methods (if updating payments)
+    if (payments && payments.length > 0) {
+      for (const p of payments) {
+        const is_payment_method_exist = await getRecord(
+          p.payment_method_id,
+          "payment_methods",
+          "company_id",
+          company_id,
+          client
+        );
+        if (!is_payment_method_exist) {
+          throw new AppError(
+            `Payment method not found: ${p.payment_method_id}`,
+            404
+          );
+        }
+      }
+    }
 
-  //       const is_bill_exist = await executeInTransaction(
-  //         client,
-  //         `SELECT id FROM purchases 
-  //    WHERE bill_number = $1 
-  //    AND vendor_id = $2 
-  //    AND status != 0`,
-  //         [bill_number, vendor_id]
-  //       );
+    // ✅ Build payment object if payments provided
+    const paymentobj = payments 
+      ? (payments || []).map((p: any) => ({
+          payment_method_id: p.payment_method_id,
+          amount: p.amount,
+          reference: p.reference ?? null
+        }))
+      : (is_sale_exist.payments || []);
 
-  //       if ((is_bill_exist.rowCount ?? 0) > 0) {
-  //         throw new AppError("purchase bill already exist", 400);
-  //       }
-  //     }
-  //     const purchaseQuery = `
-  //   UPDATE purchases SET
-  //     vendor_id = $1,
-  //     bill_number = $2,
-  //     bill_date = $3,
-  //     subtotal = $4,
-  //     discount = $5,
-  //     net_amount = $6,
-  //     total_cgst = $7,
-  //     total_sgst = $8,
-  //     total_igst = $9,
-  //     final_amount = $10,
-  //     payment_amount = $11,
-  //     notes = $12,
-  //     status = $13,
-  //     remarks = COALESCE(remarks, '[]'::jsonb) || $14::jsonb,
-  //     payment_method_id = $15,
-  //     transaction_reference = $16 WHERE
-  //     firm_id = $17
-  //    id = $18
-  //   RETURNING *;
-  // `;
+    const updateQuery = `
+      UPDATE sales SET
+        customer_id = $1,
+        invoice_date = $2,
+        subtotal = $3,
+        discount = $4,
+        net_amount = $5,
+        total_cgst = $6,
+        total_sgst = $7,
+        total_igst = $8,
+        final_amount = $9,
+        payments = $10,
+        notes = $11,
+        status = $12,
+        remarks = COALESCE(remarks, '[]'::jsonb) || $13::jsonb,
+        paid = $14
+      WHERE firm_id = $15 AND id = $16
+      RETURNING *;
+    `;
 
-  //     const values = [
-  //       vendor_id,
-  //       bill_number,
-  //       bill_date,
-  //       subtotal ?? is_purchase_exist.sub_total,
-  //       discount ?? is_purchase_exist.discount,
-  //       net_amount ?? is_purchase_exist.net_amount,
-  //       total_cgst ?? is_purchase_exist.total_cgst,
-  //       total_sgst ?? is_purchase_exist.total_sgst,
-  //       total_igst ?? is_purchase_exist.total_igst,
-  //       final_amount ?? is_purchase_exist.final_amount,
-  //       payment_amount ?? is_purchase_exist.payment_amount,
-  //       notes ?? is_purchase_exist.notes,
-  //       statusCode,
-  //       JSON.stringify([remark]),
+    const values = [
+      customer_id ?? is_sale_exist.customer_id,
+      invoice_date ?? is_sale_exist.invoice_date,
+      subtotal ?? is_sale_exist.subtotal,
+      discount ?? is_sale_exist.discount,
+      net_amount ?? is_sale_exist.net_amount,
+      total_cgst ?? is_sale_exist.total_cgst,
+      total_sgst ?? is_sale_exist.total_sgst,
+      total_igst ?? is_sale_exist.total_igst,
+      final_amount ?? is_sale_exist.final_amount,
+      JSON.stringify(paymentobj),
+      notes ?? is_sale_exist.notes,
+      statusCode ?? is_sale_exist.status,
+      JSON.stringify([remark]),
+      paid ?? is_sale_exist.paid,
+      firm_id,
+      Sale_id
+    ];
 
-  //       payment_method_id ?? is_purchase_exist.payment_method_id,
-  //       transaction_reference ?? is_purchase_exist.transaction_reference,
-  //       firm_id,
-  //       purchase_id
-  //     ];
-
-  //     const { rows } = await executeInTransaction(client, purchaseQuery, values);
-  //     return rows[0];
-  //   }
+    const { rows } = await executeInTransaction(client, updateQuery, values);
+    return rows[0];
+  }
 
   async fetchSale(data: SaleFetchParams) {
     const { filters, offset } = data;

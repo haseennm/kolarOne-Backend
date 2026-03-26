@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   SaleReturnCreateBody,
+  SaleReturnEditBody,
   SaleReturnDeleteBody,
   SaleReturnFetchBody
 } from "./saleReturn.types";
@@ -176,31 +177,125 @@ export async function saleReturnRouter(app: FastifyInstance) {
     }
   );
 
-  app.post<{ Body: SaleReturnDeleteBody }>(
-    "/delete",
+  // EDIT SALE RETURN
+  app.post<{ Body: SaleReturnEditBody }>(
+    "/edit",
     {
       schema: {
         body: {
           type: "object",
-          required: ["id", "firm_id", "deleted_by"],
+          required: ["sale_return_id", "firm_id", "branch_id", "company_id", "updated_by"],
           properties: {
-            id: { type: "number" },
+            sale_return_id: { type: "number" },
+            sale_id: { type: "number" },
+            return_date: { type: ["string", "null"], format: "date" },
             firm_id: { type: "number" },
-            deleted_by: { type: "string", minLength: 1 }
+            branch_id: { type: "number" },
+            company_id: { type: "number" },
+            updated_by: { type: "string", minLength: 1 },
+            subtotal: { type: "number" },
+            total_cgst: { type: "number" },
+            total_sgst: { type: "number" },
+            total_igst: { type: "number" },
+            final_amount: { type: "number" },
+            reason: { type: ["string", "null"] },
+            transaction_reference: { type: ["string", "null"] },
+            payment_method_id: { type: "number" },
+            status: {
+              type: "string",
+              enum: ["Completed", "Confirm", "Cancelled"]
+            },
+            items: {
+              type: "array",
+              items: {
+                type: "object",
+                required: [
+                  "item_id",
+                  "product_id",
+                  "returned_qty",
+                  "unit",
+                  "unit_price",
+                  "sub_total",
+                  "total_igst",
+                  "total_sgst",
+                  "total_cgst",
+                  "net_amount",
+                  "sale_item_id"
+                ],
+                properties: {
+                  item_id: { type: "number" },
+                  product_id: { type: "number" },
+                  sale_item_id: { type: "number" },
+                  stock_id: { type: "number" },
+                  returned_qty: { type: "number" },
+                  unit: { type: "string" },
+                  unit_price: { type: "number" },
+                  sub_total: { type: "number" },
+                  total_igst: { type: "number" },
+                  total_sgst: { type: "number" },
+                  total_cgst: { type: "number" },
+                  net_amount: { type: "number" },
+                  return_mode: {
+                    type: "string",
+                    enum: ["to_stock", "to_damage"]
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     async (
-      request: FastifyRequest<{ Body: SaleReturnDeleteBody }>,
+      request: FastifyRequest<{ Body: SaleReturnEditBody }>,
       reply: FastifyReply
     ) => {
       const controller = new SaleReturnController();
-      const data = await controller.saleReturnDelete(request.body);
+      const data = await controller.saleReturnEdit(request.body);
       return reply.code(200).send({
         status: "Success",
         message: data
       });
     }
   );
+  app.post<{ Body: SaleReturnDeleteBody }>(
+    "/delete",
+   {
+  schema: {
+    body: {
+      type: "object",
+      required: ["id", "firm_id", "deleted_by"],
+      properties: {
+        id: { type: "number" },
+        firm_id: { type: "number" },
+        deleted_by: { type: "string", minLength: 1 }
+      }
+    }
+  }
+},
+async (
+  request: FastifyRequest<{ Body: SaleReturnDeleteBody }>,
+  reply: FastifyReply
+) => {
+  try {
+    const controller = new SaleReturnController();
+    const data = await controller.saleReturnDelete(request.body);
+
+    return reply.status(200).send({
+      status: "success",
+      message: data
+    });
+  } catch (error) {
+    request.log.error(error);
+
+    return reply.status(500).send({
+      status: "error",
+      message: "Internal Server Error"
+    });
+  }
+}
+  );
+
+  // DELETE SALE RETURN
+  
 }

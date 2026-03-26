@@ -31,20 +31,20 @@ export default class SaleItemController {
     return `sale item has been created successfully.`;
   }
   async editSaleItem(data: EditSaleItemBody, client: PoolClient) {
-    cns("create purchase items", data)
+    cns("edit sale item", data);
     const { status, ...rest } = data;
 
-    let statusCode = undefined
+    let statusCode = undefined;
     if (status) statusCode = getStatusCode(status);
 
     const remark = {
-      action: "Update",
-      created_at: Date.now(),
-    }
+      action: "Updated",
+      updated_at: Date.now(),
+    };
 
-    const service = new PurchaseItemService();
+    const service = new SaleItemService();
 
-    const purchase_item = service.updateSaleItem(
+    const sale_item = await service.updateSaleItem(
       {
         ...rest,
         statusCode,
@@ -53,8 +53,7 @@ export default class SaleItemController {
       client
     );
 
-
-    return purchase_item;
+    return sale_item;
   }
   async fetchSaleItems(data: FetchSaleItemParams) {
 

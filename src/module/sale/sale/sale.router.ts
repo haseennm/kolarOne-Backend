@@ -201,89 +201,97 @@ export async function saleRouter(app: FastifyInstance) {
     }
   );
 
-  // EDIT PURCHASE
-  // app.post<{ Body: PurchaseEditBody }>(
-  //   "/edit",
-  //   {
-  //     schema: {
-  //       body: {
-  //         type: "object",
-  //         required: ["purchase_id", "firm_id", "updated_by"],
-  //         properties: {
-  //           purchase_id: { type: "number" },
-  //           company_id: { type: "number" },
-  //           updated_by: { type: "string", minLength: 1 },
-  //           firm_id: { type: "number" },
-  //           branch_id: { type: "number" },
-  //           vendor_id: { type: "string" },
-  //           bill_number: { type: "string" },
-  //           bill_date: { type: "string", format: "date" },
-  //           transaction_reference: { type: ["string", "null"] },
-  //           subtotal: { type: "number" },
-  //           discount: { type: "number" },
-  //           net_amount: { type: "number" },
-  //           total_cgst: { type: "number" },
-  //           total_sgst: { type: "number" },
-  //           total_igst: { type: "number" },
-  //           final_amount: { type: "number" },
-  //           payment_method_id: { type: "number" },
-  //           payment_amount: { type: "number" },
-  //           notes: { type: ["string", "null"] },
-  //           status: {
-  //             type: "string",
-  //             enum: ["Completed", "Confirm", "Cancelled"]
-  //           },
-  //           items: {
-  //             type: "array",
-  //             items: {
-  //               type: "object",
-  //               required: [
-  //                 "item_id",
-  //                 "product_id",
-  //                 "received_qty",
-  //                 "purchased_qty",
-  //                 "unit",
-  //                 "unit_price",
-  //                 "sub_total",
-  //                 "total_igst",
-  //                 "total_sgst",
-  //                 "total_cgst",
-  //                 "net_amount"
-  //               ],
-  //               properties: {
-  //                 item_id: { type: "number" },
-  //                 product_id: { type: "number" },
-  //                 received_qty: { type: "number" },
-  //                 purchased_qty: { type: "number" },
-  //                 unit: { type: "string" },
-  //                 unit_price: { type: "number" },
-  //                 sub_total: { type: "number" },
-  //                 total_igst: { type: "number" },
-  //                 total_sgst: { type: "number" },
-  //                 total_cgst: { type: "number" },
-  //                 net_amount: { type: "number" }
-  //               }
-  //             }
-  //           }
-  //         }
-  //       }
-  //     }
-  //   },
-  //   async (
-  //     request: FastifyRequest<{ Body: PurchaseEditBody }>,
-  //     reply: FastifyReply
-  //   ) => {
-  //     const controller = new PurchaseController();
-  //     const data = await controller.purchaseEdit(request.body);
+  // EDIT SALE
+  app.post<{ Body: SaleEditBody }>(
+    "/edit",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["Sale_id", "firm_id", "branch_id", "company_id", "updated_by"],
+          properties: {
+            Sale_id: { type: "number" },
+            firm_id: { type: "number" },
+            branch_id: { type: "number" },
+            company_id: { type: "number" },
+            updated_by: { type: "string", minLength: 1 },
+            customer_id: { type: ["string", "null"], format: "uuid" },
+            invoice_date: { type: ["string", "null"], format: "date" },
+            subtotal: { type: "number" },
+            discount: { type: "number" },
+            net_amount: { type: "number" },
+            total_cgst: { type: "number" },
+            total_sgst: { type: "number" },
+            total_igst: { type: "number" },
+            final_amount: { type: "number" },
+            paid: { type: "number" },
+            notes: { type: ["string", "null"] },
+            status: {
+              type: "string",
+              enum: ["Completed", "Confirm", "Cancelled"]
+            },
+            payments: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["amount"],
+                properties: {
+                  payment_method_id: { type: ["number", "null"] },
+                  amount: { type: "number" },
+                  reference: { type: ["string", "null"] }
+                }
+              }
+            },
+            items: {
+              type: "array",
+              items: {
+                type: "object",
+                required: [
+                  "item_id",
+                  "product_id",
+                  "stock_id",
+                  "saled_qty",
+                  "unit",
+                  "unit_price",
+                  "sub_total",
+                  "net_amount"
+                ],
+                properties: {
+                  item_id: { type: "number" },
+                  product_id: { type: "number" },
+                  stock_id: { type: "number" },
+                  saled_qty: { type: "number" },
+                  unit: { type: "string" },
+                  unit_price: { type: "number" },
+                  sub_total: { type: "number" },
+                  discount: { type: "number" },
+                  total_igst: { type: "number" },
+                  total_sgst: { type: "number" },
+                  total_cgst: { type: "number" },
+                  net_amount: { type: "number" },
+                  final_amount: { type: ["number", "null"] }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: SaleEditBody }>,
+      reply: FastifyReply
+    ) => {
+      const controller = new SaleController();
+      const data = await controller.saleEdit(request.body);
 
-  //     return reply.code(200).send({
-  //       status: "Success",
-  //       message: data
-  //     });
-  //   }
-  // );
+      return reply.code(200).send({
+        status: "Success",
+        message: data
+      });
+    }
+  );
 
-  // DELETE PURCHASE
+  // DELETE SALE
   app.post<{ Body: SaleDeleteBody }>(
     "/delete",
     {
