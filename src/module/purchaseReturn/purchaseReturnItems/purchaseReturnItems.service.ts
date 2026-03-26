@@ -2,7 +2,7 @@ import { getRecord } from "../../../utils/extra";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { PoolClient } from "pg";
-import { CreatePurchaseReturnItemParams, DeletePurchaseReturnItemParams, FetchDbPurchaseReturnItem, FetchPurchaseReturnItemParams, PurchaseReturnItemCountResult } from "./purchaseReturnItems.types";
+import { CreatePurchaseReturnItemParams, DeletePurchaseReturnItemParams, EditPurchaseReturnItemParams, FetchDbPurchaseReturnItem, FetchPurchaseReturnItemParams, PurchaseReturnItemCountResult } from "./purchaseReturnItems.types";
 
 export default class PurchaseReturnItemService {
 
@@ -176,86 +176,167 @@ export default class PurchaseReturnItemService {
     };
   }
 
-  // async updatePurchaseItem(data: EditPurchaseItemParams, client: PoolClient) {
-  //   const {
+  async updatePurchaseReturnItem(
+    data: EditPurchaseReturnItemParams,
+    client: PoolClient
+  ) {
+    const {
+      firm_id,
+      return_item_id,
+      returned_qty,
+      unit,
+      unit_price,
+      sub_total,
+      total_cgst,
+      total_sgst,
+      total_igst,
+      net_amount,
+      stock_id,
+      purchase_return_id,
+      purchase_item_id,
+      remark,
+      statusCode,
+      product_id
+    } = data;
 
-  //     branch_id,
-  //     firm_id,
-  //     purchased_qty,
-  //     received_qty,
-  //     unit,
-  //     unit_price,
-  //     sub_total,
-  //     total_cgst,
-  //     total_sgst,
-  //     total_igst,
-  //     net_amount,
-  //     stock_id,
-  //     item_id, purchase_id, remark, statusCode, product_id
-  //   } = data;
+    // 1. Check return item exists
+    const existingItem = await getRecord(
+      return_item_id,
+      "purchase_return_items",
+      "firm_id",
+      firm_id,
+      client
+    );
+    if (!existingItem) {
+      throw new AppError("Purchase return item not found", 404);
+    }
 
-  //   // 1. Validate firm existence (requirement)
-  //   const is_item_exist = await getRecord(
-  //     item_id,
-  //     "purchase_items",
-  //     "branch_id",
-  //     branch_id,
-  //     client
-  //   );
-  //   if (!is_item_exist) {
-  //     throw new AppError("Purchase item not found", 404);
-  //   }
-  //   const final_received_qty = received_qty ?? is_item_exist.received_qty;
-  //   const final_purchased_qty = purchased_qty ?? is_item_exist.purchased_qty;
-  //   if (final_received_qty > final_purchased_qty) {
-  //     throw new AppError(
-  //       "Received quantity cannot exceed purchased quantity",
-  //       422
-  //     );
-  //   }
-  //   const updateQuery = `
-  //     UPDATE purchase_items
-  //   SET
-  //   purchased_qty = $1,
-  //     received_qty = $2,
-  //     unit = $3,
-  //     unit_price = $4,
-  //     sub_total = $5,
-  //     total_cgst = $6,
-  //     total_sgst = $7,
-  //     total_igst = $8,
-  //     net_amount = $9,
-  //     stock_id = $10,
-  //     remarks =
-  //     CASE
-  //         WHEN remarks IS NULL THEN $11:: jsonb
-  //         WHEN jsonb_typeof(remarks) = 'array'
-  //           THEN remarks || $11:: jsonb
-  //         ELSE jsonb_build_array(remarks) || $11:: jsonb
-  //   END
-  //     WHERE id = $12 AND firm_id =$13
-  //   RETURNING *;
-  //   `;
+    // 2. Validate purchase return
+    const purchaseReturn = await getRecord(
+      purchase_return_id,
+      "purchase_return",
+      "firm_id",
+      firm_id,
+      client
+    );
+    if (!purchaseReturn) {
+      throw new AppError("Purchase return not found", 404);
+    }
 
-  //   const values = [
-  //     purchased_qty ?? is_item_exist.purchased_qty,
-  //     received_qty ?? is_item_exist.received_qty,
-  //     unit ?? is_item_exist.unit,
-  //     unit_price ?? is_item_exist.unit_price,
-  //     sub_total ?? is_item_exist.sub_total,
-  //     total_cgst ?? is_item_exist.total_cgst,
-  //     total_sgst ?? is_item_exist.total_sgst,
-  //     total_igst ?? is_item_exist.total_igst,
-  //     net_amount ?? is_item_exist.net_amount,
-  //     stock_id ?? is_item_exist.stock_id,
-  //     JSON.stringify(remark),
-  //     item_id,
-  //     firm_id
-  //   ];
+    // 3. Validate purchase item
+    const purchaseItem = await getRecord(
+      purchase_item_id,
+      "purchase_items",
+      "firm_id",
+      firm_id,
+      client
+    );
+    if (!purchaseItem) {
+      throw new AppError("Purchase item not found", 404);
+    }
 
-  //   const { rows } = await executeInTransaction(client, updateQuery, values);
-  //   return rows[0];
-  // }
+    // 4. Validate stock (optional)
+    if (stock_id) {
+      const stock = await getRecord(
+        stock_id,
+        "stock",
+        "firm_id",
+        firm_id,
+        client
+      );
+      if (!stock) {
+        throw new AppError("Stock not found", 404);
+      }
+    }
+
+    const purchased_qty = Number(purchaseItem.received_qty);
+
+    const returnedQtyQuery = `
+  SELECT COALESCE(SUM(returned_qty), 0) AS total_returned
+  FROM purchase_return_items
+  WHERE purchase_item_id = $1
+    AND firm_id = $2
+    AND status = $3
+    AND id != $4
+`;
+
+    const returnedQtyRes = await client.query(returnedQtyQuery, [
+      purchase_item_id,
+      firm_id,
+      0,
+      return_item_id
+    ]);
+
+    const already_returned = Number(
+      returnedQtyRes.rows[0].total_returned
+    );
+
+    const newQty = returned_qty;
+
+    if (newQty <= 0) {
+      throw new AppError("Returned quantity must be greater than 0", 400);
+    }
+
+    if (newQty + already_returned > purchased_qty) {
+      throw new AppError(
+        `Returned quantity exceeds limit. Max allowed: ${purchased_qty - already_returned
+        }`,
+        400
+      );
+    }
+
+    // 6. Update query
+    const updateQuery = `
+    UPDATE purchase_return_items
+    SET
+      product_id = $1,
+      returned_qty = $2,
+      unit = $3,
+      unit_price = $4,
+      sub_total = $5,
+      total_cgst = $6,
+      total_sgst = $7,
+      total_igst = $8,
+      net_amount = $9,
+      stock_id = $10,
+      remarks =
+        CASE
+          WHEN remarks IS NULL THEN $11::jsonb
+          WHEN jsonb_typeof(remarks) = 'array'
+            THEN remarks || $11::jsonb
+          ELSE jsonb_build_array(remarks) || $11::jsonb
+        END,
+      status = $12
+    WHERE id = $13 AND firm_id = $14
+    RETURNING *;
+  `;
+
+    const values = [
+      product_id ?? existingItem.product_id,
+      returned_qty,
+      unit ?? existingItem.unit,
+      unit_price ?? existingItem.unit_price,
+      sub_total ?? existingItem.sub_total,
+      total_cgst ?? existingItem.total_cgst,
+      total_sgst ?? existingItem.total_sgst,
+      total_igst ?? existingItem.total_igst,
+      net_amount ?? existingItem.net_amount,
+      stock_id ?? existingItem.stock_id,
+      JSON.stringify(remark),
+      statusCode ?? existingItem.status,
+      return_item_id,
+      firm_id
+    ];
+
+    const { rows } = await executeInTransaction(
+      client,
+      updateQuery,
+      values
+    );
+    let movement_type: "O" | "I" =
+      returned_qty > existingItem.returned_qty ? "O" : "I";
+    return { row: rows[0], movement_type };
+  }
 
   async deletePurchaseReturnItem(data: DeletePurchaseReturnItemParams, client: PoolClient) {
     const { purchase_id, firm_id, remark } = data;

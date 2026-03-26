@@ -21,16 +21,15 @@ export interface CreatePurchaseReturnItemParams
   statusCode: number;
   remark: object;
 }
-export interface EditPurchaseItemBody {
-  item_id: number
-  purchase_id: number;
+export interface EditPurchaseReturnItemBody {
+  return_item_id: number
+  purchase_return_id: number;
   firm_id: number;
   branch_id: number;
   status?: string;
   product_id?: number;
   stock_id?: number;
-  received_qty?: number;
-  purchased_qty?: number;
+  returned_qty: number;
   unit?: string;
   unit_price?: number;
   sub_total?: number;
@@ -38,9 +37,10 @@ export interface EditPurchaseItemBody {
   total_sgst?: number;
   total_cgst?: number;
   net_amount?: number;
+  purchase_item_id:number
 }
-export interface EditPurchaseItemParams
-  extends Omit<EditPurchaseItemBody, "status"> {
+export interface EditPurchaseReturnItemParams
+  extends Omit<EditPurchaseReturnItemBody, "status"> {
   statusCode?: number;
   remark: object;
 }

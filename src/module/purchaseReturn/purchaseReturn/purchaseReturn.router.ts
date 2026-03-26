@@ -298,5 +298,85 @@ export async function purchaseReturnRouter(app: FastifyInstance) {
       });
     }
   );
+    app.post<{ Body: PurchaseReturnEditBody }>(
+      "/edit",
+      {
+        schema: {
+          body: {
+            type: "object",
+            required: ["purchase_id", "firm_id", "updated_by"],
+            properties: {
+              purchase_id: { type: "number" },
+              company_id: { type: "number" },
+              updated_by: { type: "string", minLength: 1 },
+              firm_id: { type: "number" },
+              branch_id: { type: "number" },
+              vendor_id: { type: "string" },
+              bill_number: { type: "string" },
+              bill_date: { type: "string", format: "date" },
+              transaction_reference: { type: ["string", "null"] },
+              subtotal: { type: "number" },
+              discount: { type: "number" },
+              net_amount: { type: "number" },
+              total_cgst: { type: "number" },
+              total_sgst: { type: "number" },
+              total_igst: { type: "number" },
+              final_amount: { type: "number" },
+              payment_method_id: { type: "number" },
+              payment_amount: { type: "number" },
+              notes: { type: ["string", "null"] },
+              status: {
+                type: "string",
+                enum: ["Completed", "Confirm", "Cancelled"]
+              },
+              items: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: [
+                    "item_id",
+                    "product_id",
+                    "received_qty",
+                    "purchased_qty",
+                    "unit",
+                    "unit_price",
+                    "sub_total",
+                    "total_igst",
+                    "total_sgst",
+                    "total_cgst",
+                    "net_amount"
+                  ],
+                  properties: {
+                    item_id: { type: "number" },
+                    product_id: { type: "number" },
+                    received_qty: { type: "number" },
+                    purchased_qty: { type: "number" },
+                    unit: { type: "string" },
+                    unit_price: { type: "number" },
+                    sub_total: { type: "number" },
+                    total_igst: { type: "number" },
+                    total_sgst: { type: "number" },
+                    total_cgst: { type: "number" },
+                    net_amount: { type: "number" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      async (
+        request: FastifyRequest<{ Body: PurchaseReturnEditBody }>,
+        reply: FastifyReply
+      ) => {
+        const controller = new PurchaseController();
+        const data = await controller.purchaseEdit(request.body);
+  
+        return reply.code(200).send({
+          status: "Success",
+          message: data
+        });
+      }
+    );
 
 }

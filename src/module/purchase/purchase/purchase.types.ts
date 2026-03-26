@@ -52,7 +52,7 @@ export interface PurchaseEditBody {
 }
 export interface PurchaseEditParams
   extends Omit<PurchaseEditBody, "status" |"updated_by" |"items"> {
-  statusCode: number;
+  statusCode?: number;
   remark:object
 }
 

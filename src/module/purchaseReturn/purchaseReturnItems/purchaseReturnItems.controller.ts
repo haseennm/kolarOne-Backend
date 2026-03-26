@@ -3,7 +3,7 @@ import { transaction } from "../../../config/db";
 import { cns, getStatusCode, getStatusText } from "../../../utils/extra";
 import PurchaseReturnItemService from "./purchaseReturnItems.service";
 import { AppError } from "../../../utils/AppError";
-import { CreatePurchaseRetunItemBody, DeletePurchaseReturnItemBody, FetchPurchaseReturnItemFilters, FetchPurchaseReturnItemParams } from "./purchaseReturnItems.types";
+import { CreatePurchaseRetunItemBody, DeletePurchaseReturnItemBody, EditPurchaseReturnItemBody, FetchPurchaseReturnItemFilters, FetchPurchaseReturnItemParams } from "./purchaseReturnItems.types";
 
 export default class PurchaseReturnItemController {
 
@@ -31,32 +31,31 @@ export default class PurchaseReturnItemController {
 
     return `purchaseItem has been created successfully.`;
   }
-  // async editPurchaseItem(data: EditPurchaseReturnItemBody, client: PoolClient) {
-  //   cns("create purchase items", data)
-  //   const { status, ...rest } = data;
+  async editPurchaseReturnItem(data: EditPurchaseReturnItemBody, client: PoolClient) {
+    cns("create purchase items", data)
+    const { status, ...rest } = data;
 
-  //   let statusCode = undefined
-  //   if (status) statusCode = getStatusCode(status);
+    let statusCode = undefined
+    if (status) statusCode = getStatusCode(status);
 
-  //   const remark = {
-  //     action: "Update",
-  //     created_at: Date.now(),
-  //   }
+    const remark = {
+      action: "Update",
+      created_at: Date.now(),
+    }
 
-  //   const service = new PurchaseReturnItemService();
+    const service = new PurchaseReturnItemService();
+    const purchase_item = service.updatePurchaseReturnItem(
+      {
+        ...rest,
+        statusCode,
+        remark
+      },
+      client
+    );
 
-  //   const purchase_item = service.updatePurchaseItem(
-  //     {
-  //       ...rest,
-  //       statusCode,
-  //       remark
-  //     },
-  //     client
-  //   );
 
-
-  //   return purchase_item;
-  // }
+    return purchase_item;
+  }
   async fetchPurchaseItems(data: FetchPurchaseReturnItemParams) {
 
     const service = new PurchaseReturnItemService();
@@ -73,10 +72,6 @@ export default class PurchaseReturnItemController {
       pagination: { ...rolesWithCode.pagination }
     };
   }
-
-
-
-
   async deletePurchaseItem(data: DeletePurchaseReturnItemBody, client: PoolClient) {
 
     const remark = {

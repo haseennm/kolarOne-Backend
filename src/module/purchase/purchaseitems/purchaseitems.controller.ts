@@ -84,7 +84,6 @@ export default class PurchaseItemController {
 
 
   async deletePurchaseItem(data: DeletePurchaseItemBody, client: PoolClient) {
-
     const remark = {
       action: "Deleted",
       deleted_at: Date.now(),

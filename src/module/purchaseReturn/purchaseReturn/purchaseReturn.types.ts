@@ -1,4 +1,4 @@
-import { CreatePurchaseRetunItemBody, EditPurchaseItemBody } from "../purchaseReturnItems/purchaseReturnItems.types";
+import { CreatePurchaseRetunItemBody, EditPurchaseReturnItemBody } from "../purchaseReturnItems/purchaseReturnItems.types";
 
 export interface PurchaseReturnCreateBody {
   purchase_id: number
@@ -26,13 +26,12 @@ export interface PurchaseReturnCreateParams
   remark: object
 }
 export interface PurchaseReturnEditBody {
-  purchase_id: number
+  purchase_return_id: number
   updated_by: string;
   firm_id: number;
   branch_id: number
   company_id: number
   vendor_id?: string;
-  bill_number?: string;
   bill_date?: Date | string;
   subtotal?: number;
   discount?: number;
@@ -46,7 +45,7 @@ export interface PurchaseReturnEditBody {
   status?: string;
   transaction_reference?: string | null;
   payment_method_id?: number;
-  items?: EditPurchaseItemBody[];
+  items?: EditPurchaseReturnItemBody[];
 }
 export interface PurchaseReturnEditParams
   extends Omit<PurchaseReturnEditBody, "status" | "updated_by" | "items"> {

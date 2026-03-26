@@ -1,12 +1,13 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../../config/db";
 import { convertEntityType, EntityKey, getStatusCode, getStatusText, getTransactionCode, PaymentTransactionTypeCodeMap } from "../../../utils/extra";
-import { PurchaseReturnCreateBody, PurchaseReturnDeleteBody, PurchaseReturnFetchParams } from "./purchaseReturn.types";
+import { PurchaseReturnCreateBody, PurchaseReturnDeleteBody, PurchaseReturnEditBody, PurchaseReturnFetchParams } from "./purchaseReturn.types";
 import StockController from "../../stock/stock.controller";
 // import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 import { PaymentTransactionService } from "../../paymentTransaction/paymenttransaction.services";
 import PurchaseReturnService from "./purchaseReturn.service";
 import PurchaseReturnItemController from "../purchaseReturnItems/purchaseReturnItems.controller";
+import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 
 export default class PurchaseReturnController {
 
@@ -45,7 +46,7 @@ export default class PurchaseReturnController {
             qty: item.returned_qty,
             movement_type: 'O',
             reason: getTransactionCode("purchase_return"),
-            is_relate_purchase:true
+            is_relate_purchase: true
           },
           client
         );
@@ -65,7 +66,7 @@ export default class PurchaseReturnController {
             total_sgst: item.total_sgst ?? 0,
             total_cgst: item.total_cgst ?? 0,
             net_amount: item.net_amount,
-            purchase_item_id:item.purchase_item_id
+            purchase_item_id: item.purchase_item_id
           },
           client
         );
@@ -107,114 +108,107 @@ export default class PurchaseReturnController {
       return `purchase ${purchase_return.return_number} has been created successfully.`;
     });
   }
-  // async purchaseEdit(data: PurchaseEditBody) {
-  //   const { payment_amount, final_amount, status, company_id, updated_by, items, ...rest } = data;
+  async purchaseReturnEdit(data: PurchaseReturnEditBody) {
+    const { payment_amount, final_amount, status, company_id, updated_by, items, ...rest } = data;
 
-  //   const remark = {
-  //     action: "Updated",
-  //     updated_by,
-  //     created_at: new Date(),
-  //   };
+    const remark = {
+      action: "Updated",
+      updated_by,
+      created_at: new Date(),
+    };
 
-  //   return transaction(async (client: PoolClient) => {
-  //     const statusCode = getStatusCode(status ?? "Completed");
+    return transaction(async (client: PoolClient) => {
+      const statusCode = getStatusCode(status ?? "Completed");
 
-  //     const service = new PurchaseService();
-  //     const purchase = await service.editPurchase(
-  //       {
-  //         ...rest,
-  //         payment_amount, final_amount,
-  //         remark,
-  //         statusCode,
-  //         company_id
-  //       },
-  //       client
-  //     );
+      const service = new PurchaseReturnService();
+      const purchase_return = await service.editPurchaseReturn(
+        {
+          ...rest,
+          payment_amount, final_amount,
+          remark,
+          statusCode,
+          company_id
+        },
+        client
+      );
 
-  //     const stockController = new StockController();
-  //     const purchaseItem = new PurchaseItemController();
-  //     if (items) {
-  //       for (const item of items) {
+      const stockController = new StockController();
+      const purchaseItem = new PurchaseReturnItemController();
+      if (items) {
+        for (const item of items) {
 
-  //         const purchase_item = await purchaseItem.editPurchaseItem(
-  //           {
-  //             item_id: item.item_id, // ✅ add this
-  //             purchase_id: purchase.id,
-  //             firm_id: rest.firm_id,
-  //             branch_id: rest.branch_id,
-  //             status: status ?? "Completed",
-  //             product_id: item.product_id,
-  //             stock_id: item.stock_id,
-  //             received_qty: item.received_qty,
-  //             purchased_qty: item.purchased_qty,
-  //             unit: item.unit,
-  //             unit_price: item.unit_price,
-  //             sub_total: item.sub_total,
-  //             total_igst: item.total_igst ?? 0,
-  //             total_sgst: item.total_sgst ?? 0,
-  //             total_cgst: item.total_cgst ?? 0,
-  //             net_amount: item.net_amount,
-  //           },
-  //           client
-  //         );
-  //         const stock = await stockController.editStock(
-  //           {
-  //             stock_id: purchase_item.stock_id,
-  //             firm_id: rest.firm_id,
-  //             branch_id: rest.branch_id,
-  //             company_id,
-
-  //             purchase_id: purchase.id,
-
-  //             product_id: item.product_id,
-  //             selling_price: 0,
-
-  //             available_qty: item.received_qty,
-  //             purchased_qty: item.purchased_qty,
-
-  //             status: "Good",
-  //             movement_type: "I",
-  //             reason:getTransactionCode("purchase")
-  //           },
-  //           client
-  //         );
-  //       }
-  //     }
-  //     const difference = (payment_amount ?? 0) - (final_amount ?? 0);
-  //     const party_balance_controller = new PartyBalanceController();
+          const purchase_return_item = await purchaseItem.editPurchaseReturnItem(
+            {
+              return_item_id: item.return_item_id,
+              purchase_return_id: rest.purchase_return_id,
+              firm_id: rest.firm_id,
+              branch_id: rest.branch_id,
+              status: status ?? "Completed",
+              product_id: item.product_id,
+              stock_id: item.stock_id,
+              returned_qty: item.returned_qty,
+              unit: item.unit,
+              unit_price: item.unit_price,
+              sub_total: item.sub_total,
+              total_igst: item.total_igst ?? 0,
+              total_sgst: item.total_sgst ?? 0,
+              total_cgst: item.total_cgst ?? 0,
+              net_amount: item.net_amount,
+              purchase_item_id: item.purchase_item_id
+            },
+            client
+          );
+          if (item.returned_qty !== purchase_return_item.row.returned_qty) {
+            await stockController.reduceStock(
+              {
+                stock_id: item.stock_id ?? purchase_return_item.row.stock_id,
+                branch_id: rest.branch_id,
+                firm_id: rest.firm_id,
+                qty: item.returned_qty,
+                movement_type: purchase_return_item.movement_type,
+                reason: getTransactionCode("purchase_return"),
+                is_relate_purchase: true
+              },
+              client
+            );
+          }
+        }
+      }
+      const difference = (payment_amount ?? 0) - (final_amount ?? 0);
+      const party_balance_controller = new PartyBalanceController();
 
 
-  //     if (difference !== 0) {
-  //       const isAdvance = difference > 0;
+      if (difference !== 0) {
+        const isAdvance = difference > 0;
 
-  //       await party_balance_controller.editPartyBalance(
-  //         {
-  //           ref_id: purchase.id,
-  //           ref_type: "P",
-  //           action_by: updated_by,
-  //           balance: Math.abs(difference),
-  //           flow: isAdvance ? "O" : "I",
-  //           firm_id: rest.firm_id,
-  //         },
-  //         client
-  //       );
-  //     }
-  //     const payment_transactions_service = new PaymentTransactionService()
-  //     await payment_transactions_service.editPaymentTransaction({
-  //       company_id,
-  //       amount: payment_amount,
-  //       payment_method_id: null,
-  //       ref_id: rest.purchase_id,
-  //       ref_type: PaymentTransactionTypeCodeMap["ledger_transaction"],
-  //       status: statusCode,
-  //       transaction_reference: null,
-  //       business_id: rest.firm_id,
-  //       business_ref: "F"
-  //     }, client)
+        await party_balance_controller.editPartyBalance(
+          {
+            ref_id: purchase_return.id,
+            ref_type: "PR",
+            action_by: updated_by,
+            balance: Math.abs(difference),
+            flow: isAdvance ? "I" : "O",
+            firm_id: rest.firm_id,
+          },
+          client
+        );
+      }
+      const payment_transactions_service = new PaymentTransactionService()
+      await payment_transactions_service.editPaymentTransaction({
+        company_id,
+        amount: payment_amount,
+        payment_method_id: null,
+        ref_id: rest.purchase_return_id,
+        ref_type: PaymentTransactionTypeCodeMap["ledger_transaction"],
+        status: statusCode,
+        transaction_reference: null,
+        business_id: rest.firm_id,
+        business_ref: "F"
+      }, client)
 
-  //     return `purchase ${purchase.bill_number} has been created successfully.`;
-  //   });
-  // }
+      return `purchase ${purchase_return.bill_number} has been created successfully.`;
+    });
+  }
 
   async purchaseReturnFetch(data: PurchaseReturnFetchParams) {
     const service = new PurchaseReturnService();

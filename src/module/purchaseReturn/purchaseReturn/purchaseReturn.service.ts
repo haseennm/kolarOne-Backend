@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { getRecord } from "../../../utils/extra";
-import { PurchaseReturnCreateParams, PurchaseReturnDeleteParams, PurchaseReturnFetchParams } from "./purchaseReturn.types";
+import { PurchaseReturnCreateParams, PurchaseReturnDeleteParams, PurchaseReturnEditParams, PurchaseReturnFetchParams } from "./purchaseReturn.types";
 
 export default class PurchaseReturnService {
 
@@ -137,131 +137,114 @@ export default class PurchaseReturnService {
     const { rows } = await executeInTransaction(client, query, values);
     return rows[0];
   }
-  //   async editPurchase(data: PurchaseEditParams, client: PoolClient) {
-  //     const {
-  //       bill_date,
-  //       bill_number,
-  //       discount,
-  //       final_amount,
-  //       firm_id,
-  //       net_amount,
-  //       payment_amount,
-  //       payment_method_id,
-  //       remark,
-  //       statusCode,
-  //       subtotal,
-  //       total_cgst,
-  //       total_igst,
-  //       total_sgst,
-  //       vendor_id,
-  //       notes,
-  //       transaction_reference,
-  //       branch_id,
-  //       company_id,
-  //       purchase_id
-  //     } = data;
+  async editPurchaseReturn(data: PurchaseReturnEditParams, client: PoolClient) {
+    const {
+      bill_date,
+      discount,
+      final_amount,
+      firm_id,
+      net_amount,
+      payment_amount,
+      payment_method_id,
+      remark,
+      statusCode,
+      subtotal,
+      total_cgst,
+      total_igst,
+      total_sgst,
+      vendor_id,
+      notes,
+      transaction_reference,
+      branch_id,
+      company_id,
+      purchase_return_id,
+    } = data;
 
-  //     // Check firm existence
-  //     const is_purchase_exist = await getRecord(
-  //       purchase_id,
-  //       "purchases",
-  //       "firm_id",
-  //       firm_id,
-  //       client
-  //     );
+    // Check firm existence
+    const is_purchase_return_exist = await getRecord(
+      purchase_return_id,
+      "purchase_return",
+      "firm_id",
+      firm_id,
+      client
+    );
 
-  //     if (!is_purchase_exist) {
-  //       throw new AppError("Firm not found", 404);
-  //     }
-  //     if (payment_method_id && payment_method_id !== is_purchase_exist.payment_method_id) {
-  //       const is_payment_method_exist = await getRecord(
-  //         payment_method_id,
-  //         "payment_methods",
-  //         "company_id",
-  //         company_id,
-  //         client
-  //       );
+    if (!is_purchase_return_exist) {
+      throw new AppError("Firm not found", 404);
+    }
+    if (payment_method_id && payment_method_id !== is_purchase_return_exist.payment_method_id) {
+      const is_payment_method_exist = await getRecord(
+        payment_method_id,
+        "payment_methods",
+        "company_id",
+        company_id,
+        client
+      );
 
-  //       if (!is_payment_method_exist) {
-  //         throw new AppError("payment method not found", 404);
-  //       }
-  //     }
-  //     if (vendor_id && vendor_id !== is_purchase_exist.vendor_id) {
-  //       const is_vendor_exist = await getRecord(
-  //         vendor_id,
-  //         "vendors",
-  //         "company_id",
-  //         company_id,
-  //         client
-  //       );
+      if (!is_payment_method_exist) {
+        throw new AppError("payment method not found", 404);
+      }
+    }
+    if (vendor_id && vendor_id !== is_purchase_return_exist.vendor_id) {
+      const is_vendor_exist = await getRecord(
+        vendor_id,
+        "vendors",
+        "company_id",
+        company_id,
+        client
+      );
 
-  //       if (!is_vendor_exist) {
-  //         throw new AppError("Vendor not found", 404);
-  //       }
-  //     }
-  //     if (bill_number && bill_number !== is_purchase_exist.bill_number) {
+      if (!is_vendor_exist) {
+        throw new AppError("Vendor not found", 404);
+      }
+    }
+   
+    const purchaseQuery = `
+   UPDATE purchase_return SET
+    vendor_id = $1,
+    bill_date = $2,
+    subtotal = $3,
+    discount = $4,
+    net_amount = $5,
+    total_cgst = $6,
+    total_sgst = $7,
+    total_igst = $8,
+    final_amount = $9,
+    payment_amount = $10,
+    notes = $11,
+    status = $12,
+    remarks = COALESCE(remarks, '[]'::jsonb) || $13::jsonb,
+    payment_method_id = $14,
+    transaction_reference = $15
+WHERE
+    firm_id = $16
+    AND id = $17
+RETURNING *;
+  `;
 
-  //       const is_bill_exist = await executeInTransaction(
-  //         client,
-  //         `SELECT id FROM purchases 
-  //    WHERE bill_number = $1 
-  //    AND vendor_id = $2 
-  //    AND status != 0`,
-  //         [bill_number, vendor_id]
-  //       );
+    const values = [
+      vendor_id??is_purchase_return_exist.vendor_id,
+      bill_date ?? is_purchase_return_exist.bill_date,
+      subtotal ?? is_purchase_return_exist.sub_total,
+      discount ?? is_purchase_return_exist.discount,
+      net_amount ?? is_purchase_return_exist.net_amount,
+      total_cgst ?? is_purchase_return_exist.total_cgst,
+      total_sgst ?? is_purchase_return_exist.total_sgst,
+      total_igst ?? is_purchase_return_exist.total_igst,
+      final_amount ?? is_purchase_return_exist.final_amount,
+      payment_amount ?? is_purchase_return_exist.payment_amount,
+      notes ?? is_purchase_return_exist.notes,
+      statusCode,
+      JSON.stringify([remark]),
+      payment_method_id ?? is_purchase_return_exist.payment_method_id,
+      transaction_reference ?? is_purchase_return_exist.transaction_reference,
+      firm_id,
+      purchase_return_id
+    ];
 
-  //       if ((is_bill_exist.rowCount ?? 0) > 0) {
-  //         throw new AppError("purchase bill already exist", 400);
-  //       }
-  //     }
-  //     const purchaseQuery = `
-  //   UPDATE purchases SET
-  //     vendor_id = $1,
-  //     bill_number = $2,
-  //     bill_date = $3,
-  //     subtotal = $4,
-  //     discount = $5,
-  //     net_amount = $6,
-  //     total_cgst = $7,
-  //     total_sgst = $8,
-  //     total_igst = $9,
-  //     final_amount = $10,
-  //     payment_amount = $11,
-  //     notes = $12,
-  //     status = $13,
-  //     remarks = COALESCE(remarks, '[]'::jsonb) || $14::jsonb,
-  //     payment_method_id = $15,
-  //     transaction_reference = $16 WHERE
-  //     firm_id = $17
-  //    id = $18
-  //   RETURNING *;
-  // `;
-
-  //     const values = [
-  //       vendor_id,
-  //       bill_number,
-  //       bill_date,
-  //       subtotal ?? is_purchase_exist.sub_total,
-  //       discount ?? is_purchase_exist.discount,
-  //       net_amount ?? is_purchase_exist.net_amount,
-  //       total_cgst ?? is_purchase_exist.total_cgst,
-  //       total_sgst ?? is_purchase_exist.total_sgst,
-  //       total_igst ?? is_purchase_exist.total_igst,
-  //       final_amount ?? is_purchase_exist.final_amount,
-  //       payment_amount ?? is_purchase_exist.payment_amount,
-  //       notes ?? is_purchase_exist.notes,
-  //       statusCode,
-  //       JSON.stringify([remark]),
-
-  //       payment_method_id ?? is_purchase_exist.payment_method_id,
-  //       transaction_reference ?? is_purchase_exist.transaction_reference,
-  //       firm_id,
-  //       purchase_id
-  //     ];
-
-  //     const { rows } = await executeInTransaction(client, purchaseQuery, values);
-  //     return rows[0];
-  //   }
+    const { rows } = await executeInTransaction(client, purchaseQuery, values);
+    return rows[0];
+  }
 
   async fetchReturnPurchase(data: PurchaseReturnFetchParams) {
     const { filters, offset } = data;

@@ -186,7 +186,7 @@ export default class PurchaseItemService {
         422
       );
     }
-   const updateQuery= `
+    const updateQuery = `
       UPDATE purchase_items
     SET
     purchased_qty = $1,
@@ -231,27 +231,36 @@ export default class PurchaseItemService {
   }
 
   async deletePurchaseItem(data: DeletePurchaseItemParams, client: PoolClient) {
+    console.log(data)
 
-    const { purchase_id, firm_id,remark } = data;
+    const { purchase_id, firm_id, remark } = data;
     const isItemExist = await executeInTransaction(client,
       `SELECT * FROM purchase_items WHERE purchase_id =$1 AND firm_id= $2`,
-      [purchase_id,firm_id]
+      [purchase_id, firm_id]
     )
-    if(isItemExist){
-      throw new AppError("Purchase item not found for this purchase",404)
+    if (!isItemExist) {
+      throw new AppError("Purchase item not found for this purchase", 404)
     }
 
     const deleteQuery = `
-        UPDATE purchase_items
-        SET status = 0
-        WHERE purchase_id = $1 AND firm_id = $2
-    RETURNING *;
+      UPDATE purchase_items
+SET 
+  status = 0,
+  remarks = CASE
+    WHEN remarks IS NULL THEN $1::jsonb
+    WHEN jsonb_typeof(remarks) = 'array'
+      THEN remarks || $1::jsonb
+    ELSE jsonb_build_array(remarks) || $1::jsonb
+  END
+WHERE purchase_id = $2 
+  AND firm_id = $3
+RETURNING *;
     `;
 
     const { rows } = await executeInTransaction(
       client,
       deleteQuery,
-      [purchase_id, firm_id]
+      [remark, purchase_id, firm_id]
     );
 
     return rows[0];

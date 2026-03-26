@@ -87,7 +87,7 @@ export default class PurchaseController {
             ref_type: "P",
             created_by,
             balance: Math.abs(difference),
-            flow: isAdvance ? "O" : "I",
+            flow: isAdvance ? "I" : "O",
             firm_id: rest.firm_id,
           },
           client
@@ -179,7 +179,7 @@ export default class PurchaseController {
 
               status: "Good",
               movement_type: "I",
-              reason:getTransactionCode("purchase")
+              reason: getTransactionCode("purchase")
             },
             client
           );
@@ -289,13 +289,15 @@ export default class PurchaseController {
         },
         client
       );
+      console.log("192")
       await partyBalanceService.deletePartyBalance(
         {
           delete_by: deleted_by, firm_id: rest.firm_id, purchase_id: rest.id
         },
         client
       );
-      payment_transactions_service.deletePaymentTransaction({
+      console.log("299")
+      await payment_transactions_service.deletePaymentTransaction({
         company_id: purchase.company_id,
         ref_id: rest.id,
         ref_type: PaymentTransactionTypeCodeMap["purchase"],
