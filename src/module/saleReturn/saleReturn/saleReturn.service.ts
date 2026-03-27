@@ -383,15 +383,15 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
   );
 
   const total = await query<{ count: string }>(countQuery, values);
-
+console.log("first")
   return {
-    sale_returns,
     pagination: {
       page: filters.page,
       limit: filters.limit,
       total: Number(total[0].count),
       totalPages: Math.ceil(Number(total[0].count) / filters.limit),
     },
+    sale_returns,
   };
 }
  async fetchSaleReturnFull(data: SaleReturnFetchParams) {

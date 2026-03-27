@@ -145,7 +145,7 @@ export default class SaleController {
 
       const stockController = new StockController();
       const saleItem = new SaleItemController();
-      
+
       // ✅ Edit existing items
       if (items && items.length > 0) {
         for (const item of items) {
@@ -168,7 +168,7 @@ export default class SaleController {
               total_cgst: item.total_cgst ?? 0,
               net_amount: item.net_amount,
               final_amount: item.final_amount
-                ?? (item.net_amount
+                ?? (item.net_amount ?? 0
                   - (item.discount ?? 0)
                   + (item.total_igst ?? 0)
                   + (item.total_sgst ?? 0)
@@ -178,25 +178,26 @@ export default class SaleController {
           );
 
           // ✅ Update stock accordingly
-          await stockController.editStock(
-            {
-              stock_id: item.stock_id,
-              branch_id: rest.branch_id,
-              firm_id: rest.firm_id,
-              qty: item.saled_qty,
-              movement_type: 'O',
-              reason: getTransactionCode("sale"),
-              is_relate_purchase: false,
-              product_id: item.product_id
-            },
-            client
-          );
+          if (item.saled_qty !== saleItemData.saled_qty) {
+            await stockController.reduceStock(
+              {
+                stock_id: item.stock_id ?? saleItemData.stock_id,
+                branch_id: rest.branch_id,
+                firm_id: rest.firm_id,
+                qty: item.saled_qty,
+                movement_type: item.saled_qty > saleItemData.saled_qty ? 'I' : 'O',
+                reason: getTransactionCode("sale_return"),
+                is_relate_purchase: false
+              },
+              client
+            );
+          }
         }
       }
 
       // ✅ Update party balance if payment difference changed
       const party_balance_controller = new PartyBalanceController();
-      const difference = paid - final_amount;
+      const difference = (paid ?? sale.paid) - (final_amount ?? sale.final_amount);
 
       if (difference !== 0) {
         const isAdvance = difference > 0;

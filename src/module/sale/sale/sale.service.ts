@@ -222,12 +222,12 @@ export default class SaleService {
     }
 
     // ✅ Build payment object if payments provided
-    const paymentobj = payments 
+    const paymentobj = payments
       ? (payments || []).map((p: any) => ({
-          payment_method_id: p.payment_method_id,
-          amount: p.amount,
-          reference: p.reference ?? null
-        }))
+        payment_method_id: p.payment_method_id,
+        amount: p.amount,
+        reference: p.reference ?? null
+      }))
       : (is_sale_exist.payments || []);
 
     const updateQuery = `
@@ -497,91 +497,75 @@ export default class SaleService {
       },
     };
   }
-  async deleteSale(data: SaleDeleteParams, client: PoolClient) {
-    const { id, remark, firm_id } = data;
-    const isPurchaseExist = await getRecord(
-      id,
-      "purchases",
-      "firm_id",
-      firm_id,
-      client
-    );
+ async deleteSale(data: SaleDeleteParams, client: PoolClient) {
+  const { id, remark, firm_id } = data;
 
-    if (!isPurchaseExist) {
-      throw new AppError("Purchase not found or already deleted", 404);
-    }
+  const isSaleExist = await getRecord(
+    id,
+    "Sales",
+    "firm_id",
+    firm_id,
+    client
+  );
 
-    // this.canDeletePurchase(data, client)
-    // if (!this.canDeletePurchase) {
-    //   throw new AppError("Can't delete purchase now ", 500)
-    // }
-    const queryText = `
-  UPDATE purchases p
-  SET
-    status = $1,
-    remarks =
-      CASE
-        WHEN jsonb_typeof(p.remarks) = 'array'
-          THEN p.remarks || $2::jsonb
-        ELSE jsonb_build_array(p.remarks) || $2::jsonb
-      END
-  FROM firms f
-  JOIN branches b ON f.branch_id = b.id
-  WHERE 
-    p.id = $3 
-    AND p.firm_id = $4
-    AND p.firm_id = f.id
-  RETURNING p.*, b.company_id;
-`;
-
-    const values = [
-      0,
-      JSON.stringify(remark),
-      id, firm_id
-    ];
-
-    const row = await executeInTransaction(client, queryText, values);
-
-    return row.rows[0];
+  if (!isSaleExist) {
+    throw new AppError("Sale not found or already deleted", 404);
   }
-  // async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
-  //   const { id, firm_id } = data;
-  //   const isPurchaseExist = await getRecord(
-  //     id,
-  //     "purchases",
-  //     "firm_id",
-  //     firm_id,
-  //     client
-  //   );
 
-  //   if (!isPurchaseExist) {
-  //     throw new AppError("Purchase not found or already deleted", 404);
-  //   }
+  // ✅ FIX: await the function
+  await this.canDeleteSale(data, client);
 
+  const queryText = `
+    UPDATE sales s
+    SET
+      status = $1,
+      remarks =
+        CASE
+          WHEN s.remarks IS NULL THEN $2::jsonb
+          WHEN jsonb_typeof(s.remarks) = 'array'
+            THEN s.remarks || $2::jsonb
+          ELSE jsonb_build_array(s.remarks) || $2::jsonb
+        END
+    FROM firms f
+    JOIN branches b ON f.branch_id = b.id
+    WHERE 
+      s.id = $3 
+      AND s.firm_id = $4
+      AND s.firm_id = f.id
+    RETURNING s.*, b.company_id;
+  `;
 
+  const values = [
+    0,
+    JSON.stringify([remark]), // ensure it's an array
+    id,
+    firm_id
+  ];
 
-  //   const queryText = `
-  //       UPDATE purchases
-  //       SET
-  //         status = $1,
-  //         remarks =
-  //           CASE
-  //             WHEN jsonb_typeof(remarks) = 'array'
-  //               THEN remarks || $2::jsonb
-  //             ELSE jsonb_build_array(remarks) || $2::jsonb
-  //           END
-  //       WHERE id = $3 AND firm_id =$4
-  //       RETURNING *;
-  //       `;
+  const row = await executeInTransaction(client, queryText, values);
 
-  //   const values = [
-  //     0,
-  //     JSON.stringify(remark),
-  //     id, firm_id
-  //   ];
+  return row.rows[0];
+}
+async canDeleteSale(data: SaleDeleteParams, client: PoolClient) {
+  const { id, firm_id } = data;
 
-  //   const row = await executeInTransaction(client, queryText, values);
+  const result = await executeInTransaction(
+    client,
+    `SELECT 1 FROM sale_return 
+     WHERE sale_id = $1 
+     AND status = $2 
+     AND firm_id = $3`,
+    [id, 0, firm_id]
+  );
 
-  //   return row.rows[0];
-  // }
+  // ✅ FIX: check rows length
+  if (result.rows.length > 0) {
+    throw new AppError(
+      "Sale return already exists for this sale, cannot delete",
+      400
+    );
+  }
+
+  return true;
+}
 }

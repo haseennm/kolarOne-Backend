@@ -471,91 +471,97 @@ console.log(values)
       },
     };
   }
-  async deletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
-    const { id, remark, firm_id } = data;
-    const isPurchaseExist = await getRecord(
-      id,
-      "purchases",
-      "firm_id",
-      firm_id,
-      client
-    );
+ async deletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
+  const { id, remark, firm_id } = data;
 
-    if (!isPurchaseExist) {
-      throw new AppError("Purchase not found or already deleted", 404);
-    }
+  const isPurchaseExist = await getRecord(
+    id,
+    "purchases",
+    "firm_id",
+    firm_id,
+    client
+  );
 
-    // this.canDeletePurchase(data, client)
-    // if (!this.canDeletePurchase) {
-    //   throw new AppError("Can't delete purchase now ", 500)
-    // }
-    const queryText = `
-  UPDATE purchases p
-  SET
-    status = $1,
-    remarks =
-      CASE
-        WHEN jsonb_typeof(p.remarks) = 'array'
-          THEN p.remarks || $2::jsonb
-        ELSE jsonb_build_array(p.remarks) || $2::jsonb
-      END
-  FROM firm f
-  JOIN branches b ON f.branch_id = b.id
-  WHERE 
-    p.id = $3 
-    AND p.firm_id = $4
-    AND p.firm_id = f.id
-  RETURNING p.*, b.company_id;
-`;
-
-    const values = [
-      0,
-      JSON.stringify(remark),
-      id, firm_id
-    ];
-
-    const row = await executeInTransaction(client, queryText, values);
-
-    return row.rows[0];
+  if (!isPurchaseExist) {
+    throw new AppError("Purchase not found or already deleted", 404);
   }
-  // async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
-  //   const { id, firm_id } = data;
-  //   const isPurchaseExist = await getRecord(
-  //     id,
-  //     "purchases",
-  //     "firm_id",
-  //     firm_id,
-  //     client
-  //   );
 
-  //   if (!isPurchaseExist) {
-  //     throw new AppError("Purchase not found or already deleted", 404);
-  //   }
+  // ✅ IMPORTANT: await validation
+  await this.canDeletePurchase(data, client);
 
+  const queryText = `
+    UPDATE purchases p
+    SET
+      status = $1,
+      remarks =
+        CASE
+          WHEN p.remarks IS NULL THEN $2::jsonb
+          WHEN jsonb_typeof(p.remarks) = 'array'
+            THEN p.remarks || $2::jsonb
+          ELSE jsonb_build_array(p.remarks) || $2::jsonb
+        END
+    FROM firm f
+    JOIN branches b ON f.branch_id = b.id
+    WHERE 
+      p.id = $3 
+      AND p.firm_id = $4
+      AND p.firm_id = f.id
+    RETURNING p.*, b.company_id;
+  `;
 
+  const values = [
+    0,
+    JSON.stringify([remark]), // ensure array
+    id,
+    firm_id
+  ];
 
-  //   const queryText = `
-  //       UPDATE purchases
-  //       SET
-  //         status = $1,
-  //         remarks =
-  //           CASE
-  //             WHEN jsonb_typeof(remarks) = 'array'
-  //               THEN remarks || $2::jsonb
-  //             ELSE jsonb_build_array(remarks) || $2::jsonb
-  //           END
-  //       WHERE id = $3 AND firm_id =$4
-  //       RETURNING *;
-  //       `;
+  const row = await executeInTransaction(client, queryText, values);
 
-  //   const values = [
-  //     0,
-  //     JSON.stringify(remark),
-  //     id, firm_id
-  //   ];
+  return row.rows[0];
+}
+ async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
+  const { id, firm_id } = data;
 
-  //   const row = await executeInTransaction(client, queryText, values);
+  // ✅ 1. Check purchase_return exists
+  const purchaseReturn = await executeInTransaction(
+    client,
+    `SELECT 1 
+     FROM purchase_return 
+     WHERE purchase_id = $1 
+       AND status = $2 
+       AND firm_id = $3`,
+    [id, 0, firm_id]
+  );
 
-  //   return row.rows[0];
-  // }
+  if (purchaseReturn.rows.length > 0) {
+    throw new AppError(
+      "Purchase return already exists, cannot delete",
+      400
+    );
+  }
+
+  // ✅ 2. Check stock created from this purchase is used in sales
+  const stockUsedInSales = await executeInTransaction(
+    client,
+    `
+    SELECT 1
+    FROM stock s
+    JOIN sales_items si ON si.stock_id = s.id
+    WHERE s.purchase_id = $1
+      AND s.firm_id = $2
+    LIMIT 1
+    `,
+    [id, firm_id]
+  );
+
+  if (stockUsedInSales.rows.length > 0) {
+    throw new AppError(
+      "Stock from this purchase is already used in sales, cannot delete",
+      400
+    );
+  }
+
+  return true;
+}
 }

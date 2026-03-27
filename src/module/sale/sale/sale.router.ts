@@ -6,7 +6,6 @@ import {
   SaleFetchBody
 } from "./sale.types";
 import SaleController from "./sale.controller";
-import { format } from "node:path";
 
 export async function saleRouter(app: FastifyInstance) {
 

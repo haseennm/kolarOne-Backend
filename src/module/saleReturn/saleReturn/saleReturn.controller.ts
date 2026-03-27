@@ -202,16 +202,16 @@ export default class SaleReturnController {
 
   async saleReturnFetch(data: SaleReturnFetchParams) {
     const service = new SaleReturnService();
-    const salesWithCode = await service.fetchSaleReturn(data);
+    const sales_returnWithCode = await service.fetchSaleReturn(data);
 
-    const sales = salesWithCode.sale_returns.map((row) => ({
+    const sales_return = sales_returnWithCode.sale_returns.map((row) => ({
       ...row,
       status: getStatusText(row.status),
     }));
 
     return {
-      sales,
-      pagination: { ...salesWithCode.pagination }
+      sales_return,
+      pagination: { ...sales_returnWithCode.pagination }
     };
   }
   async fullSaleFetch(data: SaleReturnFetchParams) {

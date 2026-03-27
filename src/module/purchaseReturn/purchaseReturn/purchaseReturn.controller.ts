@@ -105,7 +105,7 @@ export default class PurchaseReturnController {
         client
       );
 
-      return `purchase ${purchase_return.return_number} has been created successfully.`;
+      return `purchase return ${purchase_return.return_number} has been created successfully.`;
     });
   }
   async purchaseReturnEdit(data: PurchaseReturnEditBody) {
@@ -206,22 +206,22 @@ export default class PurchaseReturnController {
         business_ref: "F"
       }, client)
 
-      return `purchase ${purchase_return.bill_number} has been created successfully.`;
+      return `purchase return ${purchase_return.bill_number} has been created successfully.`;
     });
   }
 
   async purchaseReturnFetch(data: PurchaseReturnFetchParams) {
     const service = new PurchaseReturnService();
-    const purchasesWithCode = await service.fetchReturnPurchase(data);
+    const purchases_returnWithCode = await service.fetchReturnPurchase(data);
 
-    const purchases = purchasesWithCode.purchaseReturns.map((row) => ({
+    const purchases_return = purchases_returnWithCode.purchaseReturns.map((row) => ({
       ...row,
       status: getStatusText(row.status),
     }));
 
     return {
-      purchases,
-      pagination: { ...purchasesWithCode.pagination }
+      purchases_return,
+      pagination: { ...purchases_returnWithCode.pagination }
     };
   }
   async fullPurchaseFetch(data: PurchaseReturnFetchParams) {
@@ -261,7 +261,7 @@ export default class PurchaseReturnController {
       // const partyBalanceService = new PartyBalanceController();
       const payment_transactions_service = new PaymentTransactionService()
 
-      const purchase = await purchaseService.deletePurchaseReturn({ remark, ...rest }, client);
+      const purchase_return = await purchaseService.deletePurchaseReturn({ remark, ...rest }, client);
       await itemService.deletePurchaseItem(
         {
           purchase_id: rest.id,
@@ -283,7 +283,7 @@ export default class PurchaseReturnController {
       //   client
       // );
       payment_transactions_service.deletePaymentTransaction({
-        company_id: purchase.company_id,
+        company_id: purchase_return.company_id,
         ref_id: rest.id,
         ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
       }, client)

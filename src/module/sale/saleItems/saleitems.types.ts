@@ -30,7 +30,8 @@ export interface EditSaleItemBody {
   status?: string;
   product_id?: number;
   stock_id?: number;
-  received_qty?: number;
+  saled_qty: number;
+  discount?: number;
   unit?: string;
   unit_price?: number;
   sub_total?: number;
@@ -38,6 +39,7 @@ export interface EditSaleItemBody {
   total_sgst?: number;
   total_cgst?: number;
   net_amount?: number;
+  final_amount?: number;
 }
 export interface EditSaleItemParams
   extends Omit<EditSaleItemBody, "status"> {
