@@ -56,7 +56,7 @@ export default class StaffService {
       }
 
       const firmIds = branchFirm.rows.map((f: any) => f.id);
-console.log(firmIds)
+      console.log(firmIds)
       const isFinger_exist = await executeInTransaction(
         client,
         `
@@ -75,7 +75,8 @@ console.log(firmIds)
     }
 
     // Check roles
-    for (const roleId of role) {
+   if(role){
+     for (const roleId of role) {
       const isRoleExist = await getRecord(
         roleId,
         "role",
@@ -88,6 +89,7 @@ console.log(firmIds)
         throw new AppError("One or more roles do not exist", 404);
       }
     }
+   }
 
     // Check entity
     const column = entity_type === "F" ? "branch_id" : "company_id";

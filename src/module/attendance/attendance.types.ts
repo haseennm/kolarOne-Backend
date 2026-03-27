@@ -2,6 +2,10 @@ export interface FingerprintAttendanceBody {
   fingerprint_id: string;
   branch_id: number;
 }
+export interface ManualAttendanceBody {
+  staff_id: string;
+  branch_id: number;
+}
 
 export interface StaffRow {
   id: number;

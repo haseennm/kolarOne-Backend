@@ -28,9 +28,9 @@ export async function salaryRouter(app: FastifyInstance) {
     },
     async (request: FastifyRequest<{ Body: GenerateSalaryBody }>, reply: FastifyReply) => {
       const controller = new SalaryController();
-       if (request.body.staff_ids.length === 0) {
-            throw new AppError("At least one staff member must be selected", 400);
-          }
+      if (request.body.staff_ids.length === 0) {
+        throw new AppError("At least one staff member must be selected", 400);
+      }
       const result = await controller.generateSalary(request.body);
 
       return reply.code(200).send({
@@ -40,52 +40,52 @@ export async function salaryRouter(app: FastifyInstance) {
     }
   );
 
-   app.post<{ Body: ConfirmSalary }>(
-      "/confirm",
-      {
-        schema: {
-          body: {
-            type: "object",
-            required: ["r_id", "branch_id", "updated_by","status","final_salary"],
-            properties: {
-  
-              r_id: {
-                type: "number"
-              },
-  
-              branch_id: {
-                type: "number"
-              },
-              final_salary: {
-                type: "number"
-              },
-              payment_method_id: {
-                type: "number"
-              },
-  
-              status: {
-                type: "string",
-                enum: ["Paid", "Confirm"]
-              }
-  
+  app.post<{ Body: ConfirmSalary }>(
+    "/confirm",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["r_id", "branch_id", "updated_by", "status", "final_salary"],
+          properties: {
+
+            r_id: {
+              type: "number"
+            },
+
+            branch_id: {
+              type: "number"
+            },
+            final_salary: {
+              type: "number"
+            },
+            payment_method_id: {
+              type: "number"
+            },
+
+            status: {
+              type: "string",
+              enum: ["Paid", "Confirm"]
             }
+
           }
         }
-      },
-      async (
-        request: FastifyRequest<{ Body: ConfirmSalary }>,
-        reply: FastifyReply
-      ) => {
-  
-        const controller = new SalaryController();
-        const data = await controller.confimSalary(request.body);
-  
-        return reply.code(200).send({
-          status: "Success",
-          message: data
-        });
-  
       }
-    );
-  
+    },
+    async (
+      request: FastifyRequest<{ Body: ConfirmSalary }>,
+      reply: FastifyReply
+    ) => {
+
+      const controller = new SalaryController();
+      const data = await controller.confimSalary(request.body);
+
+      return reply.code(200).send({
+        status: "Success",
+        message: data
+      });
+
+    }
+  );
+
 }

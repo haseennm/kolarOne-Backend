@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import AttendanceController from "./attendance.controller";
-import { DailyAttendanceBody, DeleteHoliday, FingerprintAttendanceBody, HolidayListBody, MarkHolidayBody, MonthlyAttendanceBody } from "./attendance.types";
+import { DailyAttendanceBody, DeleteHoliday, FingerprintAttendanceBody, HolidayListBody, ManualAttendanceBody, MarkHolidayBody, MonthlyAttendanceBody } from "./attendance.types";
 
 export async function attendanceRouter(app: FastifyInstance) {
 
@@ -40,6 +40,42 @@ export async function attendanceRouter(app: FastifyInstance) {
       });
     }
   );
+  app.post<{ Body: ManualAttendanceBody }>(
+    "/manual",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["staff_id", "branch_id"],
+          properties: {
+
+            staff_id: {
+              type: "string"
+            },
+
+            branch_id: {
+              type: "number"
+            }
+
+          }
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: ManualAttendanceBody }>,
+      reply: FastifyReply
+    ) => {
+
+      const controller = new AttendanceController();
+
+      const data = await controller.manualAttendance(request.body);
+
+      return reply.code(200).send({
+        status: "Success",
+        ...data
+      });
+    }
+  );
   app.post<{ Body: MarkHolidayBody }>(
     "/mark/holiday",
     {
@@ -58,7 +94,7 @@ export async function attendanceRouter(app: FastifyInstance) {
             },
 
             created_by: {
-              type: "number"
+              type: "string"
             },
             company_id: {
               type: "number"

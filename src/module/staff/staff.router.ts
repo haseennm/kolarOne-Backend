@@ -23,9 +23,9 @@ export async function staffRouter(app: FastifyInstance) {
             "entity_type",
             "entity_id",
             "email",
-            "password",
+            // "password",
             "full_name",
-            "role",
+            // "role",
             "created_by"
           ],
           properties: {

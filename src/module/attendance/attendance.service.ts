@@ -116,6 +116,115 @@ export default class AttendanceService {
 
     throw new AppError("Attendance already completed for today", 400);
   }
+  async manualAttendance(
+    staff_id: string,
+    branch_id: number,
+    today: string,
+    client: any
+  ) {
+
+    const staff = await executeInTransaction<StaffRow>(
+      client,
+      `
+      SELECT *
+      FROM staff
+      WHERE id = $1
+      AND status != $2
+      `,
+      [staff_id, 0]
+    );
+    cns("staff", staff.rows[0])
+    if (staff.rows.length === 0) {
+      throw new AppError("Cannot find staff", 404);
+    }
+
+    const staff_name = staff.rows[0].full_name;
+    const entity_type = staff.rows[0].entity_type;
+    const entity_id = staff.rows[0].entity_id;
+    let match_branch_id: number | null = null;
+    cns("Values", [staff_id, staff_name, entity_type, entity_id])
+    if (entity_type === "B") {
+      match_branch_id = entity_id;
+    }
+
+    if (entity_type === "F") {
+
+      const branchFirm = await executeInTransaction(
+        client,
+        `
+    SELECT branch_id
+    FROM firm
+    WHERE id = $1
+    `,
+        [entity_id]
+      );
+
+      if (branchFirm.rowCount === 0) {
+        throw new AppError("Firm not found", 404);
+      }
+
+      cns("branchFirm.rows[0]", branchFirm.rows[0])
+      match_branch_id = branchFirm.rows[0].branch_id;
+    }
+
+    if (Number(match_branch_id) !== Number(branch_id)) {
+      cns("Validate match", [match_branch_id, branch_id])
+
+      throw new AppError("Branch mismatch for this staff", 403);
+    }
+    const attendance = await executeInTransaction<AttendanceRow>(
+      client,
+      `
+      SELECT id,in_time,out_time
+      FROM attendance
+      WHERE staff_id = $1
+      AND attendance_date = $2
+      AND branch_id = $3
+      LIMIT 1
+      `,
+      [staff_id, today, branch_id]
+    );
+
+    if (attendance.rows.length === 0) {
+
+      await executeInTransaction(
+        client,
+        `
+        INSERT INTO attendance
+        (
+          staff_id,
+          attendance_date,
+          in_time,
+          source,
+          branch_id,
+          created_by
+        )
+        VALUES ($1,$2,NOW(),'MANUAL',$3,$4)
+        `,
+        [staff_id, today, branch_id, staff_id]
+      );
+
+      return { msg: `${staff_name} Check IN` };
+    }
+
+    if (attendance.rows[0].out_time === null) {
+      await executeInTransaction(
+        client,
+        `
+        UPDATE attendance
+        SET out_time = NOW()
+        WHERE id = $1
+        AND staff_id = $2
+        AND branch_id = $3
+        `,
+        [attendance.rows[0].id, staff_id, branch_id]
+      );
+      return { msg: `${staff_name} Check OUT` };
+
+    }
+
+    throw new AppError("Attendance already completed for today", 400);
+  }
   async markHoliday(
     data: MarkHolidayBody,
     holidayDate: string,

@@ -12,6 +12,7 @@ export default class LedgerTransactionController {
   async createStaff(data: CreateStaffBody) {
 
     let { created_by, status, entity_type, password, ...rest } = data;
+      console.log("first con")
 
     const remark = {
       action: "Created",
@@ -20,7 +21,8 @@ export default class LedgerTransactionController {
     };
 
     return transaction(async (client) => {
-      const hashed = await hashPassword(password)
+      let hashed = undefined
+      if (password) { hashed = await hashPassword(password) }
 
       const statusCode = getStatusCode(status);
       entity_type = convertEntityType(entity_type as EntityKey);
@@ -47,10 +49,10 @@ export default class LedgerTransactionController {
 
     const staff_with_code = await service.fetchStaff(data);
 
-    const staff = staff_with_code.staff.map((row) => ({
-      ...row,
-      status: getStatusText(row.status),
-    }));
+   const staff = staff_with_code.staff.map(({ password_hash, ...rest }) => ({
+  ...rest,
+  status: getStatusText(rest.status),
+}));
 
     return {
       staff,

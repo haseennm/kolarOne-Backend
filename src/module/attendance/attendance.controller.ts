@@ -1,7 +1,7 @@
 import { transaction } from "../../config/db";
 import { isValidDay } from "../../utils/extra";
 import AttendanceService from "./attendance.service";
-import { DailyAttendanceBody, DeleteHoliday, FingerprintAttendanceBody, HolidayListBody, MarkHolidayBody, MonthlyAttendanceBody } from "./attendance.types";
+import { DailyAttendanceBody, DeleteHoliday, FingerprintAttendanceBody, HolidayListBody, ManualAttendanceBody, MarkHolidayBody, MonthlyAttendanceBody } from "./attendance.types";
 
 export default class AttendanceController {
 
@@ -23,6 +23,30 @@ export default class AttendanceController {
 
       return service.fingerprintAttendance(
         fingerprint_id,
+        branch_id,
+        today,
+        client
+      );
+    });
+  }
+  async manualAttendance(data: ManualAttendanceBody) {
+
+    const { staff_id, branch_id } = data;
+
+    if (!staff_id) {
+      throw new Error("staff_id required");
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    return transaction(async (client) => {
+
+      await isValidDay(client, today, branch_id);
+
+      const service = new AttendanceService();
+
+      return service.manualAttendance(
+        staff_id,
         branch_id,
         today,
         client

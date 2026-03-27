@@ -1,7 +1,7 @@
 export interface CreateStaffBody {
-  role: number[];
+  role?: number[];
   email: string;
-  password: string;
+  password?: string;
 
   full_name: string;
 
@@ -20,7 +20,7 @@ export interface CreateStaffBody {
 
 export interface CreateStaffParams
   extends Omit<CreateStaffBody, "password" | "status" | "created_by"> {
-  password_hash: string;
+  password_hash?: string;
   remark: object;
   statusCode: number;
   entity_table: string
