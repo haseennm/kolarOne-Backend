@@ -31,6 +31,11 @@ export interface SalaryGenerationRow {
   full_name: string;        // from join
 }
 
+export interface GetSalaryBody {
+  salary_month: string;
+  branch_id: number;
+  staff_ids?: string[];
+}
 export interface GenerateSalaryResponse {
   status: "Success";
   data: SalaryGenerationRow[];
@@ -42,11 +47,11 @@ export interface ConfirmSalary {
   final_salary: number;
   updated_by: string;
   status: string;
-  payment_method_id?:number;
-  transaction_reference?:string;
+  payment_method_id?: number;
+  transaction_reference?: string;
 }
 export interface ConfirmSalaryParams
-  extends Omit<ConfirmSalary, "status"|"updated_by"> {
+  extends Omit<ConfirmSalary, "status" | "updated_by"> {
   statusCode: number;
-  remark:object;
+  remark: object;
 }

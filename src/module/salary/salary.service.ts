@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { AppError } from "../../utils/AppError";
 import { executeInTransaction } from "../../config/db";
-import { ConfirmSalaryParams, CreateSalaryParams, GenerateSalaryBody, SalaryGenerationRow } from "./salary.types";
+import { ConfirmSalaryParams, CreateSalaryParams, GenerateSalaryBody, GetSalaryBody, SalaryGenerationRow } from "./salary.types";
 import { getRecord } from "../../utils/extra";
 
 const FULL_DAY_MINUTES = 360;
@@ -277,5 +277,35 @@ GROUP BY staff_id
       data: rows[0],
       company_id
     };
+  }
+  async getSalary(
+    data: GetSalaryBody,
+    client: PoolClient
+  ): Promise<SalaryGenerationRow[]> {
+
+    const { salary_month, branch_id, staff_ids } = data;
+    let query = `
+    SELECT 
+      sg.*,
+      s.full_name
+    FROM salary_generations sg
+    JOIN staff s ON sg.staff_id = s.id
+    WHERE sg.salary_month = $1
+      AND sg.branch_id = $2
+  `;
+
+    const params: any[] = [salary_month, branch_id];
+
+    // Optional filter by staff_ids
+    if (staff_ids && staff_ids.length > 0) {
+      query += ` AND sg.staff_id = ANY($3)`;
+      params.push(staff_ids);
+    }
+
+    query += ` ORDER BY s.full_name ASC`;
+
+    const result = await executeInTransaction(client, query, params);
+
+    return result.rows as SalaryGenerationRow[];
   }
 }

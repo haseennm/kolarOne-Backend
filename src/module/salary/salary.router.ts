@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import SalaryController from "./salary.controller";
-import { ConfirmSalary, GenerateSalaryBody } from "./salary.types";
+import { ConfirmSalary, GenerateSalaryBody, GetSalaryBody } from "./salary.types";
 import { AppError } from "../../utils/AppError";
 
 export async function salaryRouter(app: FastifyInstance) {
@@ -87,5 +87,42 @@ export async function salaryRouter(app: FastifyInstance) {
 
     }
   );
+ app.post<{ Body: GetSalaryBody }>(
+  "/get",
+  {
+    schema: {
+      body: {
+        type: "object",
+        required: ["salary_month", "branch_id"],
+        properties: {
+          salary_month: {
+            type: "string"
+          },
+          branch_id: {
+            type: "number"
+          },
+          staff_ids: { 
+            type: "array",
+            items: {
+              type: "number"
+            }
+          }
+        }
+      }
+    }
+  },
+  async (
+    request: FastifyRequest<{ Body: GetSalaryBody }>,
+    reply: FastifyReply
+  ) => {
+    const controller = new SalaryController();
+    const data = await controller.getSalary(request.body);
+
+    return reply.code(200).send({
+      status: "Success",
+      message: data
+    });
+  }
+);
 
 }

@@ -3,7 +3,7 @@ import { AppError } from "../../utils/AppError";
 import { convertEntityType, EntityKey, getStatusCode, PaymentTransactionTypeCodeMap } from "../../utils/extra";
 import { PaymentTransactionService } from "../paymentTransaction/paymenttransaction.services";
 import SalaryService from "./salary.service";
-import { ConfirmSalary, GenerateSalaryBody } from "./salary.types";
+import { ConfirmSalary, GenerateSalaryBody, GetSalaryBody } from "./salary.types";
 
 export default class SalaryController {
   async generateSalary(data: GenerateSalaryBody) {
@@ -78,6 +78,24 @@ export default class SalaryController {
       }
 
       return `Salary ${status} successfully. Amount: ${rest.final_salary}`;
+    });
+  }
+  async getSalary(data: GetSalaryBody) {
+
+   
+
+    return transaction(async (client) => {
+
+   
+      const service = new SalaryService();
+
+      const salary = await service.getSalary(
+        data,
+        client
+      );
+    
+
+      return salary;
     });
   }
 }
