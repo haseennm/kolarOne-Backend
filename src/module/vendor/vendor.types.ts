@@ -84,3 +84,12 @@ export interface DeleteVendorParams
   extends Omit<DeleteVendorBody, "deleted_by"> {
   remark: object;
 }
+
+export type GetVendorReportBody = {
+  level: "firm" | "branch" | "company";
+  firm_id?: number;
+  branch_id?: number;
+  company_id?: number;
+  start_date?: string;
+  end_date?: string;
+};

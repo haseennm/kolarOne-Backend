@@ -3,6 +3,7 @@ import {
   CreateLoanBody,
   DeleteLoanBody,
   FetchLoanBody,
+  GetReportBody,
   RepayLoanBody
 } from "./loan.types";
 import LoanController from "./loan.controller";
@@ -124,8 +125,6 @@ export async function loanRouter(app: FastifyInstance) {
     }
   );
 
-
-
   // REPAY LOAN
   app.post<{ Body: RepayLoanBody }>(
     "/repay",
@@ -175,8 +174,6 @@ export async function loanRouter(app: FastifyInstance) {
     }
   );
 
-
-
   // DELETE LOAN
   app.post<{ Body: DeleteLoanBody }>(
     "/delete",
@@ -222,4 +219,42 @@ export async function loanRouter(app: FastifyInstance) {
     }
   );
 
+  app.post<{ Body: GetReportBody }>(
+  "/report",
+  {
+    schema: {
+      body: {
+        type: "object",
+        required: ["level"],
+        properties: {
+          level: {
+            type: "string",
+            enum: ["branch", "company"]
+          },
+          branch_id: { type: ["number", "null"] },
+          company_id: { type: ["number", "null"] },
+          start_date: {
+            type: ["string", "null"],
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          end_date: {
+            type: ["string", "null"],
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        }
+      }
+    }
+  },
+  async (request, reply) => {
+
+    const controller = new LoanController();
+
+    const data = await controller.getLoanReport(request.body);
+
+    return reply.code(200).send({
+      status: "Success",
+      data
+    });
+  }
+);
 }

@@ -243,3 +243,38 @@ export function isFutureDay(date: string | Date): boolean {
 
   return targetDay > today;
 }
+export const getFirstDayOfCurrentMonth = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+};
+
+export const getLastDayOfCurrentMonth = (): string => {
+  const d = new Date();
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+};
+
+export const getFirstDayOfCurrentYear = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-01-01`;
+};
+
+export const getLastDayOfCurrentYear = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-12-31`;
+};
+export function isValidDateFormat(date: string): boolean {
+  if (!date) return false;
+
+  const regex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!regex.test(date)) return false;
+
+  const [year, month, day] = date.split("-").map(Number);
+  const d = new Date(year, month - 1, day);
+
+  return (
+    d.getFullYear() === year &&
+    d.getMonth() === month - 1 &&
+    d.getDate() === day
+  );
+}

@@ -12,6 +12,7 @@ import { ledgerCategoryRouter } from './module/ledgerCategory/ledgerCategory.rou
 import { ledgerTransactionRouter } from './module/ledgertransaction/ledgertransaction.router'
 import { paymentMethodRouter } from './module/paymentmethod/paymentMethod.router'
 import { roleRouter } from './module/role/role.router'
+import { stockRouter } from './module/stock/stock.router'
 import { staffRouter } from './module/staff/staff.router'
 import { attendanceRouter } from './module/attendance/attendance.router'
 import { salaryRouter } from './module/salary/salary.router'
@@ -42,6 +43,7 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(attendanceRouter, { prefix: '/attendance' })
   app.register(salaryRouter, { prefix: '/salary' })
   app.register(loanRouter, { prefix: '/loan' })
+  app.register(stockRouter, { prefix: '/stock' })
   app.register(partnerRouter, { prefix: '/partner/personal/info' })
   app.register(profitShareRouter, { prefix: '/partner/profit/info' })
   app.register(partnerLedgerRouter, { prefix: '/partner/ledger/info' })

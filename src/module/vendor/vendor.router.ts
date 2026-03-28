@@ -4,7 +4,8 @@ import {
   CreateVendorBody,
   DeleteVendorBody,
   EditVendorBody,
-  FetchVendorBody
+  FetchVendorBody,
+  GetVendorReportBody
 } from "./vendor.types";
 import { cns } from "../../utils/extra";
 
@@ -279,4 +280,59 @@ export async function vendorRouter(app: FastifyInstance) {
     }
   );
 
+  app.post<{ Body: GetVendorReportBody }>(
+  "/reports",
+  {
+    schema: {
+      body: {
+        type: "object",
+        required: ["level"],
+        properties: {
+          level: {
+            type: "string",
+            enum: ["firm", "branch", "company"]
+          },
+
+          firm_id: {
+            type: ["number", "null"]
+          },
+
+          branch_id: {
+            type: ["number", "null"]
+          },
+
+          company_id: {
+            type: ["number", "null"]
+          },
+
+          start_date: {
+            type: ["string", "null"],
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+
+          end_date: {
+            type: ["string", "null"],
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        }
+      }
+    }
+  },
+  async (
+    request: FastifyRequest<{ Body: GetVendorReportBody }>,
+    reply: FastifyReply
+  ) => {
+
+    cns(request.url, request.body);
+
+    const controller = new VendorController();
+
+    const report = await controller.getVendorReport(request.body);
+
+    return reply.code(200).send({
+      status: "Success",
+      data: report
+    });
+  }
+);
 }

@@ -344,49 +344,49 @@ export default class StockService {
     let values: any[] = [];
 
     values.push(0);
-    where.push(`status != $${values.length}`);
+    where.push(`s.status != $${values.length}`);
 
     if (filters?.id) {
       values.push(filters.id);
-      where.push(`id = $${values.length}`);
+      where.push(`s.id = $${values.length}`);
     }
 
     if (filters?.firm_id) {
       values.push(filters.firm_id);
-      where.push(`firm_id = $${values.length}`);
+      where.push(`s.firm_id = $${values.length}`);
     }
 
     if (filters?.branch_id) {
       values.push(filters.branch_id);
-      where.push(`branch_id = $${values.length}`);
+      where.push(`s.branch_id = $${values.length}`);
     }
 
     values.push(filters.company_id);
-    where.push(`company_id = $${values.length}`);
+    where.push(`b.company_id = $${values.length}`);
 
     if (filters?.status !== undefined) {
       values.push(filters.status);
-      where.push(`status = $${values.length}`);
+      where.push(`s.status = $${values.length}`);
     }
 
     if (filters?.available_qty_min !== undefined) {
       values.push(filters.available_qty_min);
-      where.push(`available_quantity >= $${values.length}`);
+      where.push(`s.available_quantity >= $${values.length}`);
     }
 
     if (filters?.available_qty_max !== undefined) {
       values.push(filters.available_qty_max);
-      where.push(`available_quantity <= $${values.length}`);
+      where.push(`s.available_quantity <= $${values.length}`);
     }
 
     if (filters?.purchased_qty_min !== undefined) {
       values.push(filters.purchased_qty_min);
-      where.push(`purchased_qty >= $${values.length}`);
+      where.push(`s.purchased_qty >= $${values.length}`);
     }
 
     if (filters?.purchased_qty_max !== undefined) {
       values.push(filters.purchased_qty_max);
-      where.push(`purchased_qty <= $${values.length}`);
+      where.push(`s.purchased_qty <= $${values.length}`);
     }
 
     if (filters?.search) {
@@ -405,9 +405,10 @@ export default class StockService {
     const stockQuery = `
   SELECT 
     s.*, 
-    p.product_name
+    p.name
   FROM stock s
   LEFT JOIN products p ON s.product_id = p.id
+  LEFT JOIN branches b ON s.branch_id = b.id   -- ✅ ADD THIS
   ${whereClause}
   ORDER BY ${sortBy} ${sortOrder}
   LIMIT $${values.length + 1}
@@ -415,10 +416,12 @@ export default class StockService {
 `;
 
     const countQuery = `
-    SELECT COUNT(*)
-    FROM stock
-    ${whereClause}
-  `;
+  SELECT COUNT(*)
+  FROM stock s
+  LEFT JOIN products p ON s.product_id = p.id
+  LEFT JOIN branches b ON s.branch_id = b.id
+  ${whereClause}
+`;
     const limit = filters.limit ?? 50
     const stocks = await query(stockQuery, [
       ...values,

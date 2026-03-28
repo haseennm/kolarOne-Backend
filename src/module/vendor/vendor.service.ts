@@ -1,5 +1,5 @@
 import { query, transaction, executeInTransaction } from "../../config/db";
-import { getRecord } from "../../utils/extra";
+import { getFirstDayOfCurrentMonth, getFirstDayOfCurrentYear, getLastDayOfCurrentMonth, getLastDayOfCurrentYear, getRecord } from "../../utils/extra";
 import { AppError } from "../../utils/AppError";
 import {
   CountResult,
@@ -250,5 +250,204 @@ export default class VendorService {
     });
 
     return result;
+  }
+  async getVendorReportSummary(data: {
+    level: "firm" | "branch" | "company";
+    firm_id?: number;
+    branch_id?: number;
+    company_id?: number;
+    start_date?: string;
+    end_date?: string;
+  }) {
+
+    const { level, firm_id, branch_id, company_id, start_date, end_date } = data;
+
+    return transaction(async (clinet) => {
+
+      let firmIds: number[] = [];
+
+      /* ================= GET FIRM IDS ================= */
+
+      if (level === "firm") {
+        firmIds = [firm_id!];
+      }
+
+      if (level === "branch") {
+        const firms = await executeInTransaction(
+          clinet,
+          `SELECT id FROM firm WHERE branch_id = $1`,
+          [branch_id]
+        );
+        firmIds = firms.rows.map((f: any) => f.id);
+      }
+
+      if (level === "company") {
+        const firms = await executeInTransaction(
+          clinet,
+          `
+  SELECT f.id
+  FROM firm f
+  JOIN branches b ON b.id = f.branch_id
+  WHERE b.company_id = $1
+  `,
+          [company_id]
+        );
+        firmIds = firms.rows.map((f: any) => f.id);
+      }
+      if (!firmIds.length) {
+        return {};
+      }
+
+      /* ================= MAIN REPORT ================= */
+
+      const report = await this.getVendorReportByFirms(
+        clinet,
+        firmIds,
+        start_date,
+        end_date
+      );
+
+      /* ================= COMPANY EXTRA ================= */
+
+      if (level === "company") {
+
+        const branchWise = await executeInTransaction(
+          clinet,
+          `
+        SELECT 
+          b.id AS branch_id,
+          b.branch_name,
+          SUM(p.final_amount) AS total_purchase
+        FROM branches b
+        JOIN firm f ON f.branch_id = b.id
+        JOIN purchases p ON p.firm_id = f.id
+        WHERE b.company_id = $1
+        GROUP BY b.id
+        `,
+          [company_id]
+        );
+
+        const firmWise = await executeInTransaction(
+          clinet,
+          `
+        SELECT 
+          f.id AS firm_id,
+          f.firm_name,
+          SUM(p.final_amount) AS total_purchase
+        FROM firm f
+        JOIN purchases p ON p.firm_id = f.id
+        WHERE f.id= ANY($1)
+        GROUP BY f.id
+        `,
+          [firmIds]
+        );
+
+        return {
+          overall: report,
+          branch_wise: branchWise.rows,
+          firm_wise: firmWise.rows
+        };
+      }
+
+      return report;
+    });
+  }
+
+  private async getVendorReportByFirms(
+    clinet: any,
+    firmIds: number[],
+    startDate?: string,
+    endDate?: string
+  ) {
+
+    const hasDate = Boolean(startDate && endDate);
+
+    const purchaseDate = hasDate
+      ? `AND p.bill_date BETWEEN ? AND ?`
+      : "";
+
+    const returnDate = hasDate
+      ? `AND pr.return_date BETWEEN ? AND ?`
+      : "";
+
+    const params = hasDate
+      ? [firmIds, startDate, endDate, firmIds]
+      : [firmIds, firmIds];
+
+    /* ================= PURCHASE ================= */
+
+    const purchaseMostSpent = await executeInTransaction(
+      clinet,
+      `
+  SELECT 
+    v.id AS vendor_id,
+    v.vendor_name,
+    SUM(p.final_amount) AS total_spent
+  FROM vendors v
+  JOIN purchases p 
+    ON p.vendor_id = v.id
+   AND p.status = 4
+   AND p.firm_id = ANY($1)
+  GROUP BY v.id
+  ORDER BY total_spent DESC
+  `,
+      [firmIds]
+    );
+
+    /* ================= RETURN ================= */
+
+    const returnMostAmount = await executeInTransaction(
+      clinet,
+      `
+    SELECT 
+      v.id AS vendor_id,
+      v.vendor_name,
+      SUM(pr.final_amount) AS return_amount
+    FROM vendors v
+    JOIN purchases p ON p.vendor_id = v.id
+    JOIN purchase_return pr 
+      ON pr.purchase_id = p.id
+     AND pr.status != 0
+     AND pr.firm_id = ANY($1)
+     ${returnDate}
+    GROUP BY v.id
+    ORDER BY return_amount DESC
+    `,
+      [firmIds]
+    );
+
+    /* ================= NET ================= */
+
+    const netAmount = await executeInTransaction(
+      clinet,
+      `
+  SELECT 
+    v.id,
+    v.vendor_name,
+    COALESCE(SUM(p.final_amount),0) - COALESCE(SUM(pr.final_amount),0) AS net_amount
+  FROM vendors v
+  LEFT JOIN purchases p 
+    ON p.vendor_id = v.id
+   AND p.firm_id = ANY($1)
+  LEFT JOIN purchase_return pr 
+    ON pr.purchase_id = p.id
+   AND pr.firm_id = ANY($2)
+  GROUP BY v.id
+  ORDER BY net_amount DESC
+  `,
+      [firmIds, firmIds]
+    );
+
+    return {
+      purchase_only: {
+        most_spent: purchaseMostSpent.rows
+      },
+      return_only: {
+        most_amount: returnMostAmount.rows
+      },
+      purchase_plus_return: {
+        most_amount: netAmount.rows
+      }
+    };
   }
 }

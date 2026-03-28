@@ -6,7 +6,7 @@ export interface CreateLoanBody {
   created_by: string
 }
 export interface CreateLoanParams
-  extends Omit<CreateLoanBody, "status" |"created_by"> {
+  extends Omit<CreateLoanBody, "status" | "created_by"> {
   statusCode: number;
   remark: object
 }
@@ -27,6 +27,13 @@ export interface FetchLoanBody {
 
   page: number,
   limit: number
+}
+export interface GetReportBody {
+  level: "branch" | "company";
+  branch_id?: number;
+  company_id?: number;
+  start_date?: string;
+  end_date?: string;
 }
 export interface FetchLoanParams {
   offset: number;
@@ -58,23 +65,23 @@ export interface EditLoanParams
   extends Omit<EditLoanBody, "status"> {
   statusCode: number;
 }
-export interface RepayLoanBody{
-  loan_id:number;
-  company_id:number;
-  branch_id:number;
-  pay_amount :number
-  updated_by:string
+export interface RepayLoanBody {
+  loan_id: number;
+  company_id: number;
+  branch_id: number;
+  pay_amount: number
+  updated_by: string
 }
 export interface RepayLoanParams extends Omit<RepayLoanBody, "updated_by"> {
-  remarks:object;
-  
+  remarks: object;
+
 }
 export interface DeleteLoanBody {
   id: number;
-  delete_by:string
+  delete_by: string
   branch_id: number;
   company_id: number;
 }
 export interface DeleteLoanParams extends Omit<DeleteLoanBody, "delete_by"> {
-  remark:object
+  remark: object
 }

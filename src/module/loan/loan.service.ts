@@ -276,4 +276,208 @@ export default class LoanService {
     return rows[0];
 
   }
+
+   async getLoanReport(data: {
+    level: "branch" | "company";
+    branch_id?: number;
+    company_id?: number;
+    start_date?: string;
+    end_date?: string;
+  }) {
+
+    const { level, branch_id, company_id, start_date, end_date } = data;
+
+    return transaction(async (client) => {
+
+      let branchIds: number[] = [];
+
+      /* ================= RESOLVE BRANCH IDS ================= */
+
+      if (level === "branch") {
+        branchIds = [branch_id!];
+      }
+
+      if (level === "company") {
+        const branches = await executeInTransaction(
+          client,
+          `SELECT id FROM branches WHERE company_id = $1`,
+          [company_id]
+        );
+
+        branchIds = branches.rows.map((b: any) => b.id);
+      }
+
+      if (!branchIds.length) return {};
+
+      /* ================= DATE FILTER ================= */
+
+      const paramsBase = [
+        branchIds,
+        start_date ?? null,
+        end_date ?? null
+      ];
+
+      const dateFilter = `
+        AND (
+          $2::date IS NULL OR $3::date IS NULL OR
+          TO_TIMESTAMP(
+            (
+              SELECT (elem->>'created_at')::BIGINT
+              FROM jsonb_array_elements(
+  CASE 
+    WHEN jsonb_typeof(l.remarks) = 'array' THEN l.remarks
+    ELSE jsonb_build_array(l.remarks)
+  END
+) elem
+              WHERE elem ? 'created_at'
+              LIMIT 1
+            ) / 1000
+          ) BETWEEN $2 AND $3
+        )
+      `;
+
+      /* ================= SUMMARY ================= */
+
+      const summary = await executeInTransaction(
+        client,
+        `
+        SELECT
+          COALESCE(SUM(l.loan_amount), 0) AS total_loan_amount,
+          COALESCE(SUM(l.loan_amount - l.balance_amount), 0) AS total_received_amount,
+          COALESCE(SUM(l.balance_amount), 0) AS total_difference
+        FROM staff_loans l
+        WHERE l.branch_id = ANY($1)
+        ${dateFilter}
+        `,
+        paramsBase
+      );
+
+      /* ================= STAFF COUNT ================= */
+
+      const staffCount = await executeInTransaction(
+        client,
+        `
+        SELECT COUNT(DISTINCT l.staff_id) AS staff_count
+        FROM staff_loans l
+        WHERE l.branch_id = ANY($1)
+        ${dateFilter}
+        `,
+        paramsBase
+      );
+
+      /* ================= HIGHEST BALANCE ================= */
+
+      const highestBalance = await executeInTransaction(
+        client,
+        `
+        SELECT s.full_name, SUM(l.balance_amount) AS balance
+        FROM staff_loans l
+        JOIN staff s ON s.id = l.staff_id
+        WHERE l.branch_id = ANY($1)
+        GROUP BY l.staff_id, s.full_name
+        ORDER BY balance DESC
+        LIMIT 1
+        `,
+        [branchIds]
+      );
+
+      /* ================= BIGGEST LOAN ================= */
+
+      const biggestLoan = await executeInTransaction(
+        client,
+        `
+        SELECT s.full_name, MAX(l.loan_amount) AS max_loan
+        FROM staff_loans l
+        JOIN staff s ON s.id = l.staff_id
+        WHERE l.branch_id = ANY($1)
+        GROUP BY l.staff_id, s.full_name
+        ORDER BY max_loan DESC
+        LIMIT 1
+        `,
+        [branchIds]
+      );
+
+      /* ================= DEFAULTERS ================= */
+
+      const defaulters = await executeInTransaction(
+        client,
+        `
+        SELECT
+          s.full_name,
+          l.loan_amount,
+          l.balance_amount,
+          TO_TIMESTAMP(
+            (
+              SELECT (elem->>'created_at')::BIGINT
+              FROM jsonb_array_elements(
+  CASE 
+    WHEN jsonb_typeof(l.remarks) = 'array' THEN l.remarks
+    ELSE jsonb_build_array(l.remarks)
+  END
+) elem
+              WHERE elem ? 'created_at'
+              LIMIT 1
+            ) / 1000
+          ) AS created_at
+        FROM staff_loans l
+        JOIN staff s ON s.id = l.staff_id
+        WHERE l.branch_id = ANY($1)
+          AND l.balance_amount > 0
+          AND TO_TIMESTAMP(
+            (
+              SELECT (elem->>'created_at')::BIGINT
+              FROM jsonb_array_elements(
+  CASE 
+    WHEN jsonb_typeof(l.remarks) = 'array' THEN l.remarks
+    ELSE jsonb_build_array(l.remarks)
+  END
+) elem
+              WHERE elem ? 'created_at'
+              LIMIT 1
+            ) / 1000
+          ) <= NOW() - INTERVAL '3 months'
+        `,
+        [branchIds]
+      );
+
+      /* ================= COMPANY EXTRA ================= */
+
+      if (level === "company") {
+
+        const branchWise = await executeInTransaction(
+          client,
+          `
+          SELECT 
+            b.id AS branch_id,
+            b.branch_name,
+            COALESCE(SUM(l.loan_amount),0) AS total_loan
+          FROM branches b
+          LEFT JOIN staff_loans l ON l.branch_id = b.id
+          WHERE b.id = ANY($1)
+          GROUP BY b.id
+          `,
+          [branchIds]
+        );
+
+        return {
+          summary: summary.rows[0],
+          staff_count: Number(staffCount.rows[0].staff_count),
+          highest_balance_holder: highestBalance.rows[0] || null,
+          biggest_loan_taker: biggestLoan.rows[0] || null,
+          defaulters: defaulters.rows,
+          branch_wise: branchWise.rows
+        };
+      }
+
+      /* ================= FINAL RESPONSE ================= */
+
+      return {
+        summary: summary.rows[0],
+        staff_count: Number(staffCount.rows[0].staff_count),
+        highest_balance_holder: highestBalance.rows[0] || null,
+        biggest_loan_taker: biggestLoan.rows[0] || null,
+        defaulters: defaulters.rows
+      };
+    });
+  }
 }

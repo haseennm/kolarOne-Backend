@@ -1,4 +1,5 @@
-import { getStatusCode, getStatusText } from "../../utils/extra";
+import { AppError } from "../../utils/AppError";
+import { getStatusCode, getStatusText, isValidDateFormat } from "../../utils/extra";
 import VendorService from "./vendor.service";
 import {
   CreateVendorBody,
@@ -91,6 +92,61 @@ export default class VendorController {
     return service.deleteVendor({
       ...rest,
       remark
+    });
+  }
+  async getVendorReport(data: {
+    level: "firm" | "branch" | "company";
+    firm_id?: number;
+    branch_id?: number;
+    company_id?: number;
+    start_date?: string;
+    end_date?: string;
+  }) {
+
+    const {
+      level,
+      firm_id,
+      branch_id,
+      company_id,
+      start_date,
+      end_date
+    } = data;
+
+    /* ================= VALIDATION ================= */
+
+    if (!level) {
+      throw new AppError("level is required", 400);
+    }
+
+    if (level === "firm" && !firm_id) {
+      throw new AppError("firm_id is required", 400);
+    }
+
+    if (level === "branch" && !branch_id) {
+      throw new AppError("branch_id is required", 400);
+    }
+
+    if (level === "company" && !company_id) {
+      throw new AppError("company_id is required", 400);
+    }
+
+    const hasDate =
+      start_date &&
+      end_date &&
+      isValidDateFormat(start_date) &&
+      isValidDateFormat(end_date);
+
+    /* ================= SERVICE ================= */
+
+    const service = new VendorService();
+
+    return service.getVendorReportSummary({
+      level,
+      firm_id,
+      branch_id,
+      company_id,
+      start_date: hasDate ? start_date : undefined,
+      end_date: hasDate ? end_date : undefined
     });
   }
 }
