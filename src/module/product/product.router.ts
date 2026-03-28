@@ -7,6 +7,7 @@ import {
   CreateProductBody,
   EditProductBody,
   DeleteProductBody,
+  GetProductReport,
 } from "./product.types";
 
 export async function productRouter(app: FastifyInstance): Promise<void> {
@@ -214,4 +215,51 @@ export async function productRouter(app: FastifyInstance): Promise<void> {
       });
     }
   );
+   app.post<{
+  Body: GetProductReport;
+}>(
+  "/reports",
+  {
+    schema: {
+      body: {
+        type: "object",
+        required: ["level"],
+        properties: {
+          level: {
+            type: "string",
+            enum: ["firm", "branch", "company"]
+          },
+
+          firm_id: { type: ["number", "null"] },
+          branch_id: { type: ["number", "null"] },
+          company_id: { type: ["number", "null"] },
+
+          start_date: {
+            type: ["string", "null"],
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+
+          end_date: {
+            type: ["string", "null"],
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        }
+      }
+    }
+  },
+  async (
+    request: FastifyRequest<{ Body: GetProductReport }>,
+    reply: FastifyReply
+  ) => {
+
+      const controller = new ProductController();
+      const data = await controller.getProductReport(request.body);
+
+      return reply.code(200).send({
+        status: "Success",
+        data
+      });
+     
+  }
+);
 }

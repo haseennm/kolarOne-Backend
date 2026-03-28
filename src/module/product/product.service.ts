@@ -7,6 +7,7 @@ import {
   DeleteProductParams,
   EditProductParams,
   FetchProductParams,
+  GetProductReport,
 } from "./product.types";
 import { AppError } from "../../utils/AppError";
 
@@ -346,4 +347,202 @@ export default class ProductService {
       return `Product ${existing.name} deleted successfully`;
     });
   }
+  async getProductReportSummary(data: GetProductReport) {
+
+  const { level, firm_id, branch_id, company_id, start_date, end_date } = data;
+
+  return transaction(async (client) => {
+
+    let firmIds: number[] = [];
+
+    /* ================= GET FIRM IDS ================= */
+
+    if (level === "firm") {
+      firmIds = [firm_id!];
+    }
+
+    if (level === "branch") {
+      const firms = await executeInTransaction(
+        client,
+        `SELECT id FROM firm WHERE branch_id = $1`,
+        [branch_id]
+      );
+      firmIds = firms.rows.map((f: any) => f.id);
+    }
+
+    if (level === "company") {
+      const firms = await executeInTransaction(
+        client,
+        `
+        SELECT f.id
+        FROM firm f
+        JOIN branches b ON b.id = f.branch_id
+        WHERE b.company_id = $1
+        `,
+        [company_id]
+      );
+      firmIds = firms.rows.map((f: any) => f.id);
+    }
+
+    if (!firmIds.length) return {};
+
+    const hasDate = Boolean(start_date && end_date);
+
+    /* ================= MAIN QUERY ================= */
+
+    const result = await executeInTransaction(
+      client,
+      `
+      SELECT 
+        p.id AS product_id,
+        p.name AS product_name,
+        p.short_name,
+
+        /* ================= INCOME ================= */
+        COALESCE(SUM(
+          CASE 
+            WHEN s.status = 4
+            ${hasDate ? "AND s.invoice_date BETWEEN $2 AND $3" : ""}
+            THEN si.net_amount
+            ELSE 0
+          END
+        ),0)
+        +
+        COALESCE(SUM(
+          CASE 
+            WHEN pr.status = 4
+            ${hasDate ? "AND pr.return_date BETWEEN $2 AND $3" : ""}
+            THEN pri.net_amount
+            ELSE 0
+          END
+        ),0)
+        AS total_income,
+
+        /* ================= EXPENSE ================= */
+        COALESCE(SUM(
+          CASE 
+            WHEN pu.status = 4
+            ${hasDate ? "AND pu.bill_date BETWEEN $2 AND $3" : ""}
+            THEN pi.net_amount
+            ELSE 0
+          END
+        ),0)
+        +
+        COALESCE(SUM(
+          CASE 
+            WHEN sr.status = 4
+            ${hasDate ? "AND sr.return_date BETWEEN $2 AND $3" : ""}
+            THEN sri.net_amount
+            ELSE 0
+          END
+        ),0)
+        AS total_expense,
+
+        /* ================= NET SOLD ================= */
+        COALESCE(SUM(
+          CASE 
+            WHEN s.status = 4
+            ${hasDate ? "AND s.invoice_date BETWEEN $2 AND $3" : ""}
+            THEN si.saled_qty
+            ELSE 0
+          END
+        ),0)
+        -
+        COALESCE(SUM(
+          CASE 
+            WHEN sr.status = 4
+            ${hasDate ? "AND sr.return_date BETWEEN $2 AND $3" : ""}
+            THEN sri.returned_qty
+            ELSE 0
+          END
+        ),0)
+        AS net_sold_quantity
+
+      FROM products p
+
+      /* SALES */
+      LEFT JOIN sales_items si 
+        ON si.product_id = p.id
+       AND si.firm_id = ANY($1)
+
+      LEFT JOIN sales s 
+        ON s.id = si.sale_id
+       AND s.firm_id = ANY($1)
+
+      /* SALES RETURNS */
+      LEFT JOIN sale_return_items sri 
+        ON sri.product_id = p.id
+       AND sri.firm_id = ANY($1)
+
+      LEFT JOIN sale_return sr 
+        ON sr.id = sri.sale_return_id
+       AND sr.firm_id = ANY($1)
+
+      /* PURCHASES */
+      LEFT JOIN purchase_items pi 
+        ON pi.product_id = p.id
+       AND pi.firm_id = ANY($1)
+
+      LEFT JOIN purchases pu 
+        ON pu.id = pi.purchase_id
+       AND pu.firm_id = ANY($1)
+
+      /* PURCHASE RETURNS */
+      LEFT JOIN purchase_return_items pri 
+        ON pri.product_id = p.id
+       AND pri.firm_id = ANY($1)
+
+      LEFT JOIN purchase_return pr 
+        ON pr.id = pri.purchase_return_id
+       AND pr.firm_id = ANY($1)
+
+      WHERE p.status = 1
+
+      GROUP BY p.id
+
+      HAVING 
+        COALESCE(SUM(si.saled_qty),0) != 0 OR
+        COALESCE(SUM(pi.purchased_qty),0) != 0
+      `,
+      hasDate
+        ? [firmIds, start_date, end_date]
+        : [firmIds]
+    );
+
+    const products = result.rows;
+
+    /* ================= SUMMARY ================= */
+
+    let mostSold = null;
+    let leastSold = null;
+
+    if (products.length) {
+      mostSold = products.reduce((a: any, b: any) =>
+        Number(b.net_sold_quantity) > Number(a.net_sold_quantity) ? b : a
+      );
+
+      leastSold = products.reduce((a: any, b: any) =>
+        Number(b.net_sold_quantity) < Number(a.net_sold_quantity) ? b : a
+      );
+    }
+
+    return {
+      total_products_with_activity: products.length,
+
+      summary: {
+        total_income: products.reduce((s, p) => s + Number(p.total_income), 0),
+        total_expense: products.reduce((s, p) => s + Number(p.total_expense), 0),
+        net_result: products.reduce(
+          (s, p) => s + (Number(p.total_income) - Number(p.total_expense)),
+          0
+        ),
+      },
+
+      most_sold_product: mostSold || null,
+      least_sold_product: leastSold || null,
+
+      products
+    };
+  });
+}
 }

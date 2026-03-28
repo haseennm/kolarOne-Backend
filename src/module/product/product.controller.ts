@@ -1,10 +1,12 @@
-import { getStatusCode, getStatusText } from "../../utils/extra";
+import { AppError } from "../../utils/AppError";
+import { getStatusCode, getStatusText, isValidDateFormat } from "../../utils/extra";
 import ProductService from "./product.service";
 import {
   CreateProductBody,
   DeleteProductBody,
   EditProductBody,
   FetchProductParams,
+  GetProductReport,
 } from "./product.types";
 
 export default class ProductController {
@@ -96,5 +98,41 @@ export default class ProductController {
     });
 
     return product;
+  }
+  async getProductReport(data: GetProductReport) {
+
+    const { level, end_date, start_date, ...rest } = data;
+
+    /* ================= VALIDATION ================= */
+    if (start_date && !isValidDateFormat(start_date)) {
+      throw new AppError("Invalid start_date format (YYYY-MM-DD)", 400)
+    }
+
+    if (end_date && !isValidDateFormat(end_date)) {
+      throw new AppError("Invalid end date format (YYYY-MM-DD)", 400)
+    }
+    if (!level) {
+      throw new AppError("level is required", 400);
+    }
+
+    if (level === "firm" && !data.firm_id) {
+      throw new AppError("firm_id is required", 400);
+    }
+
+    if (level === "branch" && !data.branch_id) {
+      throw new AppError("branch_id is required", 400);
+    }
+
+    if (level === "company" && !data.company_id) {
+      throw new AppError("company_id is required", 400);
+    }
+
+    /* ================= SERVICE ================= */
+
+    const service = new ProductService();
+
+    const report = await service.getProductReportSummary(data);
+
+    return report;
   }
 }

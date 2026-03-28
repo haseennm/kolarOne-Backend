@@ -106,6 +106,14 @@ export interface DeleteProductBody {
   deleted_by: string;
 }
 
+export interface GetProductReport{
+    level: "firm" | "branch" | "company";
+    firm_id?: number;
+    branch_id?: number;
+    company_id?: number;
+    start_date?: string;
+    end_date?: string;
+}
 export interface DeleteProductParams
   extends Omit<DeleteProductBody, "deleted_by"> {
   remarks: object;
