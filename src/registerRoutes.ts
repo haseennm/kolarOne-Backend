@@ -25,6 +25,8 @@ import { saleReturnRouter } from './module/saleReturn/saleReturn/saleReturn.rout
 import { saleRouter } from './module/sale/sale/sale.router'
 import { purchaseReturnRouter } from './module/purchaseReturn/purchaseReturn/purchaseReturn.router'
 import { partyBalanceRouter } from './module/partyBalance/partyBalance.router'
+import { financialYearRouter } from './module/financialYear/financialYear.router'
+import { maintenanceRouter } from './module/maintenance/maintenance.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -52,4 +54,6 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(saleRouter, { prefix: '/sale' })
   app.register(saleReturnRouter, { prefix: '/sale/return' })
   app.register(partyBalanceRouter, { prefix: 'balance' })
+  app.register(financialYearRouter, { prefix: 'financial/year' })
+  app.register(maintenanceRouter, { prefix: '/maintenance' })
 }

@@ -203,6 +203,7 @@ export const isValidTransactionType = (
 // 
 // ATTENDANCE
 // 
+
 export const isValidDay = async (
   client: PoolClient,
   today: string,
