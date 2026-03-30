@@ -417,59 +417,78 @@ export default class SaleService {
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-    const saleQuery = `
-    SELECT 
-      s.*,
-      c.customer_name,
-      f.branch_id,
-      b.company_id,
+  const saleQuery = `
+SELECT 
+  s.*,
+  c.customer_name,
+  f.branch_id,
+  b.company_id,
 
-      -- ✅ Sale Items
-      COALESCE(
-        JSON_AGG(
-          JSON_BUILD_OBJECT(
-            'id', si.id,
-            'product_id', si.product_id,
-            'product_name', pr.name,
-            'stock_id', si.stock_id,
-            'batch_number', st.batch_number,
-            'saled_qty', si.saled_qty,
-            'unit', si.unit,
-            'unit_price', si.unit_price,
-            'sub_total', si.sub_total,
-            'discount', si.discount,
-            'total_cgst', si.total_cgst,
-            'total_sgst', si.total_sgst,
-            'total_igst', si.total_igst,
-            'net_amount', si.net_amount,
-            'final_amount', si.final_amount,
-            'status', si.status
-          )
-        ) FILTER (WHERE si.id IS NOT NULL),
-        '[]'
-      ) AS items
+  COALESCE(
+    JSON_AGG(
+      JSON_BUILD_OBJECT(
+        'id', si.id,
+        'product_id', si.product_id,
+        'product_name', pr.name,
+        'stock_id', si.stock_id,
+        'batch_number', st.batch_number,
+        'saled_qty', si.saled_qty,
 
-    FROM sales s
-    LEFT JOIN customers c ON c.id = s.customer_id
-    LEFT JOIN firm f ON f.id = s.firm_id
-    LEFT JOIN branches b ON b.id = f.branch_id
+        -- ✅ returned qty (correct)
+        'returned_qty', (
+          SELECT COALESCE(SUM(sri.returned_qty), 0)
+          FROM sale_return_items sri
+          WHERE sri.sale_item_id = si.id
+          AND sri.status != 0
+        ),
 
-    LEFT JOIN sales_items si ON si.sale_id = s.id
-    LEFT JOIN products pr ON pr.id = si.product_id
-    LEFT JOIN stock st ON st.id = si.stock_id
+        -- ✅ remaining qty (BONUS 🔥)
+        'remaining_qty', (
+          SELECT 
+            si.saled_qty - COALESCE(SUM(sri.returned_qty), 0)
+          FROM sale_return_items sri
+          WHERE sri.sale_item_id = si.id
+          AND sri.status != 0
+        ),
 
-    ${whereClause}
+        'unit', si.unit,
+        'unit_price', si.unit_price,
+        'sub_total', si.sub_total,
+        'discount', si.discount,
+        'total_cgst', si.total_cgst,
+        'total_sgst', si.total_sgst,
+        'total_igst', si.total_igst,
+        'net_amount', si.net_amount,
+        'final_amount', si.final_amount,
+        'status', si.status
+      )
+    ) FILTER (WHERE si.id IS NOT NULL),
+    '[]'
+  ) AS items
 
-    GROUP BY 
-      s.id,
-      c.customer_name,
-      f.branch_id,
-      b.company_id
+FROM sales s
+LEFT JOIN customers c ON c.id = s.customer_id
+LEFT JOIN firm f ON f.id = s.firm_id
+LEFT JOIN branches b ON b.id = f.branch_id
 
-    ORDER BY s.id DESC
-    LIMIT $${values.length + 1}
-    OFFSET $${values.length + 2}
-  `;
+-- ✅ correct order
+LEFT JOIN sales_items si ON si.sale_id = s.id
+LEFT JOIN products pr ON pr.id = si.product_id
+LEFT JOIN stock st ON st.id = si.stock_id
+
+${whereClause}
+
+-- ✅ ONLY parent grouping
+GROUP BY 
+  s.id,
+  c.customer_name,
+  f.branch_id,
+  b.company_id
+
+ORDER BY s.id DESC
+LIMIT $${values.length + 1}
+OFFSET $${values.length + 2}
+`;
 
     const countQuery = `
     SELECT COUNT(*)
@@ -486,7 +505,6 @@ export default class SaleService {
     );
 
     const total = await query<{ count: string }>(countQuery, values);
-
     return {
       sales,
       pagination: {
@@ -497,25 +515,25 @@ export default class SaleService {
       },
     };
   }
- async deleteSale(data: SaleDeleteParams, client: PoolClient) {
-  const { id, remark, firm_id } = data;
+  async deleteSale(data: SaleDeleteParams, client: PoolClient) {
+    const { id, remark, firm_id } = data;
 
-  const isSaleExist = await getRecord(
-    id,
-    "Sales",
-    "firm_id",
-    firm_id,
-    client
-  );
+    const isSaleExist = await getRecord(
+      id,
+      "Sales",
+      "firm_id",
+      firm_id,
+      client
+    );
 
-  if (!isSaleExist) {
-    throw new AppError("Sale not found or already deleted", 404);
-  }
+    if (!isSaleExist) {
+      throw new AppError("Sale not found or already deleted", 404);
+    }
 
-  // ✅ FIX: await the function
-  await this.canDeleteSale(data, client);
+    // ✅ FIX: await the function
+    await this.canDeleteSale(data, client);
 
-  const queryText = `
+    const queryText = `
     UPDATE sales s
     SET
       status = $1,
@@ -535,37 +553,37 @@ export default class SaleService {
     RETURNING s.*, b.company_id;
   `;
 
-  const values = [
-    0,
-    JSON.stringify([remark]), // ensure it's an array
-    id,
-    firm_id
-  ];
+    const values = [
+      0,
+      JSON.stringify([remark]), // ensure it's an array
+      id,
+      firm_id
+    ];
 
-  const row = await executeInTransaction(client, queryText, values);
+    const row = await executeInTransaction(client, queryText, values);
 
-  return row.rows[0];
-}
-async canDeleteSale(data: SaleDeleteParams, client: PoolClient) {
-  const { id, firm_id } = data;
+    return row.rows[0];
+  }
+  async canDeleteSale(data: SaleDeleteParams, client: PoolClient) {
+    const { id, firm_id } = data;
 
-  const result = await executeInTransaction(
-    client,
-    `SELECT 1 FROM sale_return 
+    const result = await executeInTransaction(
+      client,
+      `SELECT 1 FROM sale_return 
      WHERE sale_id = $1 
      AND status = $2 
      AND firm_id = $3`,
-    [id, 0, firm_id]
-  );
-
-  // ✅ FIX: check rows length
-  if (result.rows.length > 0) {
-    throw new AppError(
-      "Sale return already exists for this sale, cannot delete",
-      400
+      [id, 0, firm_id]
     );
-  }
 
-  return true;
-}
+    // ✅ FIX: check rows length
+    if (result.rows.length > 0) {
+      throw new AppError(
+        "Sale return already exists for this sale, cannot delete",
+        400
+      );
+    }
+
+    return true;
+  }
 }

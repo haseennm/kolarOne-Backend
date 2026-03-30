@@ -218,9 +218,9 @@ export default class SaleReturnController {
 
     const service = new SaleReturnService();
 
-    const salesWithCode = await service.fetchSaleReturnFull(data);
+    const sales_returnWithCode = await service.fetchSaleReturnFull(data);
 
-    const sales = salesWithCode.saleReturns.map((row) => ({
+    const sales_return = sales_returnWithCode.saleReturns.map((row) => ({
       ...row,
 
       status: getStatusText(row.status),
@@ -232,8 +232,8 @@ export default class SaleReturnController {
     }));
 
     return {
-      sales,
-      pagination: { ...salesWithCode.pagination }
+      sales_return,
+      pagination: { ...sales_returnWithCode.pagination }
     };
   }
   async saleReturnDelete(data: SaleReturnDeleteBody) {
