@@ -168,7 +168,7 @@ export default class SaleReturnController {
                 stock_id: item.stock_id ?? saleReturnItemData.stock_id,
                 branch_id: rest.branch_id,
                 firm_id: rest.firm_id,
-                qty: item.returned_qty,
+                qty: Math.abs(item.returned_qty - saleReturnItemData.returned_qty),
                 movement_type: item.returned_qty > saleReturnItemData.returned_qty ? 'I' : 'O',
                 reason: getTransactionCode("sale_return"),
                 is_relate_purchase: false

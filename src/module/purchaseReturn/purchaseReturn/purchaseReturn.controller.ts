@@ -43,7 +43,8 @@ export default class PurchaseReturnController {
             stock_id: item.stock_id ?? purchase_return.stock_id,
             branch_id: rest.branch_id,
             firm_id: rest.firm_id,
-            qty: item.returned_qty,
+            qty: Math.abs(item.returned_qty),
+
             movement_type: 'O',
             reason: getTransactionCode("purchase_return"),
             is_relate_purchase: true
@@ -96,8 +97,8 @@ export default class PurchaseReturnController {
           amount: payment_amount,
           ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
           status: getStatusCode("Paid"),
-          payment_method_id: null,
-          transaction_reference: null,
+          payment_method_id: rest.payment_method_id ?? null,
+          transaction_reference: rest.transaction_reference ?? null,
           business_id: rest.firm_id,
           business_ref: convertEntityType("Firm" as EntityKey),
           company_id
@@ -164,7 +165,7 @@ export default class PurchaseReturnController {
                 stock_id: item.stock_id ?? purchase_return_item.row.stock_id,
                 branch_id: rest.branch_id,
                 firm_id: rest.firm_id,
-                qty: item.returned_qty,
+                qty: Math.abs(item.returned_qty - purchase_return_item.row.returned_qty),
                 movement_type: purchase_return_item.movement_type,
                 reason: getTransactionCode("purchase_return"),
                 is_relate_purchase: true
@@ -209,7 +210,6 @@ export default class PurchaseReturnController {
       return `purchase return ${purchase_return.bill_number} has been created successfully.`;
     });
   }
-
   async purchaseReturnFetch(data: PurchaseReturnFetchParams) {
     const service = new PurchaseReturnService();
     const purchases_returnWithCode = await service.fetchReturnPurchase(data);

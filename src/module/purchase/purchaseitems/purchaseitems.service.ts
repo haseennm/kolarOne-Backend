@@ -171,8 +171,8 @@ export default class PurchaseItemService {
     const is_item_exist = await getRecord(
       item_id,
       "purchase_items",
-      "branch_id",
-      branch_id,
+      "firm_id",
+      firm_id,
       client
     );
     if (!is_item_exist) {

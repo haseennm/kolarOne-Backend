@@ -209,8 +209,8 @@ export async function purchaseRouter(app: FastifyInstance) {
             payment_amount: { type: "number" },
             notes: { type: ["string", "null"] },
             status: {
-              type: "string",
-              enum: ["Completed", "Confirm", "Cancelled"]
+              type: ["string", "null"],
+              enum: ["Completed", "Confirm", "Cancelled", null]
             },
             items: {
               type: "array",

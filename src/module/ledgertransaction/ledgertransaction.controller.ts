@@ -1,8 +1,11 @@
+import { PoolClient } from "pg";
 import { transaction } from "../../config/db";
 import { cns, convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
 import { PaymentTransactionService } from "../paymentTransaction/paymenttransaction.services";
+import { GetReportSalePurchaseLedger } from "../sale/sale/sale.types";
 import LedgerTransactionService from "./ledgertransaction.service";
 import { CreateLedgerTransactionBody, DeleteLedgerTransactionBody, EditLedgerTransactionBody } from "./ledgertransaction.types";
+import SaleController from "../sale/sale/sale.controller";
 
 export default class LedgerTransactionController {
 
@@ -111,6 +114,36 @@ export default class LedgerTransactionController {
       transaction,
       pagination: { ...transaction_with_code.pagination }
     }
+  }
+  async fetchReportTransaction(data: GetReportSalePurchaseLedger) {
+    return transaction(async (client: PoolClient) => {
+
+      const ledger_service = new LedgerTransactionService();
+      const sale_controller = new SaleController();
+
+      const ledger = await ledger_service.getLedgerReport(client, data);
+      const salesPurchaseResult = await sale_controller.salePurchaseReport(client, data);
+      const salesPurchase = Array.isArray(salesPurchaseResult.salesPurchase) ? salesPurchaseResult.salesPurchase : [];
+      const combined = [...salesPurchase, ...ledger];
+
+      let total_income = 0;
+      let total_expense = 0;
+
+      combined.forEach(r => {
+        const amt = Number(r.amount || 0);
+        if (amt > 0) total_income += amt;
+        else total_expense += Math.abs(amt);
+      });
+
+      return {
+        summary: {
+          total_income,
+          total_expense,
+          net: total_income - total_expense
+        },
+        data: combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      };
+    })
   }
   async deleteTransaction(data: DeleteLedgerTransactionBody) {
     const { deleted_by, company_id, ...rest } = data;

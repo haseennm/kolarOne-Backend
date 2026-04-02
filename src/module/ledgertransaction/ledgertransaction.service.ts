@@ -1,6 +1,8 @@
+import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { cns, getRecord } from "../../utils/extra";
+import { GetReportSalePurchaseLedger } from "../sale/sale/sale.types";
 import { CreateLedgerTransactionParams, DeleteLedgerTransactionParams, LedgerTransactionCountResult, EditLedgerTransactionParams, FetchLedgerTransactionParams, FetchDbLedgerTransaction } from "./ledgertransaction.types";
 export default class LedgerTransactionService {
 
@@ -286,5 +288,66 @@ export default class LedgerTransactionService {
 
     return result;
   }
+  async getLedgerReport(
+    client: PoolClient,
+    {
+      level,
+      company_id,
+      branch_id,
+      firm_id,
+      start_date,
+      end_date
+    }: GetReportSalePurchaseLedger
+  ) {
 
+    let condition = "";
+    let params: any[] = [];
+    let idx = 1;
+
+    /* ========= LEVEL FILTER ========= */
+
+    if (level === "company") {
+      condition += ` AND entity_type = 'C' AND entity_id = $${idx++}`;
+      params.push(company_id);
+    }
+
+    if (level === "branch") {
+      condition += ` AND entity_type = 'B' AND entity_id = $${idx++}`;
+      params.push(branch_id);
+    }
+
+    if (level === "firm") {
+      condition += ` AND entity_type = 'F' AND entity_id = $${idx++}`;
+      params.push(firm_id);
+    }
+
+    /* ========= DATE FILTER ========= */
+
+    if (start_date) {
+      condition += ` AND transaction_date >= $${idx++}`;
+      params.push(start_date);
+    }
+
+    if (end_date) {
+      condition += ` AND transaction_date <= $${idx++}`;
+      params.push(end_date);
+    }
+
+    const query = `
+    SELECT
+      CASE WHEN amount > 0 THEN 'income' ELSE 'expense' END AS type,
+      id,
+      transaction_date AS date,
+      amount,
+      reference_id AS invoice
+    FROM ledger_transactions
+    WHERE status != 0
+    ${condition}
+    ORDER BY transaction_date DESC
+  `;
+
+    const { rows } = await client.query(query, params);
+
+    return rows;
+  }
 }

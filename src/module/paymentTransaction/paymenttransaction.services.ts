@@ -67,7 +67,8 @@ export class PaymentTransactionService {
       transaction_reference,
       business_id, business_ref
     } = data;
-
+    cns("chaek",[company_id, ref_type, 0, ref_id, business_ref, business_id]
+)
     const payment_exist = await executeInTransaction(
       client,
       `SELECT * FROM payment_transactions

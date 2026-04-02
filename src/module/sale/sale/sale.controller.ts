@@ -1,12 +1,13 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../../config/db";
 import { convertEntityType, EntityKey, getStatusCode, getStatusText, getTransactionCode, PaymentTransactionTypeCodeMap } from "../../../utils/extra";
-import { SaleCreateBody, SaleDeleteBody, SaleEditBody, SaleFetchParams } from "./sale.types";
+import { GetReportSalePurchaseLedger, SaleCreateBody, SaleDeleteBody, SaleEditBody, SaleFetchParams } from "./sale.types";
 import StockController from "../../stock/stock.controller";
 import SaleService from "./sale.service";
 import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 import { PaymentTransactionService } from "../../paymentTransaction/paymenttransaction.services";
 import SaleItemController from "../saleItems/saleitems.controller";
+import { AppError } from "../../../utils/AppError";
 
 export default class SaleController {
 
@@ -184,7 +185,7 @@ export default class SaleController {
                 stock_id: item.stock_id ?? saleItemData.stock_id,
                 branch_id: rest.branch_id,
                 firm_id: rest.firm_id,
-                qty: item.saled_qty,
+                qty: Math.abs(item.saled_qty - saleItemData.saled_qty),
                 movement_type: item.saled_qty > saleItemData.saled_qty ? 'I' : 'O',
                 reason: getTransactionCode("sale_return"),
                 is_relate_purchase: false
@@ -198,7 +199,7 @@ export default class SaleController {
       // ✅ Update party balance if payment difference changed
       const party_balance_controller = new PartyBalanceController();
       const difference = (paid ?? sale.paid) - (final_amount ?? sale.final_amount);
-
+      const payment_status = difference === paid ? "Unpaid" : "Partial"
       if (difference !== 0) {
         const isAdvance = difference > 0;
 
@@ -207,6 +208,7 @@ export default class SaleController {
             ref_id: sale.id,
             ref_type: "S",
             action_by: updated_by,
+            status: payment_status,
             balance: Math.abs(difference),
             flow: isAdvance ? "O" : "I",
             firm_id: rest.firm_id,
@@ -257,6 +259,24 @@ export default class SaleController {
       sales,
       pagination: { ...salesWithCode.pagination }
     };
+  }
+  async salePurchaseReport(client: PoolClient, data: GetReportSalePurchaseLedger) {
+    if (data.level === "Branch") {
+      if (!data.branch_id) {
+        throw new AppError("Branch id is required if level is branch", 400)
+      }
+    }
+    if (data.level === "Firm") {
+      if (!data.branch_id) {
+        throw new AppError("Firm id is required if level is firm", 400)
+      }
+    }
+    const service = new SaleService();
+    const salesPurchase = await service.getSalesPurchaseReport(client, data);
+    return {
+      salesPurchase
+    };
+
   }
   async fullsaleFetch(data: SaleFetchParams) {
 

@@ -175,21 +175,22 @@ export default class StockService {
     available_quantity = $1,
     status = $2,
     selling_price = $3,
-    product_id = $5,
-    purchase_id = $6,
-    purchased_qty = $7
+    product_id = $4,
+    purchase_id = $5,
+    purchased_qty = $6
     
-  WHERE id = $8
-  AND firm_id = $11
-    AND branch_id = $10
+  WHERE id = $7
+  AND firm_id = $8
+    AND branch_id = $9
   RETURNING *;
 `;
-
+    const sold_qty = Number(is_stock_exist.purchased_qty) - Number(is_stock_exist.available_quantity);
+    const new_available_qty = Number(available_qty) - Number(sold_qty)
+    console.log(sold_qty, new_available_qty)
     const values = [
-      available_qty ?? is_stock_exist.available_quantity,
+      new_available_qty ?? is_stock_exist.available_quantity,
       statusCode ?? is_stock_exist.status,
       selling_price ?? is_stock_exist.selling_price,
-      firm_id,
       product_id ?? is_stock_exist.product_id,
       purchase_id ?? is_stock_exist.purchase_id,
       purchased_qty ?? is_stock_exist.purchased_qty,
@@ -206,9 +207,9 @@ export default class StockService {
     branch_id = $2,
     movement_type = $3,
     quantity = $4,
-    reason = $5,
-    status = $6
-  WHERE stock_id = $7
+    status = $5
+    WHERE stock_id = $6
+    AND reason = $7
     AND branch_id = $8
   RETURNING *;
 `;
@@ -218,9 +219,9 @@ export default class StockService {
       branch_id,
       movement_type,
       available_qty,
-      reason,
       statusCode,
       stock_id,
+      reason,
       branch_id
     ];
 

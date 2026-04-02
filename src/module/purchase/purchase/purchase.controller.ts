@@ -11,7 +11,7 @@ import { PaymentTransactionService } from "../../paymentTransaction/paymenttrans
 export default class PurchaseController {
 
   async purchaseCreate(data: PurchaseCreateBody) {
-    const { payment_amount, final_amount, status, company_id, created_by, items, ...rest } = data;
+    const { payment_amount, final_amount, status, company_id, created_by, items, transaction_reference, payment_method_id, ...rest } = data;
 
     const remark = {
       action: "Created",
@@ -29,7 +29,7 @@ export default class PurchaseController {
           payment_amount, final_amount,
           remark,
           statusCode,
-          company_id
+          company_id, transaction_reference, payment_method_id
         },
         client
       );
@@ -100,8 +100,8 @@ export default class PurchaseController {
           amount: payment_amount,
           ref_type: PaymentTransactionTypeCodeMap["purchase"],
           status: getStatusCode("Paid"),
-          payment_method_id: null,
-          transaction_reference: null,
+          payment_method_id: payment_method_id ?? null,
+          transaction_reference: transaction_reference ?? null,
           business_id: rest.firm_id,
           business_ref: convertEntityType("Firm" as EntityKey),
           company_id
@@ -189,28 +189,37 @@ export default class PurchaseController {
       const party_balance_controller = new PartyBalanceController();
 
 
-      if (difference !== 0) {
-        const isAdvance = difference > 0;
 
-        await party_balance_controller.editPartyBalance(
-          {
-            ref_id: purchase.id,
-            ref_type: "P",
-            action_by: updated_by,
-            balance: Math.abs(difference),
-            flow: isAdvance ? "O" : "I",
-            firm_id: rest.firm_id,
-          },
-          client
-        );
+      const isAdvance = difference > 0;
+      let part_status;
+
+      if (difference === 0) {
+        part_status = "Paid";
+      } else if (difference < 0) {
+        part_status = "Partial";
+      } else if (Math.abs(difference) === final_amount) {
+        part_status = "Unpaid";
       }
+      await party_balance_controller.editPartyBalance(
+        {
+          ref_id: purchase.id,
+          ref_type: "P",
+          action_by: updated_by,
+          balance: Math.abs(difference),
+          status: part_status,
+          flow: isAdvance ? "O" : "I",
+          firm_id: rest.firm_id,
+        },
+        client
+      );
+
       const payment_transactions_service = new PaymentTransactionService()
       await payment_transactions_service.editPaymentTransaction({
         company_id,
         amount: payment_amount,
         payment_method_id: null,
         ref_id: rest.purchase_id,
-        ref_type: PaymentTransactionTypeCodeMap["ledger_transaction"],
+        ref_type: PaymentTransactionTypeCodeMap["purchase"],
         status: statusCode,
         transaction_reference: null,
         business_id: rest.firm_id,

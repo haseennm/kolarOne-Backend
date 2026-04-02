@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { getRecord } from "../../../utils/extra";
-import { SaleCreateParams, SaleDeleteParams, SaleEditParams, SaleFetchParams } from "./sale.types";
+import { GetReportSalePurchaseLedger, SaleCreateParams, SaleDeleteParams, SaleEditParams, SaleFetchParams } from "./sale.types";
 
 export default class SaleService {
 
@@ -417,7 +417,7 @@ export default class SaleService {
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  const saleQuery = `
+    const saleQuery = `
 SELECT 
   s.*,
   c.customer_name,
@@ -585,5 +585,138 @@ OFFSET $${values.length + 2}
     }
 
     return true;
+  }
+  async getSalesPurchaseReport(
+    client: any,
+    {
+      level,
+      firm_id,
+      branch_id,
+      company_id,
+      start_date,
+      end_date
+    }: GetReportSalePurchaseLedger
+  ) {
+
+    let firmIds: number[] = [];
+
+    /* ========= RESOLVE FIRMS ========= */
+
+    if (level === "Firm" && firm_id) {
+      firmIds = [firm_id];
+    }
+
+    if (level === "Branch") {
+      const res = await client.query(
+        `SELECT id FROM firm WHERE branch_id = $1`,
+        [branch_id]
+      );
+      firmIds = res.rows.map((r: any) => r.id);
+    }
+
+    if (level === "Company") {
+      const res = await client.query(
+        `SELECT f.id
+       FROM firm f
+       JOIN branches b ON b.id = f.branch_id
+       WHERE b.company_id = $1`,
+        [company_id]
+      );
+      firmIds = res.rows.map((r: any) => r.id);
+    }
+
+    if (!firmIds.length) return [];
+    /* ========= DATE FILTER ========= */
+
+    let dateFilter = "";
+    let params: any[] = [firmIds];
+    let idx = 2;
+
+    // Parse and normalize dates so type comparison works as expected,
+    // and make end_date inclusive for the full day.
+    if (start_date) {
+      const parsedStart = new Date(start_date);
+      if (Number.isNaN(parsedStart.getTime())) {
+        throw new AppError("Invalid start_date format. Use YYYY-MM-DD.", 400);
+      }
+      // compare using date portion only so timestamp offsets don't fail.
+      dateFilter += ` AND main_date::date >= $${idx++}`;
+      params.push(parsedStart.toISOString().slice(0, 10));
+    }
+
+    if (end_date) {
+      const parsedEnd = new Date(end_date);
+      if (Number.isNaN(parsedEnd.getTime())) {
+        throw new AppError("Invalid end_date format. Use YYYY-MM-DD.", 400);
+      }
+      // inclusive end of day by comparing dates
+      dateFilter += ` AND main_date::date <= $${idx++}`;
+      params.push(parsedEnd.toISOString().slice(0, 10));
+    }
+
+    /* ========= MAIN QUERY ========= */
+    console.log(firmIds)
+
+    const query = `
+    SELECT * FROM (
+  SELECT
+        'sale' AS type,
+        s.id,
+        s.invoice_date AS date,
+        s.final_amount AS amount,
+        s.invoice_number AS invoice,
+        s.invoice_date AS main_date
+      FROM sales s
+      WHERE s.firm_id = ANY($1::int[])
+        AND s.status != 0
+
+      UNION ALL
+      SELECT
+        'purchase' AS type,
+        p.id,
+        p.bill_date AS date,
+        -p.final_amount AS amount,
+        p.bill_number AS invoice,
+        p.bill_date AS main_date
+      FROM purchases p
+      WHERE p.firm_id = ANY($1::int[])
+        AND p.status != 0
+
+      UNION ALL
+
+      -- SALES RETURN
+      SELECT
+        'sales_return' AS type,
+        sr.id,
+        sr.return_date AS date,
+        -sr.final_amount AS amount,
+        sr.return_number AS invoice,
+        sr.return_date AS main_date
+      FROM sale_return sr
+      WHERE sr.firm_id = ANY($1::int[])
+        AND sr.status != 0
+
+      UNION ALL
+
+      -- PURCHASE RETURN
+      SELECT
+        'purchase_return' AS type,
+        pr.id,
+        pr.return_date AS date,
+        pr.final_amount AS amount,
+        pr.return_number AS invoice,
+        pr.return_date AS main_date
+      FROM purchase_return pr
+      WHERE pr.firm_id = ANY($1::int[])
+        AND pr.status != 0
+
+    ) t
+    WHERE 1=1 ${dateFilter}
+    ORDER BY date DESC
+  `;
+console.log("PARAMS:", params);
+    const { rows } = await client.query(query, params);
+console.log(rows)
+    return rows;
   }
 }

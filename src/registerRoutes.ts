@@ -11,6 +11,7 @@ import { vendorRouter } from './module/vendor/vendor.router'
 import { ledgerCategoryRouter } from './module/ledgerCategory/ledgerCategory.router'
 import { ledgerTransactionRouter } from './module/ledgertransaction/ledgertransaction.router'
 import { paymentMethodRouter } from './module/paymentmethod/paymentMethod.router'
+import { financialRouter } from './module/financial/financial.router'
 import { roleRouter } from './module/role/role.router'
 import { stockRouter } from './module/stock/stock.router'
 import { staffRouter } from './module/staff/staff.router'
@@ -27,6 +28,7 @@ import { purchaseReturnRouter } from './module/purchaseReturn/purchaseReturn/pur
 import { partyBalanceRouter } from './module/partyBalance/partyBalance.router'
 import { financialYearRouter } from './module/financialYear/financialYear.router'
 import { maintenanceRouter } from './module/maintenance/maintenance.router'
+import { companyBrandingRouter } from './module/companyBranding/companyBranding.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -40,6 +42,7 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(ledgerCategoryRouter, { prefix: '/ledger/category' })
   app.register(ledgerTransactionRouter, { prefix: '/ledger/transaction' })
   app.register(paymentMethodRouter, { prefix: '/payment/method' })
+  app.register(financialRouter, { prefix: '/financial' })
   app.register(roleRouter, { prefix: '/role' })
   app.register(staffRouter, { prefix: '/staff' })
   app.register(attendanceRouter, { prefix: '/attendance' })
@@ -56,4 +59,5 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(partyBalanceRouter, { prefix: 'balance' })
   app.register(financialYearRouter, { prefix: 'financial/year' })
   app.register(maintenanceRouter, { prefix: '/maintenance' })
+  app.register(companyBrandingRouter, { prefix: '/company/branding' })
 }

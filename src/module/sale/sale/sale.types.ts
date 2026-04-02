@@ -1,8 +1,8 @@
 import { CreateSaleItemBody, EditSaleItemBody } from "../saleItems/saleitems.types";
-interface Payments{
-  payment_method_id:number;
-  amount:number;
-  reference?:string
+interface Payments {
+  payment_method_id: number;
+  amount: number;
+  reference?: string
 }
 export interface SaleCreateBody {
   customer_id: string;
@@ -16,18 +16,18 @@ export interface SaleCreateBody {
   final_amount: number;
   paid: number;
   notes?: string | null;
-  status?: string; 
+  status?: string;
   created_by: string;
   firm_id: number;
-  branch_id:number
-  company_id:number;
-  payments:Payments[]
+  branch_id: number
+  company_id: number;
+  payments: Payments[]
   items: CreateSaleItemBody[];
 }
 export interface SaleCreateParams
-  extends Omit<SaleCreateBody, "status" |"created_by" |"items"> {
+  extends Omit<SaleCreateBody, "status" | "created_by" | "items"> {
   statusCode: number;
-  remark:object
+  remark: object
 }
 export interface SaleEditBody {
   Sale_id: number;
@@ -60,12 +60,12 @@ export interface SaleEditParams
 
 export interface SaleFetchBody {
   id?: number;
-  firm_id?:number;
+  firm_id?: number;
   branch_id?: number;
   company_id: number;
   search?: string;
-  start_date?:string;
-  end_date?:string;
+  start_date?: string;
+  end_date?: string;
   page: number;
   limit: number;
 }
@@ -85,9 +85,17 @@ export interface SaleFetchParams {
 export interface SaleDeleteBody {
   id: number;
   firm_id: number;
-  branch_id:number
-  deleted_by:string
+  branch_id: number
+  deleted_by: string
 }
-export type SaleDeleteParams = Omit<SaleDeleteBody, 'deleted_by'|'branch_id'> & {
+export type SaleDeleteParams = Omit<SaleDeleteBody, 'deleted_by' | 'branch_id'> & {
   remark: object;
 };
+export interface GetReportSalePurchaseLedger {
+  level: string;
+  firm_id?: number;
+  branch_id?: number;
+  company_id: number;
+  start_date: string;
+  end_date: string;
+}
