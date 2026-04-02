@@ -2,16 +2,13 @@ export interface CreateFinancialYearBody {
   from_date: string | Date,
   end_date: string | Date,
   created_by: string,
-  entity_type: "Company" | "Branch" | "Firm",
-  entity_id: number
   status: string;
   company_id:number
 }
 export interface CreateFinancialYearParams
-  extends Omit<CreateFinancialYearBody, "status" | "entity_type" | "created_by"> {
+  extends Omit<CreateFinancialYearBody, "status" | "created_by"> {
   statusCode: number;
   remark: object;
-  entity_type: string;
 }
 
 
@@ -33,8 +30,6 @@ export interface FetchFinancialYearParams {
 export interface FetchDbFinancialYear {
   from_date: string | Date,
   end_date: string | Date,
-  entity_type: string,
-  entity_id: number
   status: number;
   remarks: object | null;
 }
@@ -49,9 +44,8 @@ export interface EditFinancialYearBody {
   from_date?: string | Date,
   end_date?: string | Date,
   updated_by?: string,
-  entity_type: string,
-  entity_id: number
   status?: string;
+  company_id:number
 }
 
 export interface EditFinancialYearParams

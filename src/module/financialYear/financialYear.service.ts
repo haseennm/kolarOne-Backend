@@ -14,66 +14,21 @@ export default class FinancialYearService {
 
   async createFinancialYear(data: CreateFinancialYearParams, client: any) {
 
-    const { from_date, entity_type, end_date, entity_id, remark, statusCode, company_id } = data;
-    console.log(data)
-    // 🔐 ENTITY VALIDATION
-    if (entity_type === "C") {
-      // Validate company
-      if (Number(entity_id) !== Number(company_id)) {
-        throw new AppError("Company mismatch", 400);
-      }
-      const query = `SELECT id FROM company WHERE id = $1 AND status !=0`;
-      const { rows } = await executeInTransaction(client, query, [entity_id]);
-      console.log("first", rows)
-      if (rows.length === 0) {
-        throw new AppError("Invalid company_id", 400);
-      }
-
-    } else if (entity_type === "B") {
-      const query = `
-    SELECT id FROM branches 
-    WHERE id = $1 AND company_id = $2 AND status !=0
-  `;
-      const { rows } = await executeInTransaction(client, query, [entity_id, company_id]);
-
-      if (rows.length === 0) {
-        throw new AppError("Branch does not belong to the given company", 400);
-      }
-
-    } else if (entity_type === "F") {
-      // Validate firm → branch → company
-      const query = `
-    SELECT f.id 
-    FROM firm f
-    JOIN branches b ON f.branch_id = b.id
-    WHERE f.id = $1 
-      AND b.company_id = $2
-      AND f.status != 0
-      AND b.status != 0
-  `;
-      const { rows } = await executeInTransaction(client, query, [entity_id, company_id]);
-
-      if (rows.length === 0) {
-        throw new AppError("Firm does not belong to the given company", 400);
-      }
-
-    } else {
-      throw new AppError("Invalid entity_type. Allowed: C, B, F", 400);
-    }
+    const { from_date, end_date, remark, statusCode, company_id } = data;
+   
 
     // if (!isCompanyExist) {
     //   throw new AppError("Company not found", 404);
     // }
     const overlapQuery = `
     SELECT id FROM financial_year
-    WHERE entity_id = $1
-      AND entity_type = $2
-      AND $3 <= end_date
-      AND $4 >= from_date
-      AND status != $5
+    WHERE company_id =$1
+      AND $2 <= end_date
+      AND $3 >= from_date
+      AND status != 0
   `;
 
-    const overlapValues = [entity_id, entity_type, from_date, end_date, 0];
+    const overlapValues = [company_id, from_date, end_date];
 
     const { rows: overlapRows } = await executeInTransaction(
       client,
@@ -87,14 +42,14 @@ export default class FinancialYearService {
 
     const FinancialYearQuery = `
       INSERT INTO financial_year (
-       from_date,entity_type,end_date,entity_id,remark,status,company_id
+       from_date,end_date,remark,status,company_id
       )
-      VALUES ($1,$2,$3,$4,$5,$6, $7)
+      VALUES ($1,$2,$3,$4,$5)
       RETURNING *;
     `;
 
     const values = [
-      from_date, entity_type, end_date, entity_id, JSON.stringify([remark]), statusCode, company_id
+      from_date,end_date, JSON.stringify([remark]), statusCode, company_id
     ];
 
     const { rows } = await executeInTransaction(client, FinancialYearQuery, values);
@@ -112,15 +67,6 @@ export default class FinancialYearService {
     if (filters?.id) {
       values.push(filters.id);
       where.push(`id = $${values.length}`);
-    }
-
-    if (filters?.firm_id) {
-      values.push(filters.firm_id);
-      where.push(`id = ANY(SELECT unnest(financial_year) FROM branches WHERE id = $${values.length}) AND entity_type = "F`);
-    }
-    if (filters?.branch_id) {
-      values.push(filters.branch_id);
-      where.push(`id = ANY(SELECT unnest(financial_year) FROM branches WHERE id = $${values.length}) AND entity_type = "B`);
     }
     values.push(filters.company_id);
     where.push(`company_id = $${values.length}`);
@@ -161,13 +107,13 @@ export default class FinancialYearService {
   }
 
   async updateFinancialYear(data: EditFinancialYearParams, client: any) {
-    const { id, entity_id, entity_type, end_date, from_date, statusCode, remark } = data;
+    const { id, end_date, from_date, statusCode, remark,company_id } = data;
 
     const isFinancialYearExist = await getRecord(
       id,
       "financial_year",
-      entity_type,
-      entity_id,
+      "company_id",
+      company_id,
       client
     );
 
@@ -176,14 +122,13 @@ export default class FinancialYearService {
     }
     const overlapQuery = `
     SELECT id FROM financial_year
-    WHERE entity_id = $1
-      AND entity_type = $2
-      AND $3 <= end_date
-      AND $4 >= from_date
-      AND status = $5 AND id !=$6
+    WHERE company_id = $1
+      AND $2 <= end_date
+      AND $3 >= from_date
+      AND status != 0 AND id !=$4
   `;
 
-    const overlapValues = [entity_id, entity_type, from_date, end_date, 0, id];
+    const overlapValues = [company_id, from_date, end_date, id];
 
     const { rows: overlapRows } = await executeInTransaction(
       client,

@@ -19,9 +19,7 @@ export async function financialYearRouter(app: FastifyInstance) {
           required: [
             "from_date",
             "end_date",
-            "created_by",
-            "entity_type",
-            "entity_id"
+            "created_by"
           ],
           properties: {
 
@@ -42,19 +40,6 @@ export async function financialYearRouter(app: FastifyInstance) {
               minLength: 1,
               description: "User ID who created the request"
             },
-
-            entity_type: {
-              type: "string",
-              enum: ["Company", "Branch", "Firm"],
-              description: "Type of entity"
-            },
-
-            entity_id: {
-              type: "string",
-              minLength: 1,
-              description: "Entity ID"
-            },
-
             company_id: {
               type: "number",
               minimum: 1,
@@ -105,17 +90,7 @@ export async function financialYearRouter(app: FastifyInstance) {
             company_id: {
               type: "number"
             },
-            branch_id: {
-              type: "number"
-            },
-            firm_id: {
-              type: "number"
-            },
-
-            // status: {
-            //   type: "number"
-            // },
-
+          
             page: {
               type: "number",
               minimum: 1
@@ -163,8 +138,6 @@ export async function financialYearRouter(app: FastifyInstance) {
           required: [
             "id",
             "updated_by",
-            "entity_type",
-            "entity_id",
             "company_id"
           ],
           properties: {
@@ -186,19 +159,6 @@ export async function financialYearRouter(app: FastifyInstance) {
               minLength: 1,
               description: "User ID who created the request"
             },
-
-            entity_type: {
-              type: "string",
-              enum: ["Company", "Branch", "Firm"],
-              description: "Type of entity"
-            },
-
-            entity_id: {
-              type: "string",
-              minLength: 1,
-              description: "Entity ID"
-            },
-
             company_id: {
               type: "number",
               minimum: 1,

@@ -12,7 +12,7 @@ import {
 export default class FinancialYearController {
 
   async createFinancialYear(data: CreateFinancialYearBody) {
-    const { status, entity_type, from_date, end_date, created_by, ...rest } = data;
+    const { status,  from_date, end_date, created_by, ...rest } = data;
 
     // Convert to Date
     const start = new Date(from_date);
@@ -31,8 +31,6 @@ export default class FinancialYearController {
     return transaction(async (client) => {
       const statusCode = getStatusCode(status);
 
-      // convert once, don't mutate original
-      const entityCode = convertEntityType(entity_type);
 
       const service = new FinancialYearService();
       const remark = {
@@ -46,7 +44,6 @@ export default class FinancialYearController {
           statusCode,
           remark,
           end_date, from_date,
-          entity_type: entityCode, // now "C" | "B" | "F"
         },
         client
       );
