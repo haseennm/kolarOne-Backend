@@ -10,7 +10,7 @@ import {
 
 export async function paymentMethodRouter(app: FastifyInstance) {
 
-  // CREATE
+  
   app.post<{ Body: CreatePaymentMethodBody }>(
     "/create",
     {
@@ -61,7 +61,7 @@ export async function paymentMethodRouter(app: FastifyInstance) {
   );
 
 
-  // FETCH
+  
   app.post<{ Body: FetchPaymentMethodBody }>(
     "/get",
     {
@@ -123,7 +123,7 @@ export async function paymentMethodRouter(app: FastifyInstance) {
   );
 
 
-  // EDIT
+  
   app.post<{ Body: EditPaymentMethodBody }>(
     "/edit",
     {
@@ -178,7 +178,7 @@ export async function paymentMethodRouter(app: FastifyInstance) {
   );
 
 
-  // DELETE
+  
   app.post<{ Body: DeletePaymentMethodBody }>(
     "/delete",
     {

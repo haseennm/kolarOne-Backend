@@ -59,11 +59,8 @@ export interface Product {
   cgst_rate?: number | null;
   sgst_rate?: number | null;
   igst_rate?: number | null;
-
-  status: 0 | 1 | 2; // 1 = Active, 0 = Inactive, 2 = Deleted (based on CHECK constraint)
-
-  remarks?: Record<string, any> | null; // JSONB
-
+  status: 0 | 1 | 2; 
+  remarks?: Record<string, any> | null;
   image?: string | null;
 
   company_id: number;

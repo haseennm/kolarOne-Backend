@@ -116,7 +116,6 @@ export default class BranchService {
         let where: string[] = []
         let values: any[] = []
 
-        // Exclude deleted
         where.push(`status != $${values.length + 1}`)
         values.push(-1)
 
@@ -205,7 +204,6 @@ export default class BranchService {
 
         const result = transaction(async (client) => {
 
-            // ✅ Only check by id
             const is_branch_exist = await getRecord(id, "branches", "id", id, client);
 
             if (!is_branch_exist) {

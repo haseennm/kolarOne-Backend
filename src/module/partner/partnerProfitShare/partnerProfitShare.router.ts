@@ -71,8 +71,6 @@ export async function profitShareRouter(app: FastifyInstance) {
           properties: {
             partner_id: { type: "number" },
             partner_name: { type: "string" },
-            // profit_share_min: { type: "number" },
-            // profit_share_max: { type: "number" },
             profit_share_gt: { type: "number" },
             profit_share_lt: { type: "number" },
             page: { type: "number", minimum: 1, default: 1 },

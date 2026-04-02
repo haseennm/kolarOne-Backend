@@ -10,8 +10,8 @@ export interface ManualAttendanceBody {
 export interface StaffRow {
   id: number;
   full_name: string;
-  entity_id:number
-  entity_type:string
+  entity_id: number
+  entity_type: string
 }
 
 export interface AttendanceRow {
@@ -25,11 +25,11 @@ export interface MarkHolidayBody {
   attendance_date?: string;
   created_by: number;
   description?: string;
-  company_id:number
+  company_id: number
 }
 
 export interface HolidayListBody {
-  branch_id: number;     // assuming this is company_id or global branch_id
+  branch_id: number;
 }
 
 export interface HolidayListItem {
@@ -44,7 +44,7 @@ export interface HolidayListResponse {
 }
 
 export interface DailyAttendanceBody {
-  date: string;       // YYYY-MM-DD
+  date: string;
   branch_id: number;
 }
 
@@ -56,10 +56,9 @@ export interface DailyAttendanceRow {
   status: 'Absent' | 'HalfDay' | 'FullDay';
 }
 
-// Monthly attendance report
 export interface MonthlyAttendanceBody {
-  from_date: string;   // YYYY-MM-DD
-  to_date: string;     // YYYY-MM-DD
+  from_date: string;
+  to_date: string;
   branch_id: number;
 }
 
@@ -75,17 +74,17 @@ export interface MonthlyStaffSummary {
 }
 
 export interface HolidayEntry {
-  holiday: string;          // e.g. "15-03-2025 Saturday"
-  attendance_date: string;  // YYYY-MM-DD
+  holiday: string;
+  attendance_date: string;
 }
 
 export interface MonthlyAttendanceResponse {
   duration: string;
   total_days: number;
-  holidays: string[];           // formatted holiday strings
+  holidays: string[];
   data: MonthlyStaffSummary[];
 }
-export interface DeleteHoliday{
+export interface DeleteHoliday {
   branch_id: number;
-  r_id:number
+  r_id: number
 }

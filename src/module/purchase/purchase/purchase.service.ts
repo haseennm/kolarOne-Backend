@@ -29,7 +29,6 @@ export default class PurchaseService {
       company_id
     } = data;
 
-    // Check firm existence
     const is_firm_exist = await getRecord(
       firm_id,
       "firm",
@@ -151,7 +150,6 @@ export default class PurchaseService {
       purchase_id
     } = data;
 
-    // Check firm existence
     const is_purchase_exist = await getRecord(
       purchase_id,
       "purchases",
@@ -247,7 +245,6 @@ export default class PurchaseService {
       firm_id,
       purchase_id
     ];
-console.log(values)
     const { rows } = await executeInTransaction(client, purchaseQuery, values);
     return rows[0];
   }
@@ -486,7 +483,6 @@ console.log(values)
     throw new AppError("Purchase not found or already deleted", 404);
   }
 
-  // ✅ IMPORTANT: await validation
   await this.canDeletePurchase(data, client);
 
   const queryText = `
@@ -511,7 +507,7 @@ console.log(values)
 
   const values = [
     0,
-    JSON.stringify([remark]), // ensure array
+    JSON.stringify([remark]), 
     id,
     firm_id
   ];
@@ -523,7 +519,6 @@ console.log(values)
  async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
   const { id, firm_id } = data;
 
-  // ✅ 1. Check purchase_return exists
   const purchaseReturn = await executeInTransaction(
     client,
     `SELECT 1 
@@ -541,7 +536,6 @@ console.log(values)
     );
   }
 
-  // ✅ 2. Check stock created from this purchase is used in sales
   const stockUsedInSales = await executeInTransaction(
     client,
     `

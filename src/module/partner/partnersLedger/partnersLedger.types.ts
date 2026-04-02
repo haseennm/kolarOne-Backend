@@ -19,7 +19,7 @@ export interface CreateCapitalLedgerBody {
 }
 
 export interface CreateCapitalLedgerParams extends Omit<CreateCapitalLedgerBody, "created_by" | "status" | "flow_type"> {
-  flow_type: FlowType; // "C", "D", or "S"
+  flow_type: FlowType;
   remark: object;
   statusCode: number;
 }

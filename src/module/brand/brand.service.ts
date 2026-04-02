@@ -15,7 +15,7 @@ import { DeleteBranchParams } from "../branch/branch.types";
 export default class BrandService {
 
   async createBrand(data: CreateBrandParams) {
-    const { name, statusCode, remark, company_id ,note} = data;
+    const { name, statusCode, remark, company_id, note } = data;
 
     const result = transaction(async (client) => {
 
@@ -28,7 +28,7 @@ export default class BrandService {
         throw new AppError("Brand already exists", 400);
       }
       const existing_company = await getRecord(company_id, "company", "id", company_id, client);
-    
+
       if (!existing_company) {
         throw new AppError("Company not found or deleted", 404);
       }
@@ -46,7 +46,6 @@ export default class BrandService {
         company_id,
         note
       ];
-      console.log(values)
       const { rows } = await executeInTransaction(client, queryText, values);
 
       return `Brand ${rows[0].name} created successfully`;
@@ -63,7 +62,6 @@ export default class BrandService {
     let where: string[] = [];
     let values: any[] = [];
 
-    // Exclude deleted
     where.push(`status != $${values.length + 1}`);
     values.push(0);
 
@@ -107,7 +105,7 @@ export default class BrandService {
     };
   }
   async updateBrand(data: EditBrandParams) {
-    const { id, name, statusCode, remark, company_id ,note} = data;
+    const { id, name, statusCode, remark, company_id, note } = data;
 
     const result = transaction(async (client) => {
 
@@ -176,7 +174,7 @@ export default class BrandService {
       `;
 
       const values = [
-        0, // Soft delete
+        0,  
         JSON.stringify(remark),
         id,
       ];

@@ -9,7 +9,6 @@ import FinancialYearController from "./financialYear.controller";
 
 export async function financialYearRouter(app: FastifyInstance) {
 
-  // CREATE FinancialYear
   app.post<{ Body: CreateFinancialYearBody }>(
     "/create",
     {
@@ -25,7 +24,7 @@ export async function financialYearRouter(app: FastifyInstance) {
 
             from_date: {
               type: "string",
-              format: "date", // YYYY-MM-DD
+              format: "date",
               description: "Start date of the report"
             },
 
@@ -73,7 +72,6 @@ export async function financialYearRouter(app: FastifyInstance) {
     }
   );
 
-  // FETCH FinancialYear
   app.post<{ Body: FetchFinancialYearBody }>(
     "/get",
     {
@@ -128,7 +126,7 @@ export async function financialYearRouter(app: FastifyInstance) {
     }
   );
 
-  // EDIT FinancialYear
+ 
   app.post<{ Body: EditFinancialYearBody }>(
     "/edit",
     {
@@ -144,7 +142,7 @@ export async function financialYearRouter(app: FastifyInstance) {
 
             from_date: {
               type: "string",
-              format: "date", // YYYY-MM-DD
+              format: "date",
               description: "Start date of the report"
             },
 
@@ -192,7 +190,7 @@ export async function financialYearRouter(app: FastifyInstance) {
     }
   );
 
-  // DELETE FinancialYear
+ 
   app.post<{ Body: DeleteFinancialYearBody }>(
     "/delete",
     {

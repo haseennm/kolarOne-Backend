@@ -14,8 +14,6 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
         let logoPath: string | null = null;
         let fullPath: string | null = null;
 
-        // try {
-
         for await (const part of parts) {
 
             if (part.type === "file") {
@@ -37,7 +35,6 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             }
         }
 
-        // ✅ Required Fields
         const required = [
             "company_name",
             "bussiness_category",
@@ -72,17 +69,7 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             message: result
         });
 
-        // } catch (error: any) {
-
-        //     if (fullPath && fs.existsSync(fullPath)) {
-        //         fs.unlinkSync(fullPath);
-        //     }
-
-        //     return reply.status(400).send({
-        //         status: "Error",
-        //         message: error.message || "Company creation failed"
-        //     });
-        // }
+      
     });
     app.post<{ Body: GetCompanyBody }>(
         '/get',
@@ -100,7 +87,6 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             }
         },
         async (request: FastifyRequest<{ Body: GetCompanyBody }>, reply: FastifyReply) => {
-            // try {
             cns(request.url, request.body)
             const { page = 1, limit = 10, ...filters } = request.body;
             const offset = (page - 1) * limit;
@@ -113,16 +99,8 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
                     limit
                 }
             });
-            console.log(companies)
 
             return reply.code(200).send(companies);
-
-            // } catch (err: any) {
-            //     el(err)
-            //     return reply
-            //         .status(err.statusCode || 500)
-            //         .send({ message: err.message || "Internal Server Error" });
-            // }
         }
     );
 
@@ -132,8 +110,6 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
         const body: any = {};
         let logoPath: string | null = null;
         let fullPath: string | null = null;
-
-        // try {
 
         for await (const part of parts) {
 
@@ -181,18 +157,6 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             message: company
         });
 
-        // } catch (err: any) {
-
-        //     // delete uploaded file if error happens
-        //     if (fullPath && fs.existsSync(fullPath)) {
-        //         fs.unlinkSync(fullPath);
-        //     }
-
-        //     return reply.status(400).send({
-        //         status: "Error",
-        //         message: err.message || "Company update failed"
-        //     });
-        // }
     });
     app.post<{ Body: DeleteCompanyBody }>(
         '/delete',
@@ -212,18 +176,10 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             },
         },
         async (request, reply) => {
-            // try {
             cns(request.url, request.body)
             const controller = new CompanyController()
             const company = await controller.deleteCompany(request.body)
             return reply.code(201).send(company)
-
-            // } catch (err: any) {
-            //     el(err)
-            //     return reply
-            //         .status(err.statusCode || 500)
-            //         .send({ message: err.message || "Internal Server Error" });
-            // }
         }
     )
 

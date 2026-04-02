@@ -15,7 +15,7 @@ import path from "path";
 
 export async function firmRouter(app: FastifyInstance): Promise<void> {
 
-  // CREATE
+ 
   app.post("/create", async (request, reply) => {
 
     const parts = request.parts();
@@ -45,7 +45,6 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
           uploadedFullPath = fullPath;
         }
 
-        // 🔹 Handle Text Fields
         else {
           const cleanKey = part.fieldname.trim(); // remove accidental spaces
           body[cleanKey] = part.value;
@@ -97,7 +96,6 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
 
     } catch (error: any) {
 
-      // 🔥 Delete uploaded file if DB fails
       if (uploadedFullPath && fs.existsSync(uploadedFullPath)) {
         fs.unlinkSync(uploadedFullPath);
       }
@@ -126,7 +124,6 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
       request: FastifyRequest<{ Body: FetchFirmBody }>,
       reply: FastifyReply
     ) => {
-      // try {
       cns(request.url, request.body);
 
       const { page = 1, limit = 10, ...filters } = request.body;
@@ -144,12 +141,7 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
       });
 
       return reply.code(200).send(firms);
-      // } catch (err: any) {
-      //   el(err);
-      //   return reply
-      //     .status(err.statusCode || 500)
-      //     .send({ message: err.message || "Internal Server Error" });
-      // }
+     
     }
   );
 

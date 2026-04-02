@@ -186,7 +186,6 @@ export default class StockService {
 `;
     const sold_qty = Number(is_stock_exist.purchased_qty) - Number(is_stock_exist.available_quantity);
     const new_available_qty = Number(available_qty) - Number(sold_qty)
-    console.log(sold_qty, new_available_qty)
     const values = [
       new_available_qty ?? is_stock_exist.available_quantity,
       statusCode ?? is_stock_exist.status,
@@ -333,9 +332,7 @@ export default class StockService {
       ]
     );
 
-    console.log("stock section done");
-
-    return updatedStock; // ✅ ALWAYS returns something
+    return updatedStock; 
   }
 
   async fetchStock(data: StockFetchParams) {

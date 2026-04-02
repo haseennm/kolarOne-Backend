@@ -7,7 +7,7 @@ import { DeleteCompanyBrandingBody } from "./companyBranding.types";
 
 export async function companyBrandingRouter(app: FastifyInstance): Promise<void> {
 
-  // CREATE BRANDING
+
   app.post("/create", async (request, reply) => {
     const parts = request.parts();
 
@@ -44,7 +44,7 @@ export async function companyBrandingRouter(app: FastifyInstance): Promise<void>
 
       body.company_id = Number(body.company_id);
 
-      // Convert booleans
+
       const booleanFields = [
         "invoice_header",
         "report_header",
@@ -83,7 +83,7 @@ export async function companyBrandingRouter(app: FastifyInstance): Promise<void>
     }
   });
 
-  // FETCH BRANDING
+
   app.post("/get", async (request: any, reply) => {
     const { company_id } = request.body;
 
@@ -98,7 +98,7 @@ export async function companyBrandingRouter(app: FastifyInstance): Promise<void>
     return reply.send(result);
   });
 
-  // UPDATE BRANDING
+
   app.post("/edit", async (request, reply) => {
     const parts = request.parts();
 
@@ -175,8 +175,8 @@ export async function companyBrandingRouter(app: FastifyInstance): Promise<void>
     }
   });
 
-  // DELETE (soft delete)
-   app.post<{ Body: DeleteCompanyBrandingBody }>(
+
+  app.post<{ Body: DeleteCompanyBrandingBody }>(
     "/delete",
     {
       schema: {

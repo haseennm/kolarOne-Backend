@@ -5,7 +5,7 @@ import { DeleteCapitalLedgerBody, EditCapitalLedgerBody, FetchLedgerRequest } fr
 export async function partnerLedgerRouter(app: FastifyInstance) {
   const controller = new CapitalLedgerController();
 
-  // CREATE
+  
   app.post("/create", {
     schema: {
       body: {
@@ -31,7 +31,7 @@ export async function partnerLedgerRouter(app: FastifyInstance) {
     return reply.code(201).send({ status: "Success", message: res });
   });
 
-  // FETCH (GET)
+  
   app.post<{
     Body: FetchLedgerRequest;
   }>(
@@ -85,7 +85,6 @@ export async function partnerLedgerRouter(app: FastifyInstance) {
     }
   );
 
-  // EDIT
   app.post<{Body:EditCapitalLedgerBody}>("/edit", {
     schema: {
       body: {
@@ -110,7 +109,7 @@ export async function partnerLedgerRouter(app: FastifyInstance) {
     return reply.send({ status: "Success", message: res });
   });
 
-  // DELETE
+  
   app.post<{Body:DeleteCapitalLedgerBody}>("/delete", {
     schema: {
       body: {

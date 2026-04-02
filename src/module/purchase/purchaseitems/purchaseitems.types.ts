@@ -85,7 +85,6 @@ export interface FetchDbPurchaseItem {
   status: number;
   remark: object | null;
 
-  // joined fields
   product_name: string;
   bill_number: string;
   batch_number: string | null;

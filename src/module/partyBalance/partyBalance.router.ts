@@ -10,65 +10,7 @@ import PartyBalanceController from "./partyBalance.controller";
 
 export async function partyBalanceRouter(app: FastifyInstance) {
 
-  // // CREATE PARTY BALANCE
-  // app.post<{ Body: CreatePartyBalanceBody }>(
-  //   "/create",
-  //   {
-  //     schema: {
-  //       body: {
-  //         type: "object",
-  //         required: ["ref_id", "ref_type", "balance", "flow", "firm_id", "created_by"],
-  //         properties: {
-
-  //           ref_id: {
-  //             type: "number"
-  //           },
-
-  //           ref_type: {
-  //             type: "string",
-  //             enum: ["S", "P", "SR", "PR"]
-  //           },
-
-  //           balance: {
-  //             type: "number"
-  //           },
-
-  //           flow: {
-  //             type: "string",
-  //             enum: ["I", "O"]
-  //           },
-
-  //           firm_id: {
-  //             type: "number"
-  //           },
-
-  //           created_by: {
-  //             type: "string"
-  //           }
-
-  //         }
-  //       }
-  //     }
-  //   },
-  //   async (
-  //     request: FastifyRequest<{ Body: CreatePartyBalanceBody }>,
-  //     reply: FastifyReply
-  //   ) => {
-
-  //     const controller = new PartyBalanceController();
-  //     const data = await controller.createPartyBalance(request.body);
-
-  //     return reply.code(201).send({
-  //       status: "Success",
-  //       message: data
-  //     });
-
-  //   }
-  // );
-
-
-
-  // FETCH PARTY BALANCE
+ 
   app.post<{ Body: FetchPartyBalanceBody }>(
     "/get",
     {
@@ -125,7 +67,6 @@ export async function partyBalanceRouter(app: FastifyInstance) {
 
 
 
-  // REPAY PARTY BALANCE
   app.post<{ Body: RepayPartyBalanceBody }>(
     "/repay",
     {
@@ -187,48 +128,5 @@ export async function partyBalanceRouter(app: FastifyInstance) {
   );
 
 
-
-  // DELETE PARTY BALANCE
-  // app.post<{ Body: DeletePartyBalanceBody }>(
-  //   "/delete",
-  //   {
-  //     schema: {
-  //       body: {
-  //         type: "object",
-  //         required: ["id", "delete_by", "firm_id"],
-  //         properties: {
-
-  //           id: {
-  //             type: "number"
-  //           },
-
-  //           delete_by: {
-  //             type: "string"
-  //           },
-
-  //           firm_id: {
-  //             type: "number"
-  //           }
-
-  //         }
-  //       }
-  //     }
-  //   },
-  //   async (
-  //     request: FastifyRequest<{ Body: DeletePartyBalanceBody }>,
-  //     reply: FastifyReply
-  //   ) => {
-
-  //     const controller = new PartyBalanceController();
-
-  //     const data = await controller.deletePartyBalance(request.body);
-
-  //     return reply.code(200).send({
-  //       status: "Success",
-  //       message: data
-  //     });
-
-  //   }
-  // );
 
 }

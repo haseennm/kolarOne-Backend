@@ -82,7 +82,7 @@ export async function attendanceRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["branch_id", "created_by","company_id"],
+          required: ["branch_id", "created_by", "company_id"],
           properties: {
 
             branch_id: {
@@ -137,7 +137,7 @@ export async function attendanceRouter(app: FastifyInstance) {
           }
         }
       },
-   
+
     },
     async (
       request: FastifyRequest<{ Body: HolidayListBody }>,
@@ -153,7 +153,6 @@ export async function attendanceRouter(app: FastifyInstance) {
       });
     }
   );
-    // ─── Daily attendance report ───────────────────────────────────────
   app.post<{ Body: DailyAttendanceBody }>(
     "/daily",
     {
@@ -162,12 +161,11 @@ export async function attendanceRouter(app: FastifyInstance) {
           type: "object",
           required: ["date", "branch_id"],
           properties: {
-            date:       { type: "string", format: "date" },
-            branch_id:  { type: "number" }
+            date: { type: "string", format: "date" },
+            branch_id: { type: "number" }
           }
         }
       }
-      // preHandler: [checkClientEquivalentHook]  ← add if needed
     },
     async (request: FastifyRequest<{ Body: DailyAttendanceBody }>, reply) => {
       const controller = new AttendanceController();
@@ -179,7 +177,6 @@ export async function attendanceRouter(app: FastifyInstance) {
     }
   );
 
-  // ─── Monthly attendance report ─────────────────────────────────────
   app.post<{ Body: MonthlyAttendanceBody }>(
     "/monthly",
     {
@@ -188,20 +185,19 @@ export async function attendanceRouter(app: FastifyInstance) {
           type: "object",
           required: ["from_date", "to_date", "branch_id"],
           properties: {
-            from_date:  { type: "string", format: "date" },
-            to_date:    { type: "string", format: "date" },
-            branch_id:  { type: "number" }
+            from_date: { type: "string", format: "date" },
+            to_date: { type: "string", format: "date" },
+            branch_id: { type: "number" }
           }
         }
       }
-      // preHandler: [checkClientEquivalentHook]
     },
     async (request: FastifyRequest<{ Body: MonthlyAttendanceBody }>, reply) => {
       const controller = new AttendanceController();
       const result = await controller.getMonthlyAttendance(request.body);
 
       const start = new Date(request.body.from_date);
-      const end   = new Date(request.body.to_date);
+      const end = new Date(request.body.to_date);
       const total_days = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
       return reply.code(200).send({
@@ -214,29 +210,29 @@ export async function attendanceRouter(app: FastifyInstance) {
     }
   );
 
-   app.post<{ Body: DeleteHoliday }>(
-          '/mark/workday',
-          {
-              schema: {
-                  body: {
-                      type: 'object',
-                      required: [
-                          'r_id',
-                          "branch_id"
-                      ],
-                      properties: {
-                          r_id: { type: 'number' },
-                          branch_id: { type: 'number' },
-                      },
-                  },
-              },
+  app.post<{ Body: DeleteHoliday }>(
+    '/mark/workday',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: [
+            'r_id',
+            "branch_id"
+          ],
+          properties: {
+            r_id: { type: 'number' },
+            branch_id: { type: 'number' },
           },
-          async (request, reply) => {
-              const controller = new AttendanceController()
-              const branch = await controller.deleteHoliday(request.body)
-              return reply.code(201).send(branch)
-  
-            
-          }
-      )
+        },
+      },
+    },
+    async (request, reply) => {
+      const controller = new AttendanceController()
+      const branch = await controller.deleteHoliday(request.body)
+      return reply.code(201).send(branch)
+
+
+    }
+  )
 }

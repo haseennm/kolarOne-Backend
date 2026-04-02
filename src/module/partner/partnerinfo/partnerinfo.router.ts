@@ -6,7 +6,6 @@ import { AppError } from "../../../utils/AppError";
 export async function partnerRouter(app: FastifyInstance) {
   const controller = new PartnerController();
 
-  // CREATE
   app.post<{ Body: CreatePartnerBody }>("/create", {
     schema: {
       body: {
@@ -31,7 +30,6 @@ export async function partnerRouter(app: FastifyInstance) {
     return reply.code(201).send({ status: "Success", message: res });
   });
 
-  // FETCH
   app.post<{
     Body: FetchPartnerBody;
   }>(
@@ -40,7 +38,7 @@ export async function partnerRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          additionalProperties: false, // ❗ blocks unknown fields
+          additionalProperties: false,
           properties: {
             page: { type: "number" },
             limit: { type: "number" },
@@ -60,7 +58,6 @@ export async function partnerRouter(app: FastifyInstance) {
         key => !allowedFields.includes(key)
       );
 
-      console.log("first",req.body)
       if (extraFields.length) {
         throw new AppError(`Invalid fields: ${extraFields.join(", ")}`,500);
       }

@@ -47,7 +47,6 @@ export default class LedgerCategoryService {
         statusCode,
         JSON.stringify(remark)
       ];
-      console.log(values)
       const { rows } = await executeInTransaction(client, queryText, values);
 
       return `Ledger Category ${rows[0].name} created`;
@@ -179,7 +178,6 @@ export default class LedgerCategoryService {
       ];
 
       const { rows } = await executeInTransaction(client, queryText, values);
-      console.log(rows)
       return `Ledger category ${rows[0].name} Updated`;
     });
 

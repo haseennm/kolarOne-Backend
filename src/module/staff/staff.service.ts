@@ -56,7 +56,6 @@ export default class StaffService {
       }
 
       const firmIds = branchFirm.rows.map((f: any) => f.id);
-      console.log(firmIds)
       const isFinger_exist = await executeInTransaction(
         client,
         `
@@ -369,7 +368,6 @@ OFFSET $${values.length + 2}
     }
 
     if (Number(isStaffExist.entity_id) !== entity_id) {
-      console.log(typeof isStaffExist.entity_id, typeof entity_id)
       throw new AppError("Entity id not matching", 400);
     }
 

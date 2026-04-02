@@ -109,7 +109,6 @@ export default class FirmController {
     const service = new FirmService();
     const firm = await service.loginFirm(data);
 
-    console.log("firm in controller", firm);
 
     const isValid = await verifyPassword(password, firm.password);
 

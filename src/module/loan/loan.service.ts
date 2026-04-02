@@ -75,7 +75,6 @@ export default class LoanService {
       where.push(`l.branch_id = $${values.length}`);
     }
 
-    // Loan amount filters
     if (filters?.loan_amount_min) {
       values.push(filters.loan_amount_min);
       where.push(`l.loan_amount >= $${values.length}`);
@@ -86,7 +85,6 @@ export default class LoanService {
       where.push(`l.loan_amount <= $${values.length}`);
     }
 
-    // Paid amount filters
     if (filters?.paid_amount_min) {
       values.push(filters.paid_amount_min);
       where.push(`l.paid_amount >= $${values.length}`);
@@ -97,7 +95,6 @@ export default class LoanService {
       where.push(`l.paid_amount <= $${values.length}`);
     }
 
-    // Balance amount filters
     if (filters?.balance_amount_min) {
       values.push(filters.balance_amount_min);
       where.push(`l.balance_amount >= $${values.length}`);
@@ -108,7 +105,6 @@ export default class LoanService {
       where.push(`l.balance_amount <= $${values.length}`);
     }
 
-    // company filter (from branches table)
     if (filters.company_id) {
       values.push(filters.company_id);
       where.push(`b.company_id = $${values.length}`);
@@ -153,53 +149,11 @@ export default class LoanService {
     };
   }
 
-  // async updateloan(data: EditloanParams, client: any) {
-
-  //   const { id, loan, description, company_id, statusCode } = data;
-
-  //   const isloanExist = await getRecord(
-  //     id,
-  //     "loan",
-  //     "company_id",
-  //     company_id,
-  //     client
-  //   );
-
-  //   if (!isloanExist) {
-  //     throw new AppError("loan not found", 404);
-  //   }
-
-  //   const status =
-  //     statusCode === 99
-  //       ? isloanExist.status
-  //       : statusCode;
-
-  //   const updateQuery = `
-  //     UPDATE loan
-  //     SET
-  //       loan = $1,
-  //       description = $2,
-  //       status = $3
-  //     WHERE id = $4
-  //     RETURNING *;
-  //   `;
-
-  //   const values = [
-  //     loan ?? isloanExist.loan,
-  //     description ?? isloanExist.description,
-  //     status,
-  //     id
-  //   ];
-
-  //   const { rows } = await executeInTransaction(client, updateQuery, values);
-
-  //   return rows[0];
-  // }
+  
 
   async repayLoan(data: RepayLoanParams, client: PoolClient) {
     const { loan_id, pay_amount, branch_id, company_id, remarks } = data;
 
-    // Get loan details
     const loan = await getRecord(loan_id, "staff_loans", "branch_id", branch_id, client)
 
     if (!loan) {

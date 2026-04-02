@@ -9,7 +9,6 @@ import { error } from "console";
 
 export async function productCategoryRouter(app: FastifyInstance): Promise<void> {
 
-  // CREATE
   app.post("/create", async (request, reply) => {
 
     const parts = request.parts();
@@ -39,9 +38,8 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
           uploadedFullPath = fullPath;
         }
 
-        // 🔹 Handle Text Fields
         else {
-          const cleanKey = part.fieldname.trim(); // remove accidental spaces
+          const cleanKey = part.fieldname.trim(); 
           body[cleanKey] = part.value;
         }
       }
@@ -83,7 +81,6 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
 
     } catch (error: any) {
 
-      // 🔥 Delete uploaded file if DB fails
       if (uploadedFullPath && fs.existsSync(uploadedFullPath)) {
         fs.unlinkSync(uploadedFullPath);
       }
@@ -92,7 +89,6 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
     }
   });
 
-  // FETCH
   app.post<{ Body: FetchProductCatBody }>(
     "/get",
     {
@@ -115,7 +111,6 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
       request: FastifyRequest<{ Body: FetchProductCatBody }>,
       reply: FastifyReply
     ) => {
-      // try {
       cns(request.url, request.body);
 
       const { page = 1, limit = 10, ...filters } = request.body;
@@ -133,16 +128,10 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
       });
 
       return reply.code(200).send(firms);
-      // } catch (err: any) {
-      //   el(err);
-      //   return reply
-      //     .status(err.statusCode || 500)
-      //     .send({ message: err.message || "Internal Server Error" });
-      // }
+     
     }
   );
 
-  // EDIT
   app.post("/edit", async (request, reply) => {
 
     const parts = request.parts();
@@ -205,7 +194,6 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
 
     } catch (err: any) {
 
-      // delete uploaded file if error happens
       if (fullPath && fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath);
       }
@@ -214,7 +202,6 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
     }
   });
 
-  // DELETE
   app.post<{ Body: DeleteProductCatBody }>(
     "/delete",
     {
@@ -231,17 +218,10 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
       },
     },
     async (request, reply) => {
-      // try {
       cns(request.url, request.body);
       const controller = new ProCatController();
       const firm = await controller.deleteProductCat(request.body);
       return reply.code(201).send(firm);
-      // } catch (err: any) {
-      //   el(err);
-      //   return reply
-      //     .status(err.statusCode || 500)
-      //     .send({ message: err.message || "Internal Server Error" });
-      // }
     }
   );
 }

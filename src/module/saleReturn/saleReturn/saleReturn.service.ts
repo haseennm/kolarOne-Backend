@@ -383,7 +383,6 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
   );
 
   const total = await query<{ count: string }>(countQuery, values);
-console.log("first")
   return {
     pagination: {
       page: filters.page,

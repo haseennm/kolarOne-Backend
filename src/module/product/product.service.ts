@@ -35,7 +35,7 @@ export default class ProductService {
     } = data;
 
     return transaction(async (client) => {
-      // Validate company
+
       const companyExist = await getRecord(
         company_id,
         "company",
@@ -45,7 +45,6 @@ export default class ProductService {
       );
       if (!companyExist) throw new AppError("Company not found", 404);
 
-      // Validate category
       const categoryExist = await getRecord(
         category_id,
         "product_categories",
@@ -281,23 +280,23 @@ export default class ProductService {
 `;
 
       const values = [
-        category_id ?? existing.category_id,   // $1
-        brand_id ?? existing.brand_id,         // $2
-        rest.name ?? existing.name,                 // $3
-        rest.short_name ?? existing.short_name,     // $4
-        rest.description ?? existing.description,   // $5
-        rest.sku ?? existing.sku,                   // $6
-        rest.barcode ?? existing.barcode,           // $7
-        rest.hsn_sac_code ?? existing.hsn_sac_code, // $8
-        rest.unit ?? existing.unit,                 // $9
-        rest.base_price ?? existing.base_price,     // $10
-        rest.cgst_rate ?? existing.cgst_rate,       // $11
-        rest.sgst_rate ?? existing.sgst_rate,       // $12
-        rest.igst_rate ?? existing.igst_rate,       // $13
-        statusCode ?? existing.status,              // $14
-        rest.image ?? existing.image,               // $15
-        JSON.stringify(remarks),                    // $16
-        id                                          // $17
+        category_id ?? existing.category_id,
+        brand_id ?? existing.brand_id,
+        rest.name ?? existing.name,
+        rest.short_name ?? existing.short_name,
+        rest.description ?? existing.description,
+        rest.sku ?? existing.sku,
+        rest.barcode ?? existing.barcode,
+        rest.hsn_sac_code ?? existing.hsn_sac_code,
+        rest.unit ?? existing.unit,
+        rest.base_price ?? existing.base_price,
+        rest.cgst_rate ?? existing.cgst_rate,
+        rest.sgst_rate ?? existing.sgst_rate,
+        rest.igst_rate ?? existing.igst_rate,
+        statusCode ?? existing.status,
+        rest.image ?? existing.image,
+        JSON.stringify(remarks),
+        id
       ];
 
       const { rows } = await executeInTransaction(
@@ -349,50 +348,50 @@ export default class ProductService {
   }
   async getProductReportSummary(data: GetProductReport) {
 
-  const { level, firm_id, branch_id, company_id, start_date, end_date } = data;
+    const { level, firm_id, branch_id, company_id, start_date, end_date } = data;
 
-  return transaction(async (client) => {
+    return transaction(async (client) => {
 
-    let firmIds: number[] = [];
+      let firmIds: number[] = [];
 
-    /* ================= GET FIRM IDS ================= */
+      /* ================= GET FIRM IDS ================= */
 
-    if (level === "firm") {
-      firmIds = [firm_id!];
-    }
+      if (level === "firm") {
+        firmIds = [firm_id!];
+      }
 
-    if (level === "branch") {
-      const firms = await executeInTransaction(
-        client,
-        `SELECT id FROM firm WHERE branch_id = $1`,
-        [branch_id]
-      );
-      firmIds = firms.rows.map((f: any) => f.id);
-    }
+      if (level === "branch") {
+        const firms = await executeInTransaction(
+          client,
+          `SELECT id FROM firm WHERE branch_id = $1`,
+          [branch_id]
+        );
+        firmIds = firms.rows.map((f: any) => f.id);
+      }
 
-    if (level === "company") {
-      const firms = await executeInTransaction(
-        client,
-        `
+      if (level === "company") {
+        const firms = await executeInTransaction(
+          client,
+          `
         SELECT f.id
         FROM firm f
         JOIN branches b ON b.id = f.branch_id
         WHERE b.company_id = $1
         `,
-        [company_id]
-      );
-      firmIds = firms.rows.map((f: any) => f.id);
-    }
+          [company_id]
+        );
+        firmIds = firms.rows.map((f: any) => f.id);
+      }
 
-    if (!firmIds.length) return {};
+      if (!firmIds.length) return {};
 
-    const hasDate = Boolean(start_date && end_date);
+      const hasDate = Boolean(start_date && end_date);
 
-    /* ================= MAIN QUERY ================= */
+      /* ================= MAIN QUERY ================= */
 
-    const result = await executeInTransaction(
-      client,
-      `
+      const result = await executeInTransaction(
+        client,
+        `
       SELECT 
         p.id AS product_id,
         p.name AS product_name,
@@ -504,45 +503,45 @@ export default class ProductService {
         COALESCE(SUM(si.saled_qty),0) != 0 OR
         COALESCE(SUM(pi.purchased_qty),0) != 0
       `,
-      hasDate
-        ? [firmIds, start_date, end_date]
-        : [firmIds]
-    );
-
-    const products = result.rows;
-
-    /* ================= SUMMARY ================= */
-
-    let mostSold = null;
-    let leastSold = null;
-
-    if (products.length) {
-      mostSold = products.reduce((a: any, b: any) =>
-        Number(b.net_sold_quantity) > Number(a.net_sold_quantity) ? b : a
+        hasDate
+          ? [firmIds, start_date, end_date]
+          : [firmIds]
       );
 
-      leastSold = products.reduce((a: any, b: any) =>
-        Number(b.net_sold_quantity) < Number(a.net_sold_quantity) ? b : a
-      );
-    }
+      const products = result.rows;
 
-    return {
-      total_products_with_activity: products.length,
+      /* ================= SUMMARY ================= */
 
-      summary: {
-        total_income: products.reduce((s, p) => s + Number(p.total_income), 0),
-        total_expense: products.reduce((s, p) => s + Number(p.total_expense), 0),
-        net_result: products.reduce(
-          (s, p) => s + (Number(p.total_income) - Number(p.total_expense)),
-          0
-        ),
-      },
+      let mostSold = null;
+      let leastSold = null;
 
-      most_sold_product: mostSold || null,
-      least_sold_product: leastSold || null,
+      if (products.length) {
+        mostSold = products.reduce((a: any, b: any) =>
+          Number(b.net_sold_quantity) > Number(a.net_sold_quantity) ? b : a
+        );
 
-      products
-    };
-  });
-}
+        leastSold = products.reduce((a: any, b: any) =>
+          Number(b.net_sold_quantity) < Number(a.net_sold_quantity) ? b : a
+        );
+      }
+
+      return {
+        total_products_with_activity: products.length,
+
+        summary: {
+          total_income: products.reduce((s, p) => s + Number(p.total_income), 0),
+          total_expense: products.reduce((s, p) => s + Number(p.total_expense), 0),
+          net_result: products.reduce(
+            (s, p) => s + (Number(p.total_income) - Number(p.total_expense)),
+            0
+          ),
+        },
+
+        most_sold_product: mostSold || null,
+        least_sold_product: leastSold || null,
+
+        products
+      };
+    });
+  }
 }

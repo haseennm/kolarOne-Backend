@@ -12,7 +12,7 @@ const app = Fastify({
 })
 app.register(multipart, {
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB
+        fileSize: 5 * 1024 * 1024, 
     },
 
 });
@@ -21,7 +21,6 @@ app.register(fastifyStatic, {
     root: path.join(__dirname, "../uploads"),
     prefix: "/uploads/",
 });
-// app.register(multipart)
 app.addHook('preHandler', async (request, reply) => {
   if (!request.isMultipart()) {
     cns(request.url, request.body as object)

@@ -46,7 +46,7 @@ export default class PurchaseController {
             selling_price: 0,
             available_qty: item.received_qty,
             purchased_qty: item.purchased_qty,
-            status: "Good", // optional dynamic
+            status: "Good",
             movement_type: "I",
             reason: getTransactionCode("purchase"),
             company_id
@@ -143,7 +143,7 @@ export default class PurchaseController {
 
           const purchase_item = await purchaseItem.editPurchaseItem(
             {
-              item_id: item.item_id, // ✅ add this
+              item_id: item.item_id,
               purchase_id: purchase.id,
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
@@ -298,14 +298,12 @@ export default class PurchaseController {
         },
         client
       );
-      console.log("192")
       await partyBalanceService.deletePartyBalance(
         {
           delete_by: deleted_by, firm_id: rest.firm_id, purchase_id: rest.id
         },
         client
       );
-      console.log("299")
       await payment_transactions_service.deletePaymentTransaction({
         company_id: purchase.company_id,
         ref_id: rest.id,

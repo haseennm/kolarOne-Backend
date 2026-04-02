@@ -7,7 +7,7 @@ export interface CreatePartnerBody {
   district: string;
   state?: string | null;
   pincode: string;
-  status: string; // "Active", "Inactive", etc.
+  status: string; 
   created_by: string;
 }
 

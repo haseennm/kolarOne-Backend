@@ -10,7 +10,7 @@ export default class CompanyBrandingService {
     const {
       company_id,
       accent_color,
-      primary_color, // keep if DB column is same
+      primary_color,
       secondary_color,
       font_size,
       invoice_header,
@@ -235,7 +235,7 @@ export default class CompanyBrandingService {
     `;
 
       const values = [
-        0, // soft delete (same as your branch logic)
+        0, 
         JSON.stringify(remark),
         company_id,
         0

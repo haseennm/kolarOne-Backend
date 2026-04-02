@@ -16,10 +16,6 @@ export default class FinancialYearService {
 
     const { from_date, end_date, remark, statusCode, company_id } = data;
    
-
-    // if (!isCompanyExist) {
-    //   throw new AppError("Company not found", 404);
-    // }
     const overlapQuery = `
     SELECT id FROM financial_year
     WHERE company_id =$1

@@ -6,9 +6,9 @@ export interface CreateCompanyBrandingBody {
   pos_print_header: boolean;
   tagline: string;
   show_address: boolean;
-  primary_color: string //#FFF
-  secondary_color: string //#FFF
-  accent_color: string //#FFF
+  primary_color: string;
+  secondary_color: string;
+  accent_color: string;
   show_logo: boolean;
   show_gstin: boolean;
   show_qr_upi: boolean;
@@ -24,31 +24,6 @@ export interface CreateCompanyBrandingParams
   statusCode: number
 }
 
-// export interface FetchCompanyBrandingBody {
-//   page?: number;
-//   limit?: number;
-//   id?: number;
-//   branch_id?: number;
-//   search?: string | null;
-//   status?: number;
-// }
-
-// export interface FetchCompanyBrandingParams {
-//   offset: number;
-//   filters: FetchCompanyBrandingBody;
-// }
-
-// export interface FetchDbCompanyBranding
-//   extends Omit<CreateCompanyBrandingBody, "status" | "created_by"> {
-//   id: number;
-//   status: number; // 1 = Active, 0 = Inactive, -1 = Deleted
-//   remarks: object | null;
-// }
-
-// export type CountResult = {
-//   count: string;
-// };
-
 export interface EditCompanyBrandingBody {
   id: number;
   logo?: string | null;
@@ -58,9 +33,9 @@ export interface EditCompanyBrandingBody {
   pos_print_header?: boolean;
   tagline?: string;
   show_address?: boolean;
-  primary_color?: string //#FFF
-  secondary_color?: string //#FFF
-  accent_color?: string //#FFF
+  primary_color?: string;
+  secondary_color?: string;
+  accent_color?: string;
   show_logo?: boolean;
   show_gstin?: boolean;
   show_qr_upi?: boolean;
@@ -85,4 +60,4 @@ export interface DeleteCompanyBrandingBody {
 export interface DeleteCompanyBrandingParams
   extends Omit<DeleteCompanyBrandingBody, "deleted_by"> {
   remark: object;
-  }
+}

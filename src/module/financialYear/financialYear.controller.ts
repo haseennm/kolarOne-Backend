@@ -12,18 +12,12 @@ import {
 export default class FinancialYearController {
 
   async createFinancialYear(data: CreateFinancialYearBody) {
-    const { status,  from_date, end_date, created_by, ...rest } = data;
-
-    // Convert to Date
+    const { status, from_date, end_date, created_by, ...rest } = data;
     const start = new Date(from_date);
     const end = new Date(end_date);
-
-    // Check valid date format
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       throw new AppError("Invalid date format. Use YYYY-MM-DD", 400);
     }
-
-    // Check order
     if (start > end) {
       throw new AppError("from_date cannot be greater than end_date", 400);
     }

@@ -50,31 +50,7 @@ export default class LoanController {
     });
   }
 
-  // async editLoan(data: EditLoanBody) {
 
-  //   const { status, ...rest } = data;
-
-  //   return transaction(async (client) => {
-
-  //     let statusCode = 99;
-
-  //     if (typeof status === "string") {
-  //       statusCode = getStatusCode(status);
-  //     }
-
-  //     const service = new loanService();
-
-  //     await service.updateloan(
-  //       {
-  //         ...rest,
-  //         statusCode
-  //       },
-  //       client
-  //     );
-
-  //     return `loan has been updated successfully.`;
-  //   });
-  // }
 
   async fetchLoan(data: FetchLoanParams) {
 

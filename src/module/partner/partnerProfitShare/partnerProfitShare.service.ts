@@ -17,12 +17,10 @@ export default class ProfitShareService {
    WHERE id = $1 AND status != 0`,
           [parent_id]
         );
-        console.log(company.rows[0])
         company_id = company.rows[0].company_id
       } else {
         company_id = parent_id
       }
-      console.log(company_id)
       const check_partner = await getRecord(
         partner_id,
         "partners_info",
@@ -55,7 +53,6 @@ export default class ProfitShareService {
       if (!check_exist) {
         throw new AppError(`${config.table} Not found`, 404);
       }
-      // 2. Insert the Profit Share
       const queryText = `
         INSERT INTO partner_profit_shares (partner_id, entity_id, entity_type, profit_share, status, remarks)
         VALUES ($1, $2, $3, $4, $5, $6)
@@ -132,8 +129,6 @@ export default class ProfitShareService {
     const {
       partner_id,
       partner_name,
-      // profit_share_min,
-      // profit_share_max,
       profit_share_gt,
       profit_share_lt,
       page = 1,
@@ -165,11 +160,6 @@ export default class ProfitShareService {
       conditions.push(`pps.profit_share < $${i++}`);
       values.push(profit_share_lt);
     }
-
-    // if (profit_share_min && profit_share_max) {
-    //   conditions.push(`pps.profit_share BETWEEN $${i++} AND $${i++}`);
-    //   values.push(profit_share_min, profit_share_max);
-    // }
 
     const whereClause = conditions.length
       ? `WHERE ${conditions.join(" AND ")}`
@@ -219,7 +209,7 @@ export default class ProfitShareService {
         [data.id, data.entity_id]
       );
 
-      if (partnership.rowCount ==0) {
+      if (partnership.rowCount == 0) {
         throw new AppError("Partnership not found", 404);
       }
       const partnerName = partnership.rows[0].partner_name;

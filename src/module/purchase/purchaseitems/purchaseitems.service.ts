@@ -83,7 +83,6 @@ export default class PurchaseItemService {
     let where: string[] = [];
     let values: any[] = [];
 
-    // ignore deleted
     where.push(`status != $${values.length + 1}`);
     values.push(0);
 
@@ -167,7 +166,6 @@ export default class PurchaseItemService {
       item_id, purchase_id, remark, statusCode, product_id
     } = data;
 
-    // 1. Validate firm existence (requirement)
     const is_item_exist = await getRecord(
       item_id,
       "purchase_items",
@@ -231,7 +229,6 @@ export default class PurchaseItemService {
   }
 
   async deletePurchaseItem(data: DeletePurchaseItemParams, client: PoolClient) {
-    console.log(data)
 
     const { purchase_id, firm_id, remark } = data;
     const isItemExist = await executeInTransaction(client,

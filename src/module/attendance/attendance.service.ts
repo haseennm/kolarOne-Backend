@@ -294,7 +294,6 @@ export default class AttendanceService {
 
     return result.rows;
   }
-  // ─── Daily attendance report ───────────────────────────────────────
   async getDailyAttendance(branch_id: number, date: string, client: PoolClient): Promise<DailyAttendanceRow[]> {
 
     const result = await executeInTransaction<DailyAttendanceRow>(
@@ -355,7 +354,6 @@ ORDER BY s.id;
     return result.rows;
   }
 
-  // ─── Monthly attendance report ─────────────────────────────────────
   async getMonthlyAttendance(
     branch_id: number,
     from_date: string,
@@ -366,7 +364,6 @@ ORDER BY s.id;
     holidays: HolidayEntry[];
   }> {
 
-    // 1. Monthly summary
     const attResult = await executeInTransaction<MonthlyStaffSummary>(
       client,
       `
@@ -445,7 +442,6 @@ ORDER BY s.full_name;
       [from_date, to_date, branch_id]
     );
 
-    // 2. Holiday list
     const holidayResult = await executeInTransaction<HolidayEntry>(
       client,
       `
@@ -488,7 +484,6 @@ async deleteHoliday(data: DeleteHoliday, client: PoolClient) {
 
   const deletedDate = deleteResult.rows[0].attendance_date;
   if (!isFutureDay(deletedDate))throw new AppError("Cannot modify past or current day holidays", 403);
-// Assuming holidayDate is a Date or string like '2026-03-14'
 const formattedDate = new Date(deletedDate).toLocaleDateString('en-IN', {
   weekday: 'long',
   year: 'numeric',

@@ -86,18 +86,8 @@ export default class AttendanceController {
       return { data: holidays };
     });
   }
-    // ─── Daily report ──────────────────────────────────────────────────
   async getDailyAttendance(data: DailyAttendanceBody) {
     const { date, branch_id } = data;
-
-    // if (!date || !branch_id) {
-    //   throw new AppError("date and branch_id are required", 400);
-    // }
-
-    // // Basic date format check (you can add more validation)
-    // if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    //   throw new AppError("date must be in YYYY-MM-DD format", 400);
-    // }
 
     return transaction(async (client) => {
       const service = new AttendanceService();
@@ -106,17 +96,8 @@ export default class AttendanceController {
     });
   }
 
-  // ─── Monthly report ────────────────────────────────────────────────
   async getMonthlyAttendance(data: MonthlyAttendanceBody) {
     const { from_date, to_date, branch_id } = data;
-
-    // if (!from_date || !to_date || !branch_id) {
-    //   throw new AppError("from_date, to_date and branch_id are required", 400);
-    // }
-
-    // if (!/^\d{4}-\d{2}-\d{2}$/.test(from_date) || !/^\d{4}-\d{2}-\d{2}$/.test(to_date)) {
-    //   throw new AppError("Dates must be in YYYY-MM-DD format", 400);
-    // }
 
     return transaction(async (client) => {
       const service = new AttendanceService();

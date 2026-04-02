@@ -9,7 +9,6 @@ import PurchaseController from "./purchase.controller";
 
 export async function purchaseRouter(app: FastifyInstance) {
 
-  // CREATE PURCHASE
   app.post<{ Body: PurchaseCreateBody }>(
     "/create",
     {
@@ -106,7 +105,6 @@ export async function purchaseRouter(app: FastifyInstance) {
     }
   );
 
-  // FETCH PURCHASE LIST
   app.post<{ Body: PurchaseFetchBody }>(
     "/get",
     {
@@ -143,7 +141,6 @@ export async function purchaseRouter(app: FastifyInstance) {
     }
   );
 
-  // FETCH FULL PURCHASE DETAILS
   app.post<{ Body: PurchaseFetchBody }>(
     "/get/details",
     {
@@ -180,7 +177,6 @@ export async function purchaseRouter(app: FastifyInstance) {
     }
   );
 
-  // EDIT PURCHASE
   app.post<{ Body: PurchaseEditBody }>(
     "/edit",
     {
@@ -262,7 +258,6 @@ export async function purchaseRouter(app: FastifyInstance) {
     }
   );
 
-  // DELETE PURCHASE
   app.post<{ Body: PurchaseDeleteBody }>(
     "/delete",
     {

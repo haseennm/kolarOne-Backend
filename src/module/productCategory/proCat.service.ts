@@ -81,11 +81,9 @@ export default class ProductCatService {
     const whereConditions: string[] = [];
     const queryParams: any[] = [];
 
-    // Exclude deleted (assuming 0 = deleted)
     queryParams.push(0);
     whereConditions.push(`pc.status != $${queryParams.length}`);
 
-    // Search filter
     if (filters.search) {
       queryParams.push(`%${filters.search}%`);
       const searchIndex = queryParams.length;
@@ -100,7 +98,6 @@ export default class ProductCatService {
     `);
     }
 
-    // Filter by ID
     if (filters.id) {
       queryParams.push(filters.id);
       whereConditions.push(`pc.id = $${queryParams.length}`);
@@ -112,13 +109,11 @@ export default class ProductCatService {
       whereConditions.push(`pc.parent_id IS NULL`);
     }
 
-    // Filter by Branch
     if (filters.company_id) {
       queryParams.push(filters.company_id);
       whereConditions.push(`pc.company_id = $${queryParams.length}`);
     }
 
-    // Filter by Company
     if (filters.company_id) {
       queryParams.push(filters.company_id);
       whereConditions.push(`pc.company_id = $${queryParams.length}`);
@@ -264,7 +259,7 @@ RETURNING *;
     `;
 
       const values = [
-        0, // soft delete (same as your branch logic)
+        0,
         JSON.stringify(remark),
         r_id,
       ];

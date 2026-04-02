@@ -48,7 +48,6 @@ export default class PartyBalanceService {
       [ref_id, firm_id, ref_type]
     );
 
-    // ✅ CREATE if not exists
     if (result.rows.length === 0) {
       const remark = {
         action: `Created with ${balance}`,
@@ -79,14 +78,13 @@ export default class PartyBalanceService {
         flow,
         firm_id,
         statusCode,
-        JSON.stringify([remark]), // better as array
+        JSON.stringify([remark]),
       ];
 
       const { rows } = await executeInTransaction(client, insertQuery, insertValues);
-      return rows[0]; // ✅ return immediately
+      return rows[0];
     }
 
-    // ✅ UPDATE if exists
     const remark = {
       action: `Edited with ${balance}`,
       updated_by: action_by,
@@ -110,7 +108,7 @@ export default class PartyBalanceService {
       0,
       flow,
       statusCode,
-      JSON.stringify([remark]), // overwriting for now
+      JSON.stringify([remark]),
       ref_id,
       firm_id,
       ref_type,

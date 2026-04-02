@@ -10,7 +10,6 @@ export default class PurchaseReturnService {
     const {
       final_amount,
       firm_id,
-      // net_amount,
       payment_amount,
       payment_method_id,
       remark,
@@ -27,7 +26,6 @@ export default class PurchaseReturnService {
       reason
     } = data;
 
-    // Check firm existence
     const is_firm_exist = await getRecord(
       firm_id,
       "firm",
@@ -129,7 +127,6 @@ export default class PurchaseReturnService {
       JSON.stringify(remark),
       firm_id,
       final_amount ?? 0,
-      // net_amount ?? 0,
       payment_method_id ?? null,
       transaction_reference ?? null
     ];
@@ -160,7 +157,6 @@ export default class PurchaseReturnService {
       purchase_return_id,
     } = data;
 
-    // Check firm existence
     const is_purchase_return_exist = await getRecord(
       purchase_return_id,
       "purchase_return",
@@ -252,7 +248,6 @@ RETURNING *;
     let where: string[] = [];
     let values: any[] = [];
 
-    // status filter
     where.push(`pr.status != $${values.length + 1}`);
     values.push(0);
 
@@ -297,7 +292,6 @@ RETURNING *;
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-    // 🔥 MAIN QUERY
     const purchaseReturnQuery = `
     SELECT 
       pr.*,
@@ -316,7 +310,6 @@ RETURNING *;
     OFFSET $${values.length + 2}
   `;
 
-    // 🔥 COUNT QUERY
     const countQuery = `
     SELECT COUNT(*)
     FROM purchase_return pr
@@ -350,7 +343,6 @@ RETURNING *;
     let where: string[] = [];
     let values: any[] = [];
 
-    // status filter
     where.push(`pr.status != $${values.length + 1}`);
     values.push(0);
 
@@ -502,7 +494,6 @@ RETURNING *;
       throw new AppError("Purchase return not found or already deleted", 404);
     }
 
-    // ✅ Soft delete فقط
     const queryText = `
     UPDATE purchase_return pr
     SET
@@ -531,7 +522,7 @@ RETURNING *;
 
     const result = await executeInTransaction(client, queryText, values);
 
-    return result.rows[0]; // { id, company_id }
+    return result.rows[0]; 
   }
   // async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
   //   const { id, firm_id } = data;

@@ -21,7 +21,6 @@ export default class CompanyController {
         total: companyWithCode.total
       },
       data: {
-        // ...company,
         company: company
       }
     }

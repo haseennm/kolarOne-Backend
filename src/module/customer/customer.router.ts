@@ -10,99 +10,97 @@ import CustomerController from "./customer.controller";
 
 export async function customerRouter(app: FastifyInstance): Promise<void> {
 
-  // CREATE CUSTOMER
-app.post<{ Body: CreateCustomerBody }>(
-  "/create",
-  {
-    schema: {
-      body: {
-        type: "object",
-        required: [
-          "company_id",
-          "customer_type",
-          "customer_name",
-          "status",
-          "created_by",
-          "phone_number"
-        ],
-        properties: {
-          company_id: { type: "number" },
-          customer_type: {
-            type: "string",
-            enum: ["B2B", "B2C", "both"]
-          },
-          customer_name: { type: "string", minLength: 2 },
-          gender: {
-            type: ["string", "null"],
-            enum: ["MALE", "FEMALE", "OTHER", null]
-          },
-          email: {
-            type: ["string", "null"],
-            format: "email"
-          },
-          phone_number: {
-            type: ["string"],
-            minLength: 10,
-            maxLength: 15
-          },
-          alternate_phone: {
-            type: ["string", "null"]
-          },
-          billing_address: { type: ["string", "null"] },
-          billing_district: { type: ["string", "null"] },
-          billing_state: { type: ["string", "null"] },
-          billing_pin: {
-            type: ["number", "null"],
-            minimum: 100000,
-            maximum: 999999
-          },
-          shipping_address: { type: ["string", "null"] },
-          shipping_district: { type: ["string", "null"] },
-          shipping_state: { type: ["string", "null"] },
-          shipping_pin: {
-            type: ["number", "null"],
-            minimum: 100000,
-            maximum: 999999
-          },
-          state_code: {
-            type: ["string", "null"],
-            minLength: 2,
-            maxLength: 2
-          },
-          gstin: {
-            type: ["string", "null"],
-            minLength: 15,
-            maxLength: 15
-          },
-          notes: {
-            type: ["array", "null"],
-            items: { type: "string" }
-          },
-          status: { type: "string" },
-          created_by: { type: "string" }
+  app.post<{ Body: CreateCustomerBody }>(
+    "/create",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: [
+            "company_id",
+            "customer_type",
+            "customer_name",
+            "status",
+            "created_by",
+            "phone_number"
+          ],
+          properties: {
+            company_id: { type: "number" },
+            customer_type: {
+              type: "string",
+              enum: ["B2B", "B2C", "both"]
+            },
+            customer_name: { type: "string", minLength: 2 },
+            gender: {
+              type: ["string", "null"],
+              enum: ["MALE", "FEMALE", "OTHER", null]
+            },
+            email: {
+              type: ["string", "null"],
+              format: "email"
+            },
+            phone_number: {
+              type: ["string"],
+              minLength: 10,
+              maxLength: 15
+            },
+            alternate_phone: {
+              type: ["string", "null"]
+            },
+            billing_address: { type: ["string", "null"] },
+            billing_district: { type: ["string", "null"] },
+            billing_state: { type: ["string", "null"] },
+            billing_pin: {
+              type: ["number", "null"],
+              minimum: 100000,
+              maximum: 999999
+            },
+            shipping_address: { type: ["string", "null"] },
+            shipping_district: { type: ["string", "null"] },
+            shipping_state: { type: ["string", "null"] },
+            shipping_pin: {
+              type: ["number", "null"],
+              minimum: 100000,
+              maximum: 999999
+            },
+            state_code: {
+              type: ["string", "null"],
+              minLength: 2,
+              maxLength: 2
+            },
+            gstin: {
+              type: ["string", "null"],
+              minLength: 15,
+              maxLength: 15
+            },
+            notes: {
+              type: ["array", "null"],
+              items: { type: "string" }
+            },
+            status: { type: "string" },
+            created_by: { type: "string" }
+          }
         }
       }
+    },
+    async (
+      request: FastifyRequest<{ Body: CreateCustomerBody }>,
+      reply: FastifyReply
+    ) => {
+
+      cns(request.url, request.body);
+
+      const controller = new CustomerController();
+
+      const customer = await controller.createCustomer(request.body);
+
+      return reply.code(201).send({
+        status: "Success",
+        message: customer,
+      });
     }
-  },
-  async (
-    request: FastifyRequest<{ Body: CreateCustomerBody }>,
-    reply: FastifyReply
-  ) => {
+  );
 
-    cns(request.url, request.body);
-
-    const controller = new CustomerController();
-
-    const customer = await controller.createCustomer(request.body);
-
-    return reply.code(201).send({
-      status: "Success",
-      message: customer,
-    });
-  }
-);
-
-  // FETCH CUSTOMERS
   app.post<{ Body: FetchCustomerBody }>(
     "/get",
     {
@@ -146,7 +144,6 @@ app.post<{ Body: CreateCustomerBody }>(
     }
   );
 
-  // EDIT CUSTOMER
   app.post<{ Body: EditCustomerBody }>(
     "/edit",
     async (
@@ -167,7 +164,6 @@ app.post<{ Body: CreateCustomerBody }>(
     }
   );
 
-  // DELETE CUSTOMER
   app.post<{ Body: DeleteCustomerBody }>(
     "/delete",
     {

@@ -60,13 +60,7 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             body.company_id = Number(body.company_id);
             body.state_code = Number(body.state_code);
             body.pincode = Number(body.pincode);
-            // if (body.role) {
-            //     console.log("body.role", body.role)
-            //     body.role = body.role
-            //     .split(",")
-            //     .map((r: string) => Number(r.trim()))
-            //     .filter((r: number) => !isNaN(r));
-            // }
+         
             if (body.role) {
                 try {
                     body.role = JSON.parse(body.role);
@@ -110,7 +104,6 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             }
         },
         async (request: FastifyRequest<{ Body: FetchBranchBody }>, reply: FastifyReply) => {
-            // try {
             cns(request.url, request.body)
             const { page = 1, limit = 10, ...filters } = request.body;
             const offset = (page - 1) * limit;
@@ -123,16 +116,10 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
                     limit
                 }
             });
-            console.log(companies)
 
             return reply.code(200).send(companies);
 
-            // } catch (err: any) {
-            //     el(err)
-            //     return reply
-            //         .status(err.statusCode || 500)
-            //         .send({ message: err.message || "Internal Server Error" });
-            // }
+         
         }
     );
 
@@ -167,8 +154,7 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             if (!body.company_id) {
                 throw new AppError("company_id is required",500);
             }
-            // delete body.company_id;
-            // delete body.id;
+            
             if (body.role) {
                 try {
                     body.role = JSON.parse(body.role);
@@ -216,18 +202,12 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             },
         },
         async (request, reply) => {
-            // try {
             cns(request.url, request.body)
             const controller = new BranchController()
             const branch = await controller.deleteBranch(request.body)
             return reply.code(201).send(branch)
 
-            // } catch (err: any) {
-            //     el(err)
-            //     return reply
-            //         .status(err.statusCode || 500)
-            //         .send({ message: err.message || "Internal Server Error" });
-            // }
+        
         }
     )
 
@@ -246,17 +226,11 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             },
         },
         async (request, reply) => {
-            // try {
             cns(request.url, request.body);
             const controller = new BranchController();
             const firm = await controller.loginBranch(request.body);
             return reply.code(201).send(firm);
-            // } catch (err: any) {
-            //     el(err);
-            //     return reply
-            //         .status(err.statusCode || 500)
-            //         .send({ message: err.message || "Internal Server Error" });
-            // }
+        
         }
     );
 

@@ -5,7 +5,6 @@ import {
   PurchaseReturnEditBody,
   PurchaseReturnFetchBody
 } from "./purchaseReturn.types";
-import PurchaseController from "./purchaseReturn.controller";
 import PurchaseReturnController from "./purchaseReturn.controller";
 
 export async function purchaseReturnRouter(app: FastifyInstance) {
@@ -140,7 +139,7 @@ export async function purchaseReturnRouter(app: FastifyInstance) {
       reply: FastifyReply
     ) => {
       const { page = 1, limit = 10, ...filters } = request.body;
-      const controller = new PurchaseController();
+      const controller = new PurchaseReturnController();
       const data = await controller.purchaseReturnFetch({
         offset: (page - 1) * limit,
         filters: { ...filters, page, limit }
@@ -177,7 +176,7 @@ export async function purchaseReturnRouter(app: FastifyInstance) {
       reply: FastifyReply
     ) => {
       const { page = 1, limit = 10, ...filters } = request.body;
-      const controller = new PurchaseController();
+      const controller = new PurchaseReturnController();
       const data = await controller.fullPurchaseFetch({
         offset: (page - 1) * limit,
         filters: { ...filters, page, limit }
@@ -259,7 +258,7 @@ export async function purchaseReturnRouter(app: FastifyInstance) {
   //     request: FastifyRequest<{ Body: PurchaseReturnEditBody }>,
   //     reply: FastifyReply
   //   ) => {
-  //     const controller = new PurchaseController();
+  //     const controller = new PurchaseReturnController();
   //     const data = await controller.purchaseEdit(request.body);
 
   //     return reply.code(200).send({
@@ -289,7 +288,7 @@ export async function purchaseReturnRouter(app: FastifyInstance) {
       request: FastifyRequest<{ Body: PurchaseReturnDeleteBody }>,
       reply: FastifyReply
     ) => {
-      const controller = new PurchaseController();
+      const controller = new PurchaseReturnController();
       const data = await controller.purchaseReturnDelete(request.body);
 
       return reply.code(200).send({
@@ -369,8 +368,8 @@ export async function purchaseReturnRouter(app: FastifyInstance) {
         request: FastifyRequest<{ Body: PurchaseReturnEditBody }>,
         reply: FastifyReply
       ) => {
-        const controller = new PurchaseController();
-        const data = await controller.purchaseEdit(request.body);
+        const controller = new PurchaseReturnController();
+        const data = await controller.purchaseReturnEdit(request.body);
   
         return reply.code(200).send({
           status: "Success",

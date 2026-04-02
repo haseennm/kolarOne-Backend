@@ -37,38 +37,38 @@ export default class SaleReturnItemService {
       )
       if (!check_exist_stock) throw new AppError("Stock not found.", 404)
     }
-  const saleItem = await getRecord(
-  sale_item_id,
-  "sales_items",
-  "firm_id",
-  firm_id,
-  client
-);
+    const saleItem = await getRecord(
+      sale_item_id,
+      "sales_items",
+      "firm_id",
+      firm_id,
+      client
+    );
 
-if (!saleItem) {
-  throw new AppError("Sale item not found.", 404);
-}
+    if (!saleItem) {
+      throw new AppError("Sale item not found.", 404);
+    }
 
-const sold_qty = Number(saleItem.saled_qty ?? saleItem.quantity);
-const returnedQtyQuery = `
+    const sold_qty = Number(saleItem.saled_qty ?? saleItem.quantity);
+    const returnedQtyQuery = `
   SELECT COALESCE(SUM(returned_qty), 0) AS total_returned
   FROM sale_return_items
   WHERE sale_item_id = $1 AND firm_id = $2 AND status = $3
 `;
 
-const { rows: returnedRows } = await client.query(returnedQtyQuery, [
-  sale_item_id,
-  firm_id,
-  0
-]);
+    const { rows: returnedRows } = await client.query(returnedQtyQuery, [
+      sale_item_id,
+      firm_id,
+      0
+    ]);
 
-const already_returned = Number(returnedRows[0].total_returned);
-if (returned_qty + already_returned > sold_qty) {
-  throw new AppError(
-    `Return exceeds sold quantity. Max allowed: ${sold_qty - already_returned}`,
-    400
-  );
-}
+    const already_returned = Number(returnedRows[0].total_returned);
+    if (returned_qty + already_returned > sold_qty) {
+      throw new AppError(
+        `Return exceeds sold quantity. Max allowed: ${sold_qty - already_returned}`,
+        400
+      );
+    }
     const saleReturnItemQuery = `
     INSERT INTO sale_return_items (
       firm_id,
@@ -112,10 +112,7 @@ if (returned_qty + already_returned > sold_qty) {
       sale_item_id,
       return_mode
     ];
-console.log("first")
-const { rows } = await executeInTransaction(client, saleReturnItemQuery, values);
-console.log("second")
-
+    const { rows } = await executeInTransaction(client, saleReturnItemQuery, values);
     return rows[0];
   }
 
@@ -141,9 +138,9 @@ console.log("second")
     } = data;
 
     // ✅ Validation: Check sale return item existence
-    const item_row = await executeInTransaction(client,`
+    const item_row = await executeInTransaction(client, `
       SELECT * sale_return_items WHERE id = $1 AND firm_id $2 AND sale_return_id =$3 AND status =$4`,
-    [item_id,firm_id,sale_return_id,0])
+      [item_id, firm_id, sale_return_id, 0])
     const is_item_exist = item_row.rows[0]
     if (!is_item_exist) {
       throw new AppError("Sale return item not found", 404);
@@ -198,76 +195,76 @@ console.log("second")
     return rows[0];
   }
 
-//     const { filters, offset } = data;
+  //     const { filters, offset } = data;
 
-//     let where: string[] = [];
-//     let values: any[] = [];
+  //     let where: string[] = [];
+  //     let values: any[] = [];
 
-//     // ignore deleted
-//     where.push(`status != $${values.length + 1}`);
-//     values.push(0);
+  //     // ignore deleted
+  //     where.push(`status != $${values.length + 1}`);
+  //     values.push(0);
 
-//     if (filters?.id) {
-//       values.push(filters.id);
-//       where.push(`id = $${values.length}`);
-//     }
+  //     if (filters?.id) {
+  //       values.push(filters.id);
+  //       where.push(`id = $${values.length}`);
+  //     }
 
-//     if (filters?.purchase_id) {
-//       values.push(filters.purchase_id);
-//       where.push(`purchase_id = $${values.length}`);
-//     }
+  //     if (filters?.purchase_id) {
+  //       values.push(filters.purchase_id);
+  //       where.push(`purchase_id = $${values.length}`);
+  //     }
 
-//     if (filters?.firm_id) {
-//       values.push(filters.firm_id);
-//       where.push(`firm_id = $${values.length}`);
-//     }
+  //     if (filters?.firm_id) {
+  //       values.push(filters.firm_id);
+  //       where.push(`firm_id = $${values.length}`);
+  //     }
 
-//     if (filters?.branch_id) {
-//       values.push(filters.branch_id);
-//       where.push(`branch_id = $${values.length}`);
-//     }
+  //     if (filters?.branch_id) {
+  //       values.push(filters.branch_id);
+  //       where.push(`branch_id = $${values.length}`);
+  //     }
 
-//     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  //     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-//     const saleItemQuery = `
-//   SELECT 
-//     pi.*,
-//     p.name AS product_name,
-//     pu.bill_number,
-//     s.batch_number
-//   FROM sale_return_items pi
-//   LEFT JOIN products p ON p.id = pi.product_id
-//   LEFT JOIN purchases pu ON pu.id = pi.purchase_id
-//   LEFT JOIN stock s ON s.id = pi.stock_id
-//   ${whereClause}
-//   ORDER BY pi.id DESC
-//   LIMIT $${values.length + 1}
-//   OFFSET $${values.length + 2}
-// `;
+  //     const saleItemQuery = `
+  //   SELECT 
+  //     pi.*,
+  //     p.name AS product_name,
+  //     pu.bill_number,
+  //     s.batch_number
+  //   FROM sale_return_items pi
+  //   LEFT JOIN products p ON p.id = pi.product_id
+  //   LEFT JOIN purchases pu ON pu.id = pi.purchase_id
+  //   LEFT JOIN stock s ON s.id = pi.stock_id
+  //   ${whereClause}
+  //   ORDER BY pi.id DESC
+  //   LIMIT $${values.length + 1}
+  //   OFFSET $${values.length + 2}
+  // `;
 
-//     const countQuery = `
-//     SELECT COUNT(*)
-//     FROM sale_return_items
-//     ${whereClause}
-//   `;
+  //     const countQuery = `
+  //     SELECT COUNT(*)
+  //     FROM sale_return_items
+  //     ${whereClause}
+  //   `;
 
-//     const items = await query<FetchDbSaleReturnItem>(
-//       SaleItemQuery,
-//       [...values, filters.limit, offset]
-//     );
+  //     const items = await query<FetchDbSaleReturnItem>(
+  //       SaleItemQuery,
+  //       [...values, filters.limit, offset]
+  //     );
 
-//     const total = await query<SaleReturnItemCountResult>(countQuery, values);
+  //     const total = await query<SaleReturnItemCountResult>(countQuery, values);
 
-//     return {
-//       items,
-//       pagination: {
-//         page: filters.page,
-//         limit: filters.limit,
-//         total: Number(total[0].count),
-//         totalPages: Math.ceil(Number(total[0].count) / filters.limit),
-//       },
-//     };
-//   }
+  //     return {
+  //       items,
+  //       pagination: {
+  //         page: filters.page,
+  //         limit: filters.limit,
+  //         total: Number(total[0].count),
+  //         totalPages: Math.ceil(Number(total[0].count) / filters.limit),
+  //       },
+  //     };
+  //   }
 
   // async updatePurchaseItem(data: EditPurchaseItemParams, client: PoolClient) {
   //   const {

@@ -91,11 +91,6 @@ export default class PaymentMethodService {
     values.push(filters.company_id);
     where.push(`company_id = $${values.length}`);
 
-    // if (filters?.status !== undefined) {
-    //   values.push(filters.status);
-    //   where.push(`status = $${values.length}`);
-    // }
-
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
     const paymentMethodQuery = `

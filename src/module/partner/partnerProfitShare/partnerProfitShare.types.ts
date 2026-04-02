@@ -2,11 +2,11 @@
 export interface CreateProfitShareBody {
   partner_id: string;
   entity_id: number;
-  entity_type: string; // "Branch" | "Firm"
+  entity_type: string; 
   profit_share: number;
   status: string;
   created_by: string;
-  parent_id: number; // Needed for validation logic
+  parent_id: number;
 }
 
 export interface CreateProfitShareParams extends Omit<CreateProfitShareBody, "created_by" | "status"> {
@@ -31,15 +31,13 @@ export interface EditProfitShareBody {
   updated_by: string;
 }
 export interface EditProfitShareParams extends Omit<EditProfitShareBody, "updated_by" | "status" | "entity_type"> {
-  entity_type: string; // "B" | "F"
+  entity_type: string;  
   remark: object;
   statusCode?: number;
 }
 export interface ProfitShareFilters {
   partner_id?: number;
   partner_name?: string;
-  // profit_share_min?: number;
-  // profit_share_max?: number;
   profit_share_gt?: number;
   profit_share_lt?: number;
   page?: number;

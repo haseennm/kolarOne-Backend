@@ -176,11 +176,8 @@ export default class CompanyService {
         let where: string[] = []
         let values: any[] = []
 
-        // Always exclude deleted
         where.push(`status != $${values.length + 1}`)
-        values.push(0) // 0 = Deleted
-
-        // Search across multiple columns
+        values.push(0) 
         if (filters.search) {
             values.push(`%${filters.search}%`)
             const searchIndex = values.length
@@ -203,7 +200,6 @@ export default class CompanyService {
         `)
         }
 
-        // Optional filter by id
         if (filters.id) {
             values.push(filters.id)
             where.push(`id = $${values.length}`)

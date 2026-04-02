@@ -10,7 +10,6 @@ import LoanController from "./loan.controller";
 
 export async function loanRouter(app: FastifyInstance) {
 
-  // CREATE LOAN
   app.post<{ Body: CreateLoanBody }>(
     "/create",
     {
@@ -59,9 +58,6 @@ export async function loanRouter(app: FastifyInstance) {
     }
   );
 
-
-
-  // FETCH LOAN
   app.post<{ Body: FetchLoanBody }>(
     "/get",
     {
@@ -125,7 +121,6 @@ export async function loanRouter(app: FastifyInstance) {
     }
   );
 
-  // REPAY LOAN
   app.post<{ Body: RepayLoanBody }>(
     "/repay",
     {
@@ -174,7 +169,6 @@ export async function loanRouter(app: FastifyInstance) {
     }
   );
 
-  // DELETE LOAN
   app.post<{ Body: DeleteLoanBody }>(
     "/delete",
     {

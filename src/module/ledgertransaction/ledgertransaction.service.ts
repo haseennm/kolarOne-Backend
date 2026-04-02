@@ -93,7 +93,6 @@ export default class LedgerTransactionService {
     let where: string[] = [];
     let values: any[] = [];
 
-    // Exclude deleted
     where.push(`status != $${values.length + 1}`);
     values.push(0);
 

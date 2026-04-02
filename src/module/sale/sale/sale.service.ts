@@ -655,7 +655,6 @@ OFFSET $${values.length + 2}
     }
 
     /* ========= MAIN QUERY ========= */
-    console.log(firmIds)
 
     const query = `
     SELECT * FROM (
@@ -714,9 +713,7 @@ OFFSET $${values.length + 2}
     WHERE 1=1 ${dateFilter}
     ORDER BY date DESC
   `;
-console.log("PARAMS:", params);
     const { rows } = await client.query(query, params);
-console.log(rows)
     return rows;
   }
 }

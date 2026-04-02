@@ -1,7 +1,6 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { query } from "../config/db";
 
-// Extend request body types
 interface ClientBody {
   client_id?: number;
 }
@@ -14,7 +13,6 @@ interface ClientUpdateBody extends ClientBody {
   updated_by?: number;
 }
 
-// ✅ Check Client Exists
 export async function checkClient(
   request: FastifyRequest<{ Body: ClientBody }>,
   reply: FastifyReply
@@ -58,7 +56,6 @@ export async function checkClient(
   }
 }
 
-// ✅ Check Client + Created By
 export async function cliCreCheck(
   request: FastifyRequest<{ Body: ClientCreateBody }>,
   reply: FastifyReply
@@ -117,7 +114,6 @@ export async function cliCreCheck(
   }
 }
 
-// ✅ Check Client + Updated By
 export async function cliUpdCheck(
   request: FastifyRequest<{ Body: ClientUpdateBody }>,
   reply: FastifyReply

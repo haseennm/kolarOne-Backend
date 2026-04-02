@@ -86,7 +86,6 @@ export class PaymentTransactionService {
     if (!payment) {
       throw new AppError("Payment transaction not found", 404);
     }
-    // UNPAID -> PAID
     if (!payment && status === 5) {
       await executeInTransaction(
         client,
@@ -107,7 +106,6 @@ export class PaymentTransactionService {
         ]
       );
     }
-    // 2️⃣ paid -> paid (update amount etc.)
     else if (payment && status === 5) {
       await executeInTransaction(
         client,

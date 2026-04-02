@@ -32,21 +32,7 @@ export default class PartyBalanceController {
       client
     );
 
-    // const entity_type = convertEntityType("Branch" as EntityKey);
-
-    // const payment_transactions = new PaymentTransactionService()
-    // await payment_transactions.insertPaymentTransaction({
-    //   ref_id: Number(PartyBalance.id),
-    //   amount: rest.PartyBalance_amount,
-    //   ref_type: PaymentTransactionTypeCodeMap["PartyBalance"],
-    //   status: getStatusCode("Paid"),
-    //   payment_method_id: null,
-    //   transaction_reference: null,
-    //   business_id: rest.branch_id,
-    //   business_ref: entity_type,
-    //   company_id: rest.company_id
-    // }, client)
-
+   
 
     return `PartyBalance  has been created successfully.`;
 
