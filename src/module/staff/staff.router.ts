@@ -62,6 +62,7 @@ export async function staffRouter(app: FastifyInstance) {
             },
 
             phone_number: { type: "string" },
+            designation: { type: "string" },
 
             address: { type: "string" },
 
@@ -320,9 +321,11 @@ export async function staffRouter(app: FastifyInstance) {
     },
     async (request, reply) => {
       const controller = new StaffController();
-      const firm = await controller.loginStaff(request.body);
-      return reply.code(201).send(firm);
+      const staff = await controller.loginStaff(request.body);
+      console.log(staff)
+      return reply.code(201).send(staff);
 
     }
   );
+
 }

@@ -1,6 +1,6 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { cns, getRecord } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import { CreateStaffParams, DeleteStaffParams, EditStaffParams, FetchDbStaff, FetchStaffParams, StaffCountResult, StaffLoginBody } from "./staff.types";
 
 
@@ -23,7 +23,8 @@ export default class StaffService {
       address,
       salary,
       entity_table,
-      branch_id
+      branch_id,
+      designation
     } = data;
 
     // Check company
@@ -74,25 +75,36 @@ export default class StaffService {
     }
 
     // Check roles
-   if(role){
-     for (const roleId of role) {
-      const isRoleExist = await getRecord(
-        roleId,
-        "role",
-        "company_id",
-        company_id,
-        client
-      );
+    if (role) {
+      for (const roleId of role) {
+        const isRoleExist = await getRecord(
+          roleId,
+          "role",
+          "company_id",
+          company_id,
+          client
+        );
 
-      if (!isRoleExist) {
-        throw new AppError("One or more roles do not exist", 404);
+        if (!isRoleExist) {
+          throw new AppError("One or more roles do not exist", 404);
+        }
       }
     }
-   }
 
     // Check entity
-    const column = entity_type === "F" ? "branch_id" : "company_id";
-    const value = entity_type === "F" ? branch_id : company_id;
+    const column =
+      entity_type === "F"
+        ? "branch_id"
+        : entity_type === "C"
+          ? "id"
+          : "company_id";
+
+    const value =
+      entity_type === "F"
+        ? branch_id
+        : entity_type === "C"
+          ? company_id
+          : company_id;
 
     const isEntityExist = await getRecord(
       entity_id,
@@ -120,10 +132,11 @@ export default class StaffService {
       address,
       salary,
       finger_id,
-      remarks
+      remarks,
+      designation
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
     )
     RETURNING *;
   `;
@@ -141,7 +154,8 @@ export default class StaffService {
       address,
       salary ?? 0,
       finger_id,
-      JSON.stringify(remark || {})
+      JSON.stringify(remark || {}),
+      designation
     ];
 
     const { rows } = await executeInTransaction(client, queryText, values);
@@ -261,7 +275,8 @@ OFFSET $${values.length + 2}
       salary,
       statusCode,
       remark,
-      entity_table
+      entity_table,
+      designation
     } = data;
 
     const isStaffExist = await getRecord(
@@ -321,8 +336,9 @@ OFFSET $${values.length + 2}
           WHEN jsonb_typeof(remarks) = 'array'
             THEN remarks || $10::jsonb
           ELSE jsonb_build_array(remarks) || $10::jsonb
-        END
-    WHERE id = $11
+        END,
+        designation = $11
+    WHERE id = $12
     RETURNING *;
   `;
 
@@ -342,6 +358,7 @@ OFFSET $${values.length + 2}
       salary ?? isStaffExist.salary,
       status,
       JSON.stringify(remark),
+      designation,
       id
     ];
 
@@ -405,7 +422,7 @@ OFFSET $${values.length + 2}
     const result = await transaction(async (client) => {
 
       const query = `
-      SELECT id, password_hash, full_name
+      SELECT id, password_hash, full_name , role, entity_type
       FROM staff
       WHERE email = $1 AND status != $2
     `;

@@ -105,7 +105,7 @@ export default class CompanyService {
         } = data;
         const result = transaction(async (client) => {
 
-            const companies  = await query(
+            const companies = await query(
                 `SELECT * FROM company WHERE id = $1 AND status != $2`,
                 [id, 0]
             );
@@ -114,7 +114,7 @@ export default class CompanyService {
                 throw new AppError("Company not found or already deleted", 404);
             }
 
-            const existing =  companies[0];
+            const existing = companies[0];
 
             const update_query = `
         UPDATE company 
@@ -143,7 +143,8 @@ export default class CompanyService {
         WHERE id = $17
         RETURNING *;
     `;
-
+            let status = null;
+            status = statusCode === 99 ? existing.status : statusCode;
             const values = [
                 company_name ?? existing.company_name,
                 bussiness_category ?? existing.bussiness_category,
@@ -155,7 +156,7 @@ export default class CompanyService {
                 district ?? existing.district,
                 state ?? existing.state,
                 state_code ?? existing.state_code,
-                statusCode ?? existing.status,
+                status,
                 phone_number ?? existing.phone_number,
                 email ?? existing.email,
                 website ?? existing.website,
@@ -164,7 +165,7 @@ export default class CompanyService {
                 id
             ];
 
-            const { rows } = await executeInTransaction(client,update_query, values);
+            const { rows } = await executeInTransaction(client, update_query, values);
             return rows[0];
         })
         return result;
@@ -177,7 +178,7 @@ export default class CompanyService {
         let values: any[] = []
 
         where.push(`status != $${values.length + 1}`)
-        values.push(0) 
+        values.push(0)
         if (filters.search) {
             values.push(`%${filters.search}%`)
             const searchIndex = values.length

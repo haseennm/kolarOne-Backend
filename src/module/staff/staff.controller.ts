@@ -1,8 +1,7 @@
 import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { generateToken, hashPassword, verifyPassword } from "../../utils/auth.util";
-import { cns, convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
-import { PaymentTransactionService } from "../paymentTransaction/paymenttransaction.services";
+import { convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText } from "../../utils/extra";
 import StaffService from "./staff.service";
 import { CreateStaffBody, DeleteStaffBody, EditStaffBody, StaffLoginBody } from "./staff.types";
 
@@ -152,7 +151,11 @@ export default class LedgerTransactionController {
 
     return {
       token: token,
+      role: staff.role,
+      id: staff.id,
+      entity_type: convertEntityCode(staff.entity_type) ?? staff.entity_type,
       message: `staff ${staff.full_name} Login success`
     }
   }
+
 }
