@@ -47,17 +47,17 @@ export default class LedgerTransactionService {
       throw new Error("Invalid entity type");
     }
 
-    const isEntityExist = await getRecord(
-      entity_id,
-      entity_table,
-      "company_id",
-      company_id,
-      client
-    );
+    // const isEntityExist = await getRecord(
+    //   entity_id,
+    //   entity_table,
+    //   "company_id",
+    //   company_id,
+    //   client
+    // );
 
-    if (!isEntityExist) {
-      throw new AppError(`${entity_table} not found`, 404);
-    }
+    // if (!isEntityExist) {
+    //   throw new AppError(`${entity_table} not found`, 404);
+    // }
 
 
     const queryText = `
@@ -93,7 +93,7 @@ export default class LedgerTransactionService {
     let where: string[] = [];
     let values: any[] = [];
 
-    where.push(`status != $${values.length + 1}`);
+    where.push(`lt.status != $${values.length + 1}`);
     values.push(0);
 
     if (filters?.id) {
@@ -103,52 +103,77 @@ export default class LedgerTransactionService {
 
     if (filters?.category_id) {
       values.push(filters.category_id);
-      where.push(`category_id = $${values.length}`);
+      where.push(`lt.category_id = $${values.length}`);
     }
 
     if (filters?.entity_type) {
       values.push(filters.entity_type);
-      where.push(`entity_type = $${values.length}`);
+      where.push(`lt.entity_type = $${values.length}`);
     }
 
     if (filters?.entity_id) {
       values.push(filters.entity_id);
-      where.push(`entity_id = $${values.length}`);
+      where.push(`lt.entity_id = $${values.length}`);
     }
 
     if (filters?.status) {
       values.push(filters.status);
-      where.push(`status = $${values.length}`);
+      where.push(`lt.status = $${values.length}`);
     }
     if (filters?.from_date) {
       values.push(filters.from_date);
-      where.push(`transaction_date >= $${values.length}`);
+      where.push(`lt.transaction_date >= $${values.length}`);
     }
 
     if (filters?.to_date) {
       values.push(filters.to_date);
-      where.push(`transaction_date <= $${values.length}`);
+      where.push(`lt.transaction_date <= $${values.length}`);
     }
 
     values.push(filters.company_id);
-    where.push(`company_id = $${values.length}`);
+    where.push(`lt.company_id = $${values.length}`);
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
     const ledgerTransactionQuery = `
-    SELECT *
-    FROM ledger_transactions
-    ${whereClause}
-    ORDER BY id DESC
-    LIMIT $${values.length + 1}
-    OFFSET $${values.length + 2}
-  `;
+  SELECT 
+    lt.*,
+    lc.name AS category_name,
+    lc.category_type AS flow,
 
-    const countQuery = `
-    SELECT COUNT(*)
-    FROM ledger_transactions
-    ${whereClause}
-  `;
+    CASE 
+      WHEN lt.entity_type = 'C' THEN c.company_name
+      WHEN lt.entity_type = 'B' THEN b.branch_name
+      WHEN lt.entity_type = 'F' THEN f.firm_name
+      ELSE NULL
+    END AS entity_name
+
+  FROM ledger_transactions lt
+
+  LEFT JOIN ledger_categories lc 
+    ON lt.category_id = lc.id
+
+  LEFT JOIN company c 
+    ON lt.entity_type = 'C' AND lt.entity_id = c.id
+
+  LEFT JOIN branches b 
+    ON lt.entity_type = 'B' AND lt.entity_id = b.id
+
+  LEFT JOIN firm f 
+    ON lt.entity_type = 'F' AND lt.entity_id = f.id
+
+  ${whereClause}
+
+  ORDER BY lt.id DESC
+  LIMIT $${values.length + 1}
+  OFFSET $${values.length + 2}
+`;
+
+   const countQuery = `
+  SELECT COUNT(*)
+  FROM ledger_transactions lt
+  ${whereClause}
+`;
 
     const transactions = await query<FetchDbLedgerTransaction>(
       ledgerTransactionQuery,

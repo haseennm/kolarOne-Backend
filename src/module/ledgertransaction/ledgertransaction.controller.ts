@@ -1,6 +1,6 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../config/db";
-import { cns, convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
+import { cns, convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
 import { PaymentTransactionService } from "../paymentTransaction/paymenttransaction.services";
 import { GetReportSalePurchaseLedger } from "../sale/sale/sale.types";
 import LedgerTransactionService from "./ledgertransaction.service";
@@ -54,8 +54,6 @@ export default class LedgerTransactionController {
       return `Ledger transaction for amount ${ledger_transaction.amount} has been created successfully.`;
     })
   }
-
-
   async editTransaction(data: EditLedgerTransactionBody) {
 
     const { id, updated_by, status, company_id, amount, entity_type, entity_id, ...rest } = data;
@@ -105,11 +103,12 @@ export default class LedgerTransactionController {
     const service = new LedgerTransactionService();
 
     const transaction_with_code = await service.fetchLedgerTransaction(data);
-
     const transaction = transaction_with_code.transactions.map((row) => ({
       ...row,
       status: getStatusText(row.status),
+    entity_type: convertEntityCode(row.entity_type) ?? row.entity_type
     }));
+    
     return {
       transaction,
       pagination: { ...transaction_with_code.pagination }
