@@ -262,7 +262,7 @@ export default class VendorService {
 
     const { level, firm_id, branch_id, company_id, start_date, end_date } = data;
 
-    return transaction(async (clinet) => {
+    return transaction(async (client) => {
 
       let firmIds: number[] = [];
 
@@ -274,7 +274,7 @@ export default class VendorService {
 
       if (level === "branch") {
         const firms = await executeInTransaction(
-          clinet,
+          client,
           `SELECT id FROM firm WHERE branch_id = $1`,
           [branch_id]
         );
@@ -283,7 +283,7 @@ export default class VendorService {
 
       if (level === "company") {
         const firms = await executeInTransaction(
-          clinet,
+          client,
           `
   SELECT f.id
   FROM firm f
@@ -301,7 +301,7 @@ export default class VendorService {
       /* ================= MAIN REPORT ================= */
 
       const report = await this.getVendorReportByFirms(
-        clinet,
+        client,
         firmIds,
         start_date,
         end_date
@@ -312,7 +312,7 @@ export default class VendorService {
       if (level === "company") {
 
         const branchWise = await executeInTransaction(
-          clinet,
+          client,
           `
         SELECT 
           b.id AS branch_id,
@@ -328,7 +328,7 @@ export default class VendorService {
         );
 
         const firmWise = await executeInTransaction(
-          clinet,
+          client,
           `
         SELECT 
           f.id AS firm_id,
@@ -353,101 +353,205 @@ export default class VendorService {
     });
   }
 
-  private async getVendorReportByFirms(
-    clinet: any,
-    firmIds: number[],
-    startDate?: string,
-    endDate?: string
-  ) {
+ private async getVendorReportByFirms(
+  client: any,
+  firmIds: number[],
+  startDate?: string,
+  endDate?: string
+) {
+  const hasDate = Boolean(startDate && endDate);
 
-    const hasDate = Boolean(startDate && endDate);
+  const purchaseDate = hasDate
+    ? `AND p.bill_date BETWEEN $2 AND $3`
+    : "";
 
-    const purchaseDate = hasDate
-      ? `AND p.bill_date BETWEEN ? AND ?`
-      : "";
+  const returnDate = hasDate
+    ? `AND pr.return_date BETWEEN $2 AND $3`
+    : "";
 
-    const returnDate = hasDate
-      ? `AND pr.return_date BETWEEN ? AND ?`
-      : "";
+  const params = hasDate
+    ? [firmIds, startDate, endDate]
+    : [firmIds];
 
-    const params = hasDate
-      ? [firmIds, startDate, endDate, firmIds]
-      : [firmIds, firmIds];
+  /* ================= PURCHASE ================= */
 
-    /* ================= PURCHASE ================= */
-
-    const purchaseMostSpent = await executeInTransaction(
-      clinet,
-      `
-  SELECT 
-    v.id AS vendor_id,
-    v.vendor_name,
-    SUM(p.final_amount) AS total_spent
-  FROM vendors v
-  JOIN purchases p 
-    ON p.vendor_id = v.id
-   AND p.status = 4
-   AND p.firm_id = ANY($1)
-  GROUP BY v.id
-  ORDER BY total_spent DESC
-  `,
-      [firmIds]
-    );
-
-    /* ================= RETURN ================= */
-
-    const returnMostAmount = await executeInTransaction(
-      clinet,
-      `
+  // 1. Most items bought (count)
+  const purchaseMostItems = await executeInTransaction(
+    client,
+    `
     SELECT 
       v.id AS vendor_id,
       v.vendor_name,
-      SUM(pr.final_amount) AS return_amount
+      COUNT(pi.id) AS total_items
     FROM vendors v
-    JOIN purchases p ON p.vendor_id = v.id
+    JOIN purchases p 
+      ON p.vendor_id = v.id
+     AND p.status != 0
+     AND p.firm_id = ANY($1)
+
+    JOIN purchase_items pi 
+      ON pi.purchase_id = p.id
+     AND pi.status != 0
+     AND pi.firm_id = ANY($1)
+
+    ${purchaseDate}
+
+    GROUP BY v.id, v.vendor_name
+    ORDER BY total_items DESC
+    `,
+    params
+  );
+
+  // 2. Most amount spent
+  const purchaseMostAmount = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      v.id AS vendor_id,
+      v.vendor_name,
+      SUM(p.final_amount) AS total_amount
+    FROM vendors v
+    JOIN purchases p 
+      ON p.vendor_id = v.id
+     AND p.status = 4
+     AND p.firm_id = ANY($1)
+
+    ${purchaseDate}
+
+    GROUP BY v.id, v.vendor_name
+    ORDER BY total_amount DESC
+    `,
+    params
+  );
+
+  // 3. Most quantity bought
+  const purchaseMostQuantity = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      v.id AS vendor_id,
+      v.vendor_name,
+      SUM(pi.purchased_qty) AS total_quantity
+    FROM vendors v
+    JOIN purchases p 
+      ON p.vendor_id = v.id
+     AND p.status != 0
+     AND p.firm_id = ANY($1)
+
+    JOIN purchase_items pi 
+      ON pi.purchase_id = p.id
+     AND pi.status != 0
+     AND pi.firm_id = ANY($1)
+
+    ${purchaseDate}
+
+    GROUP BY v.id, v.vendor_name
+    ORDER BY total_quantity DESC
+    `,
+    params
+  );
+
+  /* ================= RETURN ================= */
+
+  // 4. Most items returned
+  const returnMostItems = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      v.id AS vendor_id,
+      v.vendor_name,
+      COUNT(pri.id) AS total_items
+    FROM vendors v
+    JOIN purchases p 
+      ON p.vendor_id = v.id
+     AND p.firm_id = ANY($1)
+
     JOIN purchase_return pr 
       ON pr.purchase_id = p.id
      AND pr.status != 0
      AND pr.firm_id = ANY($1)
-     ${returnDate}
-    GROUP BY v.id
-    ORDER BY return_amount DESC
+
+    JOIN purchase_return_items pri 
+      ON pri.purchase_return_id = pr.id
+     AND pri.status != 0
+     AND pri.firm_id = ANY($1)
+
+    ${returnDate}
+
+    GROUP BY v.id, v.vendor_name
+    ORDER BY total_items DESC
     `,
-      [firmIds]
-    );
+    params
+  );
 
-    /* ================= NET ================= */
+  // 5. Most return amount
+  const returnMostAmount = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      v.id AS vendor_id,
+      v.vendor_name,
+      SUM(p.final_amount) AS total_amount
+    FROM vendors v
+    JOIN purchases p 
+      ON p.vendor_id = v.id
+     AND p.firm_id = ANY($1)
 
-    const netAmount = await executeInTransaction(
-      clinet,
-      `
-  SELECT 
-    v.id,
-    v.vendor_name,
-    COALESCE(SUM(p.final_amount),0) - COALESCE(SUM(pr.final_amount),0) AS net_amount
-  FROM vendors v
-  LEFT JOIN purchases p 
-    ON p.vendor_id = v.id
-   AND p.firm_id = ANY($1)
-  LEFT JOIN purchase_return pr 
-    ON pr.purchase_id = p.id
-   AND pr.firm_id = ANY($2)
-  GROUP BY v.id
-  ORDER BY net_amount DESC
-  `,
-      [firmIds, firmIds]
-    );
+    JOIN purchase_return pr 
+      ON pr.purchase_id = p.id
+     AND pr.status != 0
+     AND pr.firm_id = ANY($1)
 
-    return {
-      purchase_only: {
-        most_spent: purchaseMostSpent.rows
-      },
-      return_only: {
-        most_amount: returnMostAmount.rows
-      },
-      purchase_plus_return: {
-        most_amount: netAmount.rows
-      }
-    };
-  }
+    ${returnDate}
+
+    GROUP BY v.id, v.vendor_name
+    ORDER BY total_amount DESC
+    `,
+    params
+  );
+
+  // 6. Most return quantity
+  const returnMostQuantity = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      v.id AS vendor_id,
+      v.vendor_name,
+      SUM(pri.returned_qty) AS total_quantity
+    FROM vendors v
+    JOIN purchases p 
+      ON p.vendor_id = v.id
+     AND p.firm_id = ANY($1)
+
+    JOIN purchase_return pr 
+      ON pr.purchase_id = p.id
+     AND pr.status != 0
+     AND pr.firm_id = ANY($1)
+
+    JOIN purchase_return_items pri 
+      ON pri.purchase_return_id = pr.id
+     AND pri.status != 0
+     AND pri.firm_id = ANY($1)
+
+    ${returnDate}
+
+    GROUP BY v.id, v.vendor_name
+    ORDER BY total_quantity DESC
+    `,
+    params
+  );
+
+  return {
+    purchase: {
+      most_items: purchaseMostItems.rows,
+      most_amount: purchaseMostAmount.rows,
+      most_quantity: purchaseMostQuantity.rows
+    },
+    return: {
+      most_items: returnMostItems.rows,
+      most_amount: returnMostAmount.rows,
+      most_quantity: returnMostQuantity.rows
+    }
+  };
+}
 }

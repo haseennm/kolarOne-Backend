@@ -6,7 +6,7 @@ export interface CreateCustomerBody {
   gender?: "MALE" | "FEMALE" | "OTHER" | null;
 
   email?: string | null;
-  phone_number: string ;
+  phone_number: string;
   alternate_phone?: string | null;
 
   billing_address?: string | null;
@@ -53,7 +53,7 @@ export interface FetchCustomerParams {
 export interface FetchDbCustomer
   extends Omit<CreateCustomerBody, "status" | "created_by"> {
   id: string;
-  status: number; 
+  status: number;
   remarks: object | null;
 }
 
@@ -101,4 +101,12 @@ export interface DeleteCustomerParams
   extends Omit<DeleteCustomerBody, "deleted_by"> {
   remark: object;
   company_id: number;
+}
+export interface GetCustomerReport {
+  level: "firm" | "branch" | "company";
+  firm_id?: number;
+  branch_id?: number;
+  company_id?: number;
+  start_date?: string;
+  end_date?: string;
 }

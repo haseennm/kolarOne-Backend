@@ -5,6 +5,7 @@ import {
   DeleteCustomerBody,
   EditCustomerBody,
   FetchCustomerBody,
+  GetCustomerReport,
 } from "./customer.types";
 import CustomerController from "./customer.controller";
 
@@ -196,4 +197,37 @@ export async function customerRouter(app: FastifyInstance): Promise<void> {
       });
     }
   );
+  app.post<{ Body: GetCustomerReport }>(
+  "/reports",
+  {
+    schema: {
+      body: {
+        type: "object",
+        required: ["level"],
+        properties: {
+          level: {
+            type: "string",
+            enum: ["firm", "branch", "company"]
+          },
+          firm_id: { type: ["number", "null"] },
+          branch_id: { type: ["number", "null"] },
+          company_id: { type: ["number", "null"] },
+          start_date: { type: ["string", "null"] },
+          end_date: { type: ["string", "null"] }
+        }
+      }
+    }
+  },
+  async (request, reply) => {
+
+    const controller = new CustomerController();
+
+    const data = await controller.getCustomerReport(request.body);
+
+    return reply.send({
+      status: "Success",
+      data
+    });
+  }
+);
 }

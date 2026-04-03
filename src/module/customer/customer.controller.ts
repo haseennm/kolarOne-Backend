@@ -1,10 +1,12 @@
-import { getStatusCode, getStatusText } from "../../utils/extra";
+import { AppError } from "../../utils/AppError";
+import { getStatusCode, getStatusText, isValidDateFormat } from "../../utils/extra";
 import CustomerService from "./customer.service";
 import {
   CreateCustomerBody,
   DeleteCustomerBody,
   EditCustomerBody,
   FetchCustomerParams,
+  GetCustomerReport,
 } from "./customer.types";
 
 export default class CustomerController {
@@ -102,4 +104,19 @@ export default class CustomerController {
     return customer;
   }
 
+  async getCustomerReport(data: GetCustomerReport) {
+    const { ...rest } = data
+    const hasDate =
+      rest.start_date &&
+      rest.end_date &&
+      isValidDateFormat(rest.start_date) &&
+      isValidDateFormat(rest.end_date);
+
+    if ((rest.start_date || rest.end_date) && !hasDate) {
+      throw new AppError("Invalid date format (YYYY-MM-DD)", 400)
+    }
+    const service = new CustomerService();
+
+    return service.getCustomerReportSummary(data);
+  }
 }

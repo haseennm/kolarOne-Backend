@@ -7,6 +7,7 @@ import {
   EditCustomerParams,
   FetchCustomerParams,
   FetchDbCustomer,
+  GetCustomerReport,
 } from "./customer.types";
 import { AppError } from "../../utils/AppError";
 
@@ -334,5 +335,321 @@ export default class CustomerService {
 
     return result;
   }
+  async getCustomerReportSummary(data: GetCustomerReport) {
 
+    const { level, firm_id, branch_id, company_id, start_date, end_date } = data;
+
+    return transaction(async (client) => {
+
+      let firmIds: number[] = [];
+
+      /* ================= GET FIRM IDS ================= */
+
+      if (level === "firm") {
+        firmIds = [firm_id!];
+      }
+
+      if (level === "branch") {
+        const firms = await executeInTransaction(
+          client,
+          `SELECT id FROM firm WHERE branch_id = $1`,
+          [branch_id]
+        );
+        firmIds = firms.rows.map((f: any) => f.id);
+      }
+
+      if (level === "company") {
+        const firms = await executeInTransaction(
+          client,
+          `
+          SELECT f.id
+          FROM firm f
+          JOIN branches b ON b.id = f.branch_id
+          WHERE b.company_id = $1
+          `,
+          [company_id]
+        );
+        firmIds = firms.rows.map((f: any) => f.id);
+      }
+
+      if (!firmIds.length) return {};
+
+      /* ================= MAIN REPORT ================= */
+
+      const report = await this.getCustomerReportByFirms(
+        client,
+        firmIds,
+        start_date,
+        end_date
+      );
+
+      /* ================= COMPANY EXTRA ================= */
+
+      if (level === "company") {
+
+        const branchWise = await executeInTransaction(
+          client,
+          `
+          SELECT 
+            b.id AS branch_id,
+            b.branch_name,
+            SUM(s.final_amount) AS total_sales
+          FROM branches b
+          JOIN firm f ON f.branch_id = b.id
+          JOIN sales s ON s.firm_id = f.id
+          WHERE b.company_id = $1
+          GROUP BY b.id
+          `,
+          [company_id]
+        );
+
+        const firmWise = await executeInTransaction(
+          client,
+          `
+          SELECT 
+            f.id AS firm_id,
+            f.firm_name,
+            SUM(s.final_amount) AS total_sales
+          FROM firm f
+          JOIN sales s ON s.firm_id = f.id
+          WHERE f.id = ANY($1)
+          GROUP BY f.id
+          `,
+          [firmIds]
+        );
+
+        return {
+          overall: report,
+          branch_wise: branchWise.rows,
+          firm_wise: firmWise.rows
+        };
+      }
+
+      return report;
+    });
+  }
+
+  /* ============================================================ */
+
+ private async getCustomerReportByFirms(
+  client: any,
+  firmIds: number[],
+  startDate?: string,
+  endDate?: string
+) {
+  const hasDate = Boolean(startDate && endDate);
+
+  const salesDate = hasDate
+    ? `AND s.invoice_date BETWEEN $2 AND $3`
+    : "";
+
+  const returnDate = hasDate
+    ? `AND sr.return_date BETWEEN $2 AND $3`
+    : "";
+
+  const params = hasDate
+    ? [firmIds, startDate, endDate]
+    : [firmIds];
+
+  /* ================= SALES ================= */
+
+  // 1. Most items sold (count)
+  const mostItemsSold = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      c.id AS customer_id,
+      c.customer_name,
+      COUNT(si.id) AS total_items
+    FROM customers c
+    JOIN sales s 
+      ON s.customer_id = c.id
+     AND s.status != 0
+     AND s.firm_id = ANY($1)
+
+    JOIN sales_items si 
+      ON si.sale_id = s.id
+     AND si.status != 0
+     AND si.firm_id = ANY($1)
+
+    ${salesDate}
+
+    GROUP BY c.id, c.customer_name
+    ORDER BY total_items DESC
+    `,
+    params
+  );
+
+  // 2. Most amount spent
+  const mostAmount = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      c.id AS customer_id,
+      c.customer_name,
+      SUM(s.final_amount) AS total_amount
+    FROM customers c
+    JOIN sales s 
+      ON s.customer_id = c.id
+     AND s.status = 4
+     AND s.firm_id = ANY($1)
+
+    ${salesDate}
+
+    GROUP BY c.id, c.customer_name
+    ORDER BY total_amount DESC
+    `,
+    params
+  );
+
+  // 3. Most quantity sold
+  const mostQuantity = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      c.id AS customer_id,
+      c.customer_name,
+      SUM(si.saled_qty) AS total_quantity
+    FROM customers c
+    JOIN sales s 
+      ON s.customer_id = c.id
+     AND s.status != 0
+     AND s.firm_id = ANY($1)
+
+    JOIN sales_items si 
+      ON si.sale_id = s.id
+     AND si.status != 0
+     AND si.firm_id = ANY($1)
+
+    ${salesDate}
+
+    GROUP BY c.id, c.customer_name
+    ORDER BY total_quantity DESC
+    `,
+    params
+  );
+
+  // 4. Customers with pending balance
+  const customersWithBalance = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      COUNT(DISTINCT c.id) AS total_customers_with_balance
+    FROM customers c
+    JOIN sales s 
+      ON s.customer_id = c.id
+     AND s.status = 4
+     AND s.firm_id = ANY($1)
+     AND s.final_amount > s.paid
+
+    ${salesDate}
+    `,
+    params
+  );
+
+  /* ================= RETURN ================= */
+
+  // 5. Most items returned
+  const mostReturnItems = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      c.id AS customer_id,
+      c.customer_name,
+      COUNT(sri.id) AS total_items
+    FROM customers c
+    JOIN sales s 
+      ON s.customer_id = c.id
+     AND s.firm_id = ANY($1)
+
+    JOIN sale_return sr 
+      ON sr.sale_id = s.id
+     AND sr.status != 0
+     AND sr.firm_id = ANY($1)
+
+    JOIN sale_return_items sri 
+      ON sri.sale_return_id = sr.id
+     AND sri.status != 0
+     AND sri.firm_id = ANY($1)
+
+    ${returnDate}
+
+    GROUP BY c.id, c.customer_name
+    ORDER BY total_items DESC
+    `,
+    params
+  );
+
+  // 6. Most return amount
+  const mostReturnAmount = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      c.id AS customer_id,
+      c.customer_name,
+      SUM(sr.final_amount) AS total_amount
+    FROM customers c
+    JOIN sales s 
+      ON s.customer_id = c.id
+     AND s.firm_id = ANY($1)
+
+    JOIN sale_return sr 
+      ON sr.sale_id = s.id
+     AND sr.status != 0
+     AND sr.firm_id = ANY($1)
+
+    ${returnDate}
+
+    GROUP BY c.id, c.customer_name
+    ORDER BY total_amount DESC
+    `,
+    params
+  );
+
+  // 7. Most return quantity
+  const mostReturnQuantity = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      c.id AS customer_id,
+      c.customer_name,
+      SUM(sri.returned_qty) AS total_quantity
+    FROM customers c
+    JOIN sales s 
+      ON s.customer_id = c.id
+     AND s.firm_id = ANY($1)
+
+    JOIN sale_return sr 
+      ON sr.sale_id = s.id
+     AND sr.status != 0
+     AND sr.firm_id = ANY($1)
+
+    JOIN sale_return_items sri 
+      ON sri.sale_return_id = sr.id
+     AND sri.status != 0
+     AND sri.firm_id = ANY($1)
+
+    ${returnDate}
+
+    GROUP BY c.id, c.customer_name
+    ORDER BY total_quantity DESC
+    `,
+    params
+  );
+
+  return {
+    sales: {
+      most_items: mostItemsSold.rows,
+      most_amount: mostAmount.rows,
+      most_quantity: mostQuantity.rows,
+      customers_with_balance:
+        customersWithBalance.rows[0]?.total_customers_with_balance || 0
+    },
+    return: {
+      most_items: mostReturnItems.rows,
+      most_amount: mostReturnAmount.rows,
+      most_quantity: mostReturnQuantity.rows
+    }
+  };
+}
 }
