@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { transaction } from "../../config/db";
 import { cns, getStatusCode, getStatusText } from "../../utils/extra";
 import StockService from "./stock.service";
-import { StockChangeBody, StockCreateBody, StockDelete, StockEditBody, StockFetchParams } from "./stock.types";
+import { StockChangeBody, StockCreateBody, StockDelete, StockEditBody, StockFetchParams, StockReport } from "./stock.types";
 import { AppError } from "../../utils/AppError";
 
 export default class StockController {
@@ -90,5 +90,10 @@ export default class StockController {
     await service.deleteStock(data, client);
     return `stock has been deleted successfully.`;
 
+  }
+   async reportStock(data: StockReport) {
+    const service = new StockService();
+    const staff = await service.getStockReportSummary(data);
+    return staff
   }
 }

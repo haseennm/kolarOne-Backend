@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import StockController from "./stock.controller";
-import { StockDelete, StockFetchBody } from "./stock.types";
+import { StockDelete, StockFetchBody, StockReport } from "./stock.types";
 
 export async function stockRouter(app: FastifyInstance) {
 
@@ -68,6 +68,49 @@ export async function stockRouter(app: FastifyInstance) {
     return reply.code(200).send(data);
   }
 );
-
+  app.post<{ Body: StockReport }>(
+    "/reports",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["level"],
+          properties: {
+            level: {
+              type: "string",
+              enum: ["firm", "branch", "company"]
+            },
+  
+            firm_id: {
+              type: ["number", "null"]
+            },
+  
+            branch_id: {
+              type: ["number", "null"]
+            },
+  
+            company_id: {
+              type: ["number", "null"]
+            },
+  
+           
+          }
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: StockReport }>,
+      reply: FastifyReply
+    ) => {
+      const controller = new StockController();
+  
+      const report = await controller.reportStock(request.body);
+  
+      return reply.code(200).send({
+        status: "Success",
+        data: report
+      });
+    }
+  );
 
 }

@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord } from "../../utils/extra";
-import { StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams } from "./stock.types";
+import { StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams, StockReport } from "./stock.types";
 
 export default class StockService {
 
@@ -485,4 +485,205 @@ export default class StockService {
 
     return rows[0];
   }
+
+   async getStockReportSummary(data:StockReport) {
+
+  const { level, firm_id, branch_id, company_id } = data;
+
+  return transaction(async (client) => {
+
+    let firmIds: number[] = [];
+    let branchIds: number[] = [];
+
+    /* ================= GET IDS ================= */
+
+    if (level === "firm") {
+      firmIds = [firm_id!];
+
+      const branches = await executeInTransaction(
+        client,
+        `SELECT branch_id FROM firm WHERE id = $1`,
+        [firm_id]
+      );
+      branchIds = branches.rows.map((b: any) => b.branch_id);
+    }
+
+    if (level === "branch") {
+      branchIds = [branch_id!];
+
+      const firms = await executeInTransaction(
+        client,
+        `SELECT id FROM firm WHERE branch_id = $1`,
+        [branch_id]
+      );
+      firmIds = firms.rows.map((f: any) => f.id);
+    }
+
+    if (level === "company") {
+      const branches = await executeInTransaction(
+        client,
+        `SELECT id FROM branches WHERE company_id = $1`,
+        [company_id]
+      );
+      branchIds = branches.rows.map((b: any) => b.id);
+
+      const firms = await executeInTransaction(
+        client,
+        `
+        SELECT f.id
+        FROM firm f
+        JOIN branches b ON b.id = f.branch_id
+        WHERE b.company_id = $1
+        `,
+        [company_id]
+      );
+      firmIds = firms.rows.map((f: any) => f.id);
+    }
+
+    if (!firmIds.length) return {};
+
+    /* ============================================================
+       🟢 STOCK TABLE REPORTS
+    ============================================================ */
+
+    // 1️⃣ Most purchased product
+    const mostPurchased = await executeInTransaction(client, `
+      SELECT p.id, p.name, SUM(s.quantity) AS total_qty
+      FROM stock s
+      JOIN products p ON p.id = s.product_id
+      WHERE s.firm_id = ANY($1)
+      GROUP BY p.id
+      ORDER BY total_qty DESC
+      LIMIT 1
+    `, [firmIds]);
+
+    // 2️⃣ Least purchased product
+    const leastPurchased = await executeInTransaction(client, `
+      SELECT p.id, p.name, SUM(s.quantity) AS total_qty
+      FROM stock s
+      JOIN products p ON p.id = s.product_id
+      WHERE s.firm_id = ANY($1)
+      GROUP BY p.id
+      HAVING SUM(s.quantity) > 0
+      ORDER BY total_qty ASC
+      LIMIT 1
+    `, [firmIds]);
+
+    // 3️⃣ Low stock (<20)
+    const lowStock = await executeInTransaction(client, `
+      SELECT p.id, p.name, SUM(s.available_quantity) AS total_available
+      FROM stock s
+      JOIN products p ON p.id = s.product_id
+      WHERE s.firm_id = ANY($1)
+      GROUP BY p.id
+      HAVING SUM(s.available_quantity) < 20
+    `, [firmIds]);
+
+    // 4️⃣ Most batches product
+    const mostBatches = await executeInTransaction(client, `
+      SELECT p.id, p.name, COUNT(s.id) AS batch_count
+      FROM stock s
+      JOIN products p ON p.id = s.product_id
+      WHERE s.firm_id = ANY($1)
+        AND s.available_quantity > 1
+      GROUP BY p.id
+      ORDER BY batch_count DESC
+      LIMIT 1
+    `, [firmIds]);
+
+    /* ============================================================
+       🔵 STOCK MOVEMENT REPORTS
+    ============================================================ */
+
+    // 5️⃣ Most damaged
+    const mostDamaged = await executeInTransaction(client, `
+      SELECT p.id, p.name, SUM(sm.quantity) AS damaged_qty
+      FROM stock_movements sm
+      JOIN products p ON p.id = sm.product_id
+      WHERE sm.branch_id = ANY($1)
+        AND sm.status = 12
+      GROUP BY p.id
+      ORDER BY damaged_qty DESC
+      LIMIT 1
+    `, [branchIds]);
+
+    // 6️⃣ Least damaged
+    const leastDamaged = await executeInTransaction(client, `
+      SELECT p.id, p.name, SUM(sm.quantity) AS damaged_qty
+      FROM stock_movements sm
+      JOIN products p ON p.id = sm.product_id
+      WHERE sm.branch_id = ANY($1)
+        AND sm.status = 12
+      GROUP BY p.id
+      HAVING SUM(sm.quantity) > 0
+      ORDER BY damaged_qty ASC
+      LIMIT 1
+    `, [branchIds]);
+
+    // Helper function
+    const getMovement = async (reason: string, order: "DESC" | "ASC") => {
+      return executeInTransaction(client, `
+        SELECT p.id, p.name, SUM(sm.quantity) AS qty
+        FROM stock_movements sm
+        JOIN products p ON p.id = sm.product_id
+        WHERE sm.branch_id = ANY($1)
+          AND sm.reason = $2
+          AND sm.movement_type = 'O'
+        GROUP BY p.id
+        HAVING SUM(sm.quantity) > 0
+        ORDER BY qty ${order}
+        LIMIT 1
+      `, [branchIds, reason]);
+    };
+
+    const getMovementIn = async (reason: string) => {
+      return executeInTransaction(client, `
+        SELECT p.id, p.name, SUM(sm.quantity) AS qty
+        FROM stock_movements sm
+        JOIN products p ON p.id = sm.product_id
+        WHERE sm.branch_id = ANY($1)
+          AND sm.reason = $2
+          AND sm.movement_type = 'I'
+        GROUP BY p.id
+        ORDER BY qty DESC
+        LIMIT 1
+      `, [branchIds, reason]);
+    };
+
+    const mostSold = await getMovement("S", "DESC");
+    const leastSold = await getMovement("S", "ASC");
+
+    const mostSalesReturn = await getMovement("SR", "DESC");
+    const leastSalesReturn = await getMovement("SR", "ASC");
+
+    const mostPurchaseReturn = await getMovement("PR", "DESC");
+    const leastPurchaseReturn = await getMovement("PR", "ASC");
+
+    const mostAdjustment = await getMovementIn("A");
+
+    /* ============================================================
+       FINAL RESPONSE
+    ============================================================ */
+
+    return {
+      stock: {
+        most_purchased: mostPurchased.rows[0] || null,
+        least_purchased: leastPurchased.rows[0] || null,
+        low_stock_products: lowStock.rows,
+        most_batches_product: mostBatches.rows[0] || null
+      },
+      movements: {
+        most_damaged: mostDamaged.rows[0] || null,
+        least_damaged: leastDamaged.rows[0] || null,
+        most_sold: mostSold.rows[0] || null,
+        least_sold: leastSold.rows[0] || null,
+        most_sales_return: mostSalesReturn.rows[0] || null,
+        least_sales_return: leastSalesReturn.rows[0] || null,
+        most_purchase_return: mostPurchaseReturn.rows[0] || null,
+        least_purchase_return: leastPurchaseReturn.rows[0] || null,
+        most_adjusted: mostAdjustment.rows[0] || null
+      }
+    };
+  });
+}
 }

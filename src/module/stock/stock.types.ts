@@ -74,3 +74,9 @@ export interface StockDelete {
   purchase_id: number;
   firm_id: number
 }
+export interface StockReport {
+    level: "firm" | "branch" | "company";
+    firm_id?: number;
+    branch_id?: number;
+    company_id?: number;
+}
