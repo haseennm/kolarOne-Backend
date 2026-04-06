@@ -231,7 +231,10 @@ export default class SaleItemService {
     ];
 
     const { rows } = await executeInTransaction(client, updateQuery, values);
-    return rows[0];
+    return {
+      new_row: rows[0],
+      old_row: is_item_exist
+    };
   }
 
   async deleteSaleItem(data: DeleteSaleItemParams, client: PoolClient) {

@@ -239,7 +239,7 @@ export default class StockService {
       is_relate_purchase,
       return_mode
     } = data;
-
+console.log(qty,qty)
     const stock = await getRecord(
       stock_id,
       "stock",
@@ -263,11 +263,12 @@ export default class StockService {
 
     const finalAvailableQty =
       Number(stock.available_quantity) + calculation;
-
+    console.log("finalAvailableQty", finalAvailableQty)
     const finalPurchasedQty = is_relate_purchase
       ? Number(stock.purchased_qty) + calculation
       : Number(stock.purchased_qty);
 
+    console.log("finalPurchasedQty", finalPurchasedQty)
     if (finalAvailableQty > finalPurchasedQty) {
       throw new AppError(
         "Available quantity cannot exceed purchased quantity",
@@ -280,7 +281,15 @@ export default class StockService {
     }
 
     let updatedStock = stock; // 👈 default return
-
+console.log( [
+        stock.product_id,
+        branch_id,
+        movement_type,
+        qty,
+        reason,
+        stock_id,
+        statusCode
+      ])
     // ✅ Update only if NOT damaged
     if (return_mode !== "to_damage") {
       const { rows } = await executeInTransaction(

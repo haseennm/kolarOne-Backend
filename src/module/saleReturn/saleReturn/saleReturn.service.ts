@@ -471,7 +471,8 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
             'total_igst', sri.total_igst,
             'net_amount', sri.net_amount,
             'status', sri.status,
-            'stock_qty', st.available_quantity
+            'stock_qty', st.available_quantity,
+            'saled_qty', si.saled_qty
           )
         ) FILTER (WHERE sri.id IS NOT NULL),
         '[]'
@@ -489,6 +490,7 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
     LEFT JOIN sale_return_items sri ON sri.sale_return_id = sr.id
     LEFT JOIN products prd ON prd.id = sri.product_id
     LEFT JOIN stock st ON st.id = sri.stock_id
+    LEFT JOIN sales_items si ON si.id = sri.sale_item_id
 
     ${whereClause}
 

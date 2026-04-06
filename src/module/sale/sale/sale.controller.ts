@@ -177,17 +177,16 @@ export default class SaleController {
             },
             client
           );
-
-          // ✅ Update stock accordingly
-          if (item.saled_qty !== saleItemData.saled_qty) {
+          console.log("item.saled_qty !== saleItemData.saled_qty", Number(item.saled_qty), "!== ", Number(saleItemData.old_row.saled_qty))
+          if (Number(item.saled_qty) !== Number(saleItemData.old_row.saled_qty)) {
             await stockController.reduceStock(
               {
-                stock_id: item.stock_id ?? saleItemData.stock_id,
+                stock_id: item.stock_id ?? saleItemData.new_row.stock_id,
                 branch_id: rest.branch_id,
                 firm_id: rest.firm_id,
-                qty: Math.abs(item.saled_qty - saleItemData.saled_qty),
-                movement_type: item.saled_qty > saleItemData.saled_qty ? 'I' : 'O',
-                reason: getTransactionCode("sale_return"),
+                qty: Math.abs(item.saled_qty - saleItemData.old_row.saled_qty),
+                movement_type: item.saled_qty < saleItemData.old_row.saled_qty ? 'I' : 'O',
+                reason: getTransactionCode("sale"),
                 is_relate_purchase: false
               },
               client
