@@ -1,8 +1,8 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../config/db";
-import { cns, getStatusCode, getStatusText } from "../../utils/extra";
+import { cns, getStatusCode, getStatusText, getTransactionCode } from "../../utils/extra";
 import StockService from "./stock.service";
-import { StockChangeBody, StockCreateBody, StockDelete, StockEditBody, StockFetchParams, StockReport } from "./stock.types";
+import { StockAdditionalBody, StockChangeBody, StockCreateBody, StockDelete, StockEditBody, StockFetchParams, StockPriceSet, StockReport } from "./stock.types";
 import { AppError } from "../../utils/AppError";
 
 export default class StockController {
@@ -67,6 +67,35 @@ export default class StockController {
 
     return stock;
   }
+  async manualStock(data: StockAdditionalBody) {
+    const service = new StockService();
+    const statusCode = getStatusCode("Good");
+    return transaction(async (client: PoolClient) => {
+
+      await service.createManualStock(
+        {
+          statusCode,
+          reason: getTransactionCode("addition"),
+          ...data
+        }
+        ,
+        client
+      );
+    })
+  }
+  async setPrice(data: StockPriceSet) {
+    const service = new StockService();
+    return transaction(async (client: PoolClient) => {
+
+      await service.updateSellingPrice(
+        {
+          ...data
+        }
+        ,
+        client
+      );
+    })
+  }
 
   async fetchStock(data: StockFetchParams) {
 
@@ -91,7 +120,7 @@ export default class StockController {
     return `stock has been deleted successfully.`;
 
   }
-   async reportStock(data: StockReport) {
+  async reportStock(data: StockReport) {
     const service = new StockService();
     const staff = await service.getStockReportSummary(data);
     return staff

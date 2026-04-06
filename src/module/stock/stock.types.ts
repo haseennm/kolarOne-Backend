@@ -39,8 +39,7 @@ export interface StockChangeBody {
   movement_type?: 'I' | 'O';
   reason: string;
   is_relate_purchase: boolean;
-  return_mode?: "to_stock"|"to_damage"
-
+  return_mode?: "to_stock" | "to_damage";
 }
 
 export interface StockChangeParams extends StockChangeBody {
@@ -75,8 +74,28 @@ export interface StockDelete {
   firm_id: number
 }
 export interface StockReport {
-    level: "firm" | "branch" | "company";
-    firm_id?: number;
-    branch_id?: number;
-    company_id?: number;
+  level: "firm" | "branch" | "company";
+  firm_id?: number;
+  branch_id?: number;
+  company_id?: number;
+}
+
+export interface StockPriceSet {
+  branch_id: number;
+  r_id: number;
+  selling_price: number;
+}
+export interface StockAdditionalBody {
+  firm_id: number | null;
+  branch_id: number;
+  product_id: number;
+  selling_price?: number;
+  insert_batch_number?: number;
+  qty: number;
+  status: 'Damaged' | 'Good';
+  company_id: number
+}
+export interface StockAdditionalParams extends Omit<StockAdditionalBody, "status"> {
+  statusCode: number,
+  reason:string
 }

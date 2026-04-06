@@ -216,7 +216,6 @@ export default class ProductService {
 
   async updateProduct(data: EditProductParams) {
     const { id, company_id, remarks, statusCode, category_id, brand_id, ...rest } = data;
-
     return transaction(async (client) => {
       const existing = await getRecord(
         id,

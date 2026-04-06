@@ -16,7 +16,6 @@ export default class BrandService {
 
   async createBrand(data: CreateBrandParams) {
     const { name, statusCode, remark, company_id, note } = data;
-
     const result = transaction(async (client) => {
 
       const existing = await query(
@@ -73,6 +72,10 @@ export default class BrandService {
     if (filters.filter?.id) {
       values.push(filters.filter.id);
       where.push(`id = $${values.length}`);
+    }
+    if (filters.filter?.company_id) {
+      values.push(filters.filter.company_id);
+      where.push(`company_id = $${values.length}`);
     }
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";

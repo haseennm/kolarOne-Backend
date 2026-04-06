@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord } from "../../utils/extra";
-import { StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams, StockReport } from "./stock.types";
+import { StockAdditionalParams, StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams, StockPriceSet, StockReport } from "./stock.types";
 
 export default class StockService {
 
@@ -239,7 +239,6 @@ export default class StockService {
       is_relate_purchase,
       return_mode
     } = data;
-console.log(qty,qty)
     const stock = await getRecord(
       stock_id,
       "stock",
@@ -281,16 +280,7 @@ console.log(qty,qty)
     }
 
     let updatedStock = stock; // 👈 default return
-console.log( [
-        stock.product_id,
-        branch_id,
-        movement_type,
-        qty,
-        reason,
-        stock_id,
-        statusCode
-      ])
-    // ✅ Update only if NOT damaged
+
     if (return_mode !== "to_damage") {
       const { rows } = await executeInTransaction(
         client,
@@ -447,7 +437,6 @@ console.log( [
       },
     };
   }
-
 
   async deleteStock(data: StockDelete, client: PoolClient) {
     const { firm_id, purchase_id } = data;
@@ -693,5 +682,223 @@ console.log( [
         }
       };
     });
+  }
+
+  async createManualStock(data: StockAdditionalParams, client: PoolClient) {
+    const {
+      branch_id,
+      selling_price,
+      firm_id,
+      product_id,
+      qty,
+      statusCode,
+      reason,
+      company_id,
+      insert_batch_number
+    } = data;
+
+    // 🔍 Validate existing stock (if batch provided)
+    if (insert_batch_number) {
+      const is_stock_exist = await getRecord(
+        insert_batch_number,
+        "stock",
+        "branch_id",
+        branch_id,
+        client
+      );
+
+      if (!is_stock_exist) {
+        throw new AppError("Stock not found", 404);
+      }
+    }
+
+    if (firm_id !== null && firm_id !== undefined) {
+      const isFirmExist = await getRecord(
+        firm_id,
+        "firm",
+        "branch_id",
+        branch_id,
+        client
+      );
+
+      if (!isFirmExist) {
+        throw new AppError("Firm not found", 404);
+      }
+    }
+
+    // 🔍 Validate product
+    const is_product_exist = await getRecord(
+      product_id,
+      "products",
+      "company_id",
+      company_id,
+      client
+    );
+
+    if (!is_product_exist) {
+      throw new AppError("Product not found", 404);
+    }
+
+    if (insert_batch_number) {
+      const updated_stock = await executeInTransaction(
+        client,
+        `
+      UPDATE stock SET
+        available_quantity = available_quantity + $1,
+        purchased_qty = purchased_qty + $2
+      WHERE id = $3
+        AND branch_id = $4
+      RETURNING *;
+      `,
+        [qty, qty, insert_batch_number, branch_id]
+      );
+
+      if (!updated_stock.rows.length) {
+        throw new AppError("Stock update failed", 400);
+      }
+
+      const stock_id = updated_stock.rows[0].id;
+
+      await executeInTransaction(
+        client,
+        `
+      INSERT INTO stock_movements (
+        product_id,
+        branch_id,
+        movement_type,
+        quantity,
+        reason,
+        stock_id,
+        status
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+      RETURNING *;
+      `,
+        [
+          product_id,
+          branch_id,
+          "I",
+          qty,
+          reason,
+          stock_id,
+          statusCode
+        ]
+      );
+
+      return updated_stock.rows[0]; // ✅ stop here
+    }
+
+    const lastStock = await executeInTransaction(
+      client,
+      `
+    SELECT MAX(batch_num) AS last_batch FROM (
+      SELECT CAST(SUBSTRING(batch_number FROM 7) AS INTEGER) AS batch_num
+      FROM stock
+      WHERE branch_id = $1
+      FOR UPDATE
+    ) AS locked_rows;
+    `,
+      [branch_id]
+    );
+
+    const nextBatch = (lastStock.rows[0]?.last_batch || 0) + 1;
+    const batch_number = `BATCH-${nextBatch}`;
+
+    // 📦 Insert into stock
+    const stockInsert = await executeInTransaction(
+      client,
+      `
+    INSERT INTO stock (
+      available_quantity,
+      branch_id,
+      selling_price,
+      firm_id,
+      product_id,
+      purchase_id,
+      purchased_qty,
+      status,
+      batch_number
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    RETURNING *;
+    `,
+      [
+        qty,
+        branch_id,
+        selling_price ?? 0,
+        firm_id ?? null,
+        product_id,
+        null,
+        qty,
+        statusCode,
+        batch_number
+      ]
+    );
+
+    const stock_id = stockInsert.rows[0].id;
+
+    // 📦 Insert movement
+    await executeInTransaction(
+      client,
+      `
+    INSERT INTO stock_movements (
+      product_id,
+      branch_id,
+      movement_type,
+      quantity,
+      reason,
+      stock_id,
+      status
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7)
+    RETURNING *;
+    `,
+      [
+        product_id,
+        branch_id,
+        "I",
+        qty,
+        reason,
+        stock_id,
+        statusCode
+      ]
+    );
+
+    return stockInsert.rows[0];
+  }
+
+  async updateSellingPrice(data: StockPriceSet, client: PoolClient) {
+    const { branch_id, r_id, selling_price } = data;
+
+    // 🔍 Check stock exists
+    const isStockExist = await getRecord(
+      r_id,
+      "stock",
+      "branch_id",
+      branch_id,
+      client
+    );
+
+    if (!isStockExist) {
+      throw new AppError("Stock not found", 404);
+    }
+
+    const updatedStock = await executeInTransaction(
+      client,
+      `
+    UPDATE stock
+    SET selling_price = $1
+    WHERE id = $2
+      AND branch_id = $3
+    RETURNING *;
+    `,
+      [selling_price, r_id, branch_id]
+    );
+
+    if (!updatedStock.rows.length) {
+      throw new AppError("Failed to update selling price", 400);
+    }
+
+    return updatedStock.rows[0];
   }
 }
