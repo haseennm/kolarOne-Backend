@@ -115,10 +115,28 @@ export default class LoanService {
     const loanQuery = `
   SELECT 
     l.*,
-    b.branch_name
+    b.branch_name,
+    s.full_name AS staff_name,
+    s.entity_type,   -- ✅ add this
+
+    CASE 
+      WHEN s.entity_type = 'C' THEN c.company_name
+      WHEN s.entity_type = 'B' THEN b2.branch_name
+      WHEN s.entity_type = 'F' THEN f.firm_name
+      ELSE NULL
+    END AS entity_name
+
   FROM staff_loans l
+
   JOIN branches b ON b.id = l.branch_id
+  JOIN staff s ON s.id = l.staff_id
+
+  LEFT JOIN company c ON c.id = s.entity_id AND s.entity_type = 'C'
+  LEFT JOIN branches b2 ON b2.id = s.entity_id AND s.entity_type = 'B'
+  LEFT JOIN firm f ON f.id = s.entity_id AND s.entity_type = 'F'
+
   ${whereClause}
+
   ORDER BY l.id DESC
   LIMIT $${values.length + 1}
   OFFSET $${values.length + 2}
@@ -149,7 +167,7 @@ export default class LoanService {
     };
   }
 
-  
+
 
   async repayLoan(data: RepayLoanParams, client: PoolClient) {
     const { loan_id, pay_amount, branch_id, company_id, remarks } = data;
@@ -231,7 +249,7 @@ export default class LoanService {
 
   }
 
-   async getLoanReport(data: {
+  async getLoanReport(data: {
     level: "branch" | "company";
     branch_id?: number;
     company_id?: number;

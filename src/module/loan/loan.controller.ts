@@ -1,6 +1,6 @@
 import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
+import { convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
 import { PaymentTransactionService } from "../paymentTransaction/paymenttransaction.services";
 import LoanService from "./loan.service";
 import { CreateLoanBody, DeleteLoanBody, FetchLoanBody, FetchLoanParams, GetReportBody, RepayLoanBody } from "./loan.types";
@@ -61,6 +61,7 @@ export default class LoanController {
     const loanes = loanesWithCode.loans.map((row) => ({
       ...row,
       status: getStatusText(row.status),
+      entity_type:convertEntityCode(row.entity_type)
     }));
 
     return {

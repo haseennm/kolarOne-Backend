@@ -45,7 +45,10 @@ export interface FetchDbLoan extends Omit<CreateLoanBody, "status" | "created_by
   status: number;
   remarks: object | null;
   balance_amount: number;
-  paid_amount: number
+  paid_amount: number;
+  staff_name:string;
+  entity_type:string;
+  entity_name:string;
 }
 export type LoanCountResult = {
   count: string;
