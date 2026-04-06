@@ -42,7 +42,6 @@ export default class PartyBalanceController {
 
     const { status, ...rest } = data;
 
-
     let statusCode = undefined;
 
     if (typeof status === "string") {

@@ -137,10 +137,9 @@ export default class PurchaseReturnController {
       const purchaseItem = new PurchaseReturnItemController();
       if (items) {
         for (const item of items) {
-
           const purchase_return_item = await purchaseItem.editPurchaseReturnItem(
             {
-              return_item_id: item.return_item_id,
+              item_id: item.item_id,
               purchase_return_id: rest.purchase_return_id,
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
@@ -159,13 +158,14 @@ export default class PurchaseReturnController {
             },
             client
           );
-          if (item.returned_qty !== purchase_return_item.row.returned_qty) {
+          console.log("item.returned_qty", Number(item.returned_qty), "::purchase_return_item.row.returned_qty", Number(purchase_return_item.row.returned_qty))
+         if (Number(item.returned_qty) !== Number(purchase_return_item.row.returned_qty)) {
             await stockController.reduceStock(
               {
                 stock_id: item.stock_id ?? purchase_return_item.row.stock_id,
                 branch_id: rest.branch_id,
                 firm_id: rest.firm_id,
-                qty: Math.abs(item.returned_qty - purchase_return_item.row.returned_qty),
+                qty: Math.abs(item.returned_qty - purchase_return_item.existingItem.returned_qty),
                 movement_type: purchase_return_item.movement_type,
                 reason: getTransactionCode("purchase_return"),
                 is_relate_purchase: true
@@ -200,14 +200,13 @@ export default class PurchaseReturnController {
         amount: payment_amount,
         payment_method_id: null,
         ref_id: rest.purchase_return_id,
-        ref_type: PaymentTransactionTypeCodeMap["ledger_transaction"],
+        ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
         status: statusCode,
         transaction_reference: null,
         business_id: rest.firm_id,
         business_ref: "F"
       }, client)
-
-      return `purchase return ${purchase_return.bill_number} has been created successfully.`;
+      return `purchase return ${purchase_return.return_number} has been updated successfully.`;
     });
   }
   async purchaseReturnFetch(data: PurchaseReturnFetchParams) {

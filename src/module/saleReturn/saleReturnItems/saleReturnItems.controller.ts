@@ -51,7 +51,6 @@ export default class SaleReturnItemController {
       },
       client
     );
-
     return sale_return_item;
   }
 

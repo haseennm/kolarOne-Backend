@@ -255,7 +255,6 @@ export default class LedgerTransactionService {
     ];
 
     const { rows } = await executeInTransaction(client, updateQuery, values);
-    console.log(rows)
     return rows;
 
 

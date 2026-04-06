@@ -22,7 +22,7 @@ export interface CreatePurchaseReturnItemParams
   remark: object;
 }
 export interface EditPurchaseReturnItemBody {
-  return_item_id: number
+  item_id: number
   purchase_return_id: number;
   firm_id: number;
   branch_id: number;

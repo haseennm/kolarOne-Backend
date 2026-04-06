@@ -195,9 +195,11 @@ export default class PurchaseController {
 
       if (difference === 0) {
         part_status = "Paid";
-      } else if (difference < 0) {
+      } else if (difference > 0) {
+        part_status = "Advance";   // extra payment
+      } else if (difference < 0 && (payment_amount ?? 0) > 0) {
         part_status = "Partial";
-      } else if (Math.abs(difference) === final_amount) {
+      } else {
         part_status = "Unpaid";
       }
       await party_balance_controller.editPartyBalance(

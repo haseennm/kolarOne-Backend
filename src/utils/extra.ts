@@ -3,14 +3,14 @@ import { executeInTransaction, pool, query } from "../config/db"
 import { AppError } from "./AppError"
 
 export const cns = (url: string, values: string | object) => {
-console.log(
-  `\x1b[43m\x1b[30m ${url} \x1b[0m`,
-  `\x1b[32m${JSON.stringify(values)}\x1b[0m`
-)
+  console.log(
+    `\x1b[43m\x1b[30m ${url} \x1b[0m`,
+    `\x1b[32m${JSON.stringify(values)}\x1b[0m`
+  )
 }
 export const el = (errr: any) => {
-console.log(`\x1b[41m${errr}\x1b[0m`
-)
+  console.log(`\x1b[41m${errr}\x1b[0m`
+  )
 }
 
 export const STATUS_MAP = {
@@ -28,6 +28,7 @@ export const STATUS_MAP = {
   11: 'Partial',
   12: 'Good',
   13: 'Damaged',
+  14: 'Advance'
 } as const
 export const STATUS_REVERSE_MAP = Object.fromEntries(
   Object.entries(STATUS_MAP).map(([key, value]) => [
@@ -47,20 +48,20 @@ export function getStatusText(code: number): string {
   return STATUS_MAP[code as keyof typeof STATUS_MAP] ?? 'Unknown'
 }
 
-export async function getRecord(id:number | string, table:string,bussiness_category:string,bussiness_id:number,client:PoolClient) {
+export async function getRecord(id: number | string, table: string, bussiness_category: string, bussiness_id: number, client: PoolClient) {
   // bussiness_category = branch or company or firm
   // bussiness_id is row id
-//  const allowedTables = ["company", "branches", "firm","product_categories"];
-// if (!allowedTables.includes(table)) {
-//   throw new Error("Invalid table name to check Exist");
-// }
-console.log([id,table,bussiness_category,bussiness_id])
-const  isrowExist = await executeInTransaction(client,
-  `SELECT * FROM ${table} WHERE id = $1 AND ${bussiness_category} = $2 AND status != $3`,
-  [id,bussiness_id, 0]
+  //  const allowedTables = ["company", "branches", "firm","product_categories"];
+  // if (!allowedTables.includes(table)) {
+  //   throw new Error("Invalid table name to check Exist");
+  // }
+  console.log([id, table, bussiness_category, bussiness_id])
+  const isrowExist = await executeInTransaction(client,
+    `SELECT * FROM ${table} WHERE id = $1 AND ${bussiness_category} = $2 AND status != $3`,
+    [id, bussiness_id, 0]
   )
   return isrowExist.rows[0] || null;
-} 
+}
 
 const ENTITY_MAP = {
   Company: "C",
@@ -163,10 +164,10 @@ export const StockTransactionTypeCodeMap: Record<
   purchase: StockTransactionCode.PURCHASE,
   purchase_return: StockTransactionCode.PURCHASE_RETURN,
   addition: StockTransactionCode.ADDITION,
-  purchase_delete:StockTransactionCode.PURCHASE_DELETE,
-  purchase_return_delete:StockTransactionCode.PURCHASE_RETURN_DELETE,
-  sale_delete:StockTransactionCode.SALE_DELETE,
-  sale_return_delete:StockTransactionCode.SALE_RETURN_DELETE
+  purchase_delete: StockTransactionCode.PURCHASE_DELETE,
+  purchase_return_delete: StockTransactionCode.PURCHASE_RETURN_DELETE,
+  sale_delete: StockTransactionCode.SALE_DELETE,
+  sale_return_delete: StockTransactionCode.SALE_RETURN_DELETE
 };
 
 // 🔹 Code → Type (Auto Generated)

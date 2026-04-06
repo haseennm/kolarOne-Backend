@@ -470,7 +470,8 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
             'total_sgst', sri.total_sgst,
             'total_igst', sri.total_igst,
             'net_amount', sri.net_amount,
-            'status', sri.status
+            'status', sri.status,
+            'stock_qty', st.available_quantity
           )
         ) FILTER (WHERE sri.id IS NOT NULL),
         '[]'

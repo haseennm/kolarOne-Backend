@@ -182,7 +182,7 @@ export default class PurchaseReturnItemService {
   ) {
     const {
       firm_id,
-      return_item_id,
+      item_id,
       returned_qty,
       unit,
       unit_price,
@@ -201,7 +201,7 @@ export default class PurchaseReturnItemService {
 
     // 1. Check return item exists
     const existingItem = await getRecord(
-      return_item_id,
+      item_id,
       "purchase_return_items",
       "firm_id",
       firm_id,
@@ -264,7 +264,7 @@ export default class PurchaseReturnItemService {
       purchase_item_id,
       firm_id,
       0,
-      return_item_id
+      item_id
     ]);
 
     const already_returned = Number(
@@ -300,20 +300,19 @@ export default class PurchaseReturnItemService {
       net_amount = $9,
       stock_id = $10,
       remarks =
-        CASE
-          WHEN remarks IS NULL THEN $11::jsonb
-          WHEN jsonb_typeof(remarks) = 'array'
-            THEN remarks || $11::jsonb
-          ELSE jsonb_build_array(remarks) || $11::jsonb
-        END,
+    CASE
+  WHEN remarks IS NULL THEN $11::jsonb
+  WHEN jsonb_typeof(remarks::jsonb) = 'array'
+    THEN remarks::jsonb || $11::jsonb
+  ELSE jsonb_build_array(remarks::jsonb) || $11::jsonb
+END,
       status = $12
     WHERE id = $13 AND firm_id = $14
     RETURNING *;
   `;
-
     const values = [
       product_id ?? existingItem.product_id,
-      returned_qty,
+      newQty,
       unit ?? existingItem.unit,
       unit_price ?? existingItem.unit_price,
       sub_total ?? existingItem.sub_total,
@@ -324,7 +323,7 @@ export default class PurchaseReturnItemService {
       stock_id ?? existingItem.stock_id,
       JSON.stringify(remark),
       statusCode ?? existingItem.status,
-      return_item_id,
+      item_id,
       firm_id
     ];
 
@@ -335,7 +334,11 @@ export default class PurchaseReturnItemService {
     );
     let movement_type: "O" | "I" =
       returned_qty > existingItem.returned_qty ? "O" : "I";
-    return { row: rows[0], movement_type };
+    return {
+      row: rows[0],
+      movement_type,
+      existingItem
+    };
   }
 
   async deletePurchaseReturnItem(data: DeletePurchaseReturnItemParams, client: PoolClient) {

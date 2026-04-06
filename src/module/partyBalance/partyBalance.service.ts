@@ -102,7 +102,7 @@ export default class PartyBalanceService {
     WHERE ref_id = $6 AND firm_id = $7 AND ref_type = $8
     RETURNING *;
   `;
-
+ 
     const updateValues = [
       balance,
       0,

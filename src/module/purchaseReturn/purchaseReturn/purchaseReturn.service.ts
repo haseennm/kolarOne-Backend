@@ -136,8 +136,8 @@ export default class PurchaseReturnService {
   }
   async editPurchaseReturn(data: PurchaseReturnEditParams, client: PoolClient) {
     const {
-      bill_date,
-      discount,
+      return_date,
+      reason,
       final_amount,
       firm_id,
       net_amount,
@@ -149,8 +149,6 @@ export default class PurchaseReturnService {
       total_cgst,
       total_igst,
       total_sgst,
-      vendor_id,
-      notes,
       transaction_reference,
       branch_id,
       company_id,
@@ -181,61 +179,39 @@ export default class PurchaseReturnService {
         throw new AppError("payment method not found", 404);
       }
     }
-    if (vendor_id && vendor_id !== is_purchase_return_exist.vendor_id) {
-      const is_vendor_exist = await getRecord(
-        vendor_id,
-        "vendors",
-        "company_id",
-        company_id,
-        client
-      );
 
-      if (!is_vendor_exist) {
-        throw new AppError("Vendor not found", 404);
-      }
-    }
-   
     const purchaseQuery = `
-   UPDATE purchase_return SET
-    vendor_id = $1,
-    bill_date = $2,
-    subtotal = $3,
-    discount = $4,
-    net_amount = $5,
-    total_cgst = $6,
-    total_sgst = $7,
-    total_igst = $8,
-    final_amount = $9,
-    payment_amount = $10,
-    notes = $11,
-    status = $12,
-    remarks = COALESCE(remarks, '[]'::jsonb) || $13::jsonb,
-    payment_method_id = $14,
-    transaction_reference = $15
+    UPDATE purchase_return SET
+    return_date = $1,
+    reason = $2,
+    sub_total = $3,
+    total_cgst = $4,
+    total_sgst = $5,
+    total_igst = $6,
+    final_amount = $7,
+    payment_method_id = $8,
+    reference_number = $9,
+    status = $10,
+    remarks = COALESCE(remarks, '[]'::jsonb) || COALESCE($11::jsonb, '[]'::jsonb)
 WHERE
-    firm_id = $16
-    AND id = $17
+    firm_id = $12
+    AND id = $13
 RETURNING *;
-  `;
-
+`;
     const values = [
-      vendor_id??is_purchase_return_exist.vendor_id,
-      bill_date ?? is_purchase_return_exist.bill_date,
-      subtotal ?? is_purchase_return_exist.sub_total,
-      discount ?? is_purchase_return_exist.discount,
-      net_amount ?? is_purchase_return_exist.net_amount,
-      total_cgst ?? is_purchase_return_exist.total_cgst,
-      total_sgst ?? is_purchase_return_exist.total_sgst,
-      total_igst ?? is_purchase_return_exist.total_igst,
-      final_amount ?? is_purchase_return_exist.final_amount,
-      payment_amount ?? is_purchase_return_exist.payment_amount,
-      notes ?? is_purchase_return_exist.notes,
-      statusCode,
-      JSON.stringify([remark]),
-      payment_method_id ?? is_purchase_return_exist.payment_method_id,
-      transaction_reference ?? is_purchase_return_exist.transaction_reference,
-      firm_id,
-      purchase_return_id
+      return_date ?? is_purchase_return_exist.return_date,   // $1
+      reason ?? is_purchase_return_exist.reason,             // $2
+      subtotal ?? is_purchase_return_exist.sub_total,        // $3
+      total_cgst ?? is_purchase_return_exist.total_cgst,     // $5
+      total_sgst ?? is_purchase_return_exist.total_sgst,     // $6
+      total_igst ?? is_purchase_return_exist.total_igst,     // $7
+      final_amount ?? is_purchase_return_exist.final_amount, // $8
+      payment_method_id ?? is_purchase_return_exist.payment_method_id, // $10
+      transaction_reference ?? is_purchase_return_exist.reference_number, // $11
+      statusCode,                                            // $12
+      JSON.stringify([remark]),                              // $13
+      firm_id,                                               // $14
+      purchase_return_id                                     // $15
     ];
 
     const { rows } = await executeInTransaction(client, purchaseQuery, values);
@@ -412,7 +388,8 @@ RETURNING *;
             'total_cgst', pri.total_cgst,
             'total_sgst', pri.total_sgst,
             'total_igst', pri.total_igst,
-            'final_amount', pri.final_amount,
+            'final_amount', pri.net_amount,
+            'max_return_qty', pi.purchased_qty,
             'status', pri.status
           )
         ) FILTER (WHERE pri.id IS NOT NULL),
@@ -427,8 +404,8 @@ RETURNING *;
 
     LEFT JOIN firm f ON f.id = pr.firm_id
     LEFT JOIN branches b ON b.id = f.branch_id
-
     LEFT JOIN purchase_return_items pri ON pri.purchase_return_id = pr.id
+    LEFT JOIN purchase_items pi ON pi.id = pri.purchase_item_id  -- ✅ ADD THIS
     LEFT JOIN products prd ON prd.id = pri.product_id
     LEFT JOIN stock s ON s.id = pri.stock_id
 
@@ -522,7 +499,7 @@ RETURNING *;
 
     const result = await executeInTransaction(client, queryText, values);
 
-    return result.rows[0]; 
+    return result.rows[0];
   }
   // async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
   //   const { id, firm_id } = data;

@@ -31,17 +31,15 @@ export interface PurchaseReturnEditBody {
   firm_id: number;
   branch_id: number
   company_id: number
-  vendor_id?: string;
-  bill_date?: Date | string;
+  return_date?: Date | string;
   subtotal?: number;
-  discount?: number;
   net_amount?: number;
   total_cgst?: number;
   total_sgst?: number;
   total_igst?: number;
   final_amount?: number;
   payment_amount?: number;
-  notes?: string | null;
+  reason?: string | null; 
   status?: string;
   transaction_reference?: string | null;
   payment_method_id?: number;

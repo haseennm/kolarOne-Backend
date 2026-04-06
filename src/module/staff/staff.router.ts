@@ -322,7 +322,6 @@ export async function staffRouter(app: FastifyInstance) {
     async (request, reply) => {
       const controller = new StaffController();
       const staff = await controller.loginStaff(request.body);
-      console.log(staff)
       return reply.code(201).send(staff);
 
     }

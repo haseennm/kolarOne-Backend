@@ -139,14 +139,14 @@ export default class SaleReturnItemService {
 
     // ✅ Validation: Check sale return item existence
     const item_row = await executeInTransaction(client, `
-      SELECT * sale_return_items WHERE id = $1 AND firm_id $2 AND sale_return_id =$3 AND status =$4`,
-      [item_id, firm_id, sale_return_id, 0])
+      SELECT * FROM sale_return_items WHERE id = $1 AND firm_id =$2 AND sale_return_id =$3 AND status !=0`,
+      [item_id, firm_id, sale_return_id])
+
     const is_item_exist = item_row.rows[0]
     if (!is_item_exist) {
       throw new AppError("Sale return item not found", 404);
     }
 
-    // ✅ Validation: Check returned quantity if updating
     if (returned_qty && returned_qty <= 0) {
       throw new AppError("Returned quantity must be greater than 0", 422);
     }
@@ -192,7 +192,7 @@ export default class SaleReturnItemService {
     ];
 
     const { rows } = await executeInTransaction(client, updateQuery, values);
-    return rows[0];
+    return { row: rows[0], old_row: is_item_exist };
   }
 
   //     const { filters, offset } = data;
