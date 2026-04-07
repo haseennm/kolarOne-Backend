@@ -56,6 +56,11 @@ export interface EditPartyBalanceParams
   extends Omit<EditPartyBalanceBody, "status"> {
   statusCode?: number;
 }
+interface ObjPayment{
+  payment_method_id:number,
+  amount:number;
+  reference_number:string | null
+}
 export interface RepayPartyBalanceBody {
   payment_amount: number;
   ref_id: number;
@@ -65,7 +70,8 @@ export interface RepayPartyBalanceBody {
   updated_by: string;
   payment_method_id: number;
   transaction_reference: string;
-  company_id: number
+  company_id: number;
+  payments:ObjPayment[]
 }
 export interface RepayPartyBalanceParams extends Omit<RepayPartyBalanceBody,"payment_amount"| "updated_by" | "payment_method_id" | "transaction_reference" | "company_id"> {
   remarks: object;

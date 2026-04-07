@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { getRecord } from "../../../utils/extra";
-import { GetReportSalePurchaseLedger, SaleCreateParams, SaleDeleteParams, SaleEditParams, SaleFetchParams } from "./sale.types";
+import { GetReportSalePurchaseLedger, RepayBalanceSale, SaleCreateParams, SaleDeleteParams, SaleEditParams, SaleFetchParams } from "./sale.types";
 
 export default class SaleService {
 
@@ -544,7 +544,7 @@ OFFSET $${values.length + 2}
             THEN s.remarks || $2::jsonb
           ELSE jsonb_build_array(s.remarks) || $2::jsonb
         END
-    FROM firms f
+    FROM firm f
     JOIN branches b ON f.branch_id = b.id
     WHERE 
       s.id = $3 
@@ -715,5 +715,74 @@ OFFSET $${values.length + 2}
   `;
     const { rows } = await client.query(query, params);
     return rows;
+  }
+
+  async updateSalePayment(
+    data: RepayBalanceSale,
+    client: PoolClient
+  ) {
+    const { firm_id, payments, remark, sale_id, company_id } = data
+    const is_sale_exist = await getRecord(
+      sale_id,
+      "sales",
+      "firm_id",
+      firm_id,
+      client
+    );
+
+    if (!is_sale_exist) {
+      throw new AppError("Sale not found", 404);
+    }
+
+    // ✅ Validate payment methods
+    for (const p of payments) {
+      const is_payment_method_exist = await getRecord(
+        p.payment_method_id,
+        "payment_methods",
+        "company_id",
+        company_id, // safer
+        client
+      );
+
+      if (!is_payment_method_exist) {
+        throw new AppError(
+          `Payment method not found: ${p.payment_method_id}`,
+          404
+        );
+      }
+    }
+
+    // ✅ Calculate new paid amount
+    const newPaid =
+      (Number(is_sale_exist.paid) || 0) +
+      payments.reduce((sum, p) => sum + p.amount, 0);
+    console.log("newPaid", newPaid)
+    const paymentObj = payments.map((p) => ({
+      payment_method_id: p.payment_method_id,
+      amount: p.amount,
+      reference: p.reference_number ?? null
+    }));
+
+    const query = `
+    UPDATE sales
+    SET 
+      payments = COALESCE(payments, '[]'::jsonb) || $1::jsonb,
+      paid = $2,
+      remarks = COALESCE(remarks, '[]'::jsonb) || $3::jsonb
+    WHERE id = $4 AND firm_id = $5
+    RETURNING *;
+  `;
+
+    const values = [
+      JSON.stringify(paymentObj),  // append array
+      newPaid,
+      JSON.stringify([remark]),    // keep consistent with purchase
+      sale_id,
+      firm_id
+    ];
+
+    const { rows } = await executeInTransaction(client, query, values);
+
+    return rows[0];
   }
 }

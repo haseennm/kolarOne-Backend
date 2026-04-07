@@ -99,3 +99,15 @@ export interface GetReportSalePurchaseLedger {
   start_date: string;
   end_date: string;
 }
+interface ObjPayment{
+  payment_method_id:number,
+  amount:number;
+  reference_number:string | null
+}
+export interface RepayBalanceSale {
+  sale_id: number,
+  firm_id: number,
+  payments: ObjPayment[],
+  remark: any,
+  company_id:number
+}

@@ -10,7 +10,7 @@ import PartyBalanceController from "./partyBalance.controller";
 
 export async function partyBalanceRouter(app: FastifyInstance) {
 
- 
+
   app.post<{ Body: FetchPartyBalanceBody }>(
     "/get",
     {
@@ -73,40 +73,44 @@ export async function partyBalanceRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["ref_id", "ref_type", "firm_id", "pay_amount", "updated_by","company_id"],
+          required: [
+            "ref_id",
+            "ref_type",
+            "firm_id",
+            "pay_amount",
+            "updated_by",
+            "company_id",
+          ],
           properties: {
-
             payment_amount: {
               type: "number"
             },
             ref_id: {
               type: "number"
             },
-
-            comnpany_id: {
+            company_id: {   // ✅ fixed
               type: "number"
             },
             firm_id: {
               type: "number"
             },
-
             pay_amount: {
-              type: "number"
+              type: "number",
+              minimum: 1   // ✅ added
             },
-
             updated_by: {
               type: "string"
             },
             ref_type: {
-              type: "string"
+              type: "string",
+              enum: ["P", "S"]   // ✅ added
             },
             transaction_reference: {
               type: "string"
             },
             payment_method_id: {
-              type: "number"
+              type: ["number","null"]
             }
-
           }
         }
       }

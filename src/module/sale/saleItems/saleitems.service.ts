@@ -113,23 +113,23 @@ export default class SaleItemService {
 
     const saleItemQuery = `
   SELECT 
-    pi.*,
+    si.*,
     p.name AS product_name,
-    pu.bill_number,
+    sl.invoice_number,
     s.batch_number
-  FROM purchase_items pi
-  LEFT JOIN products p ON p.id = pi.product_id
-  LEFT JOIN purchases pu ON pu.id = pi.purchase_id
-  LEFT JOIN stock s ON s.id = pi.stock_id
+  FROM sales_items si
+  LEFT JOIN products p ON p.id = si.product_id
+  LEFT JOIN sales sl ON sl.id = si.sale_id
+  LEFT JOIN stock s ON s.id = si.stock_id
   ${whereClause}
-  ORDER BY pi.id DESC
+  ORDER BY si.id DESC
   LIMIT $${values.length + 1}
   OFFSET $${values.length + 2}
 `;
 
     const countQuery = `
     SELECT COUNT(*)
-    FROM purchase_items
+    FROM sales_items
     ${whereClause}
   `;
 
@@ -240,11 +240,12 @@ export default class SaleItemService {
   async deleteSaleItem(data: DeleteSaleItemParams, client: PoolClient) {
 
     const { sale_id, firm_id, remark } = data;
+    console.log(data)
     const isItemExist = await executeInTransaction(client,
-      `SELECT * FROM purchase_items WHERE sale_id =$1 AND firm_id= $2`,
+      `SELECT * FROM sales_items WHERE sale_id =$1 AND firm_id= $2`,
       [sale_id, firm_id]
     )
-    if (isItemExist) {
+    if (!isItemExist) {
       throw new AppError("Sale item not found for this Sale", 404)
     }
 

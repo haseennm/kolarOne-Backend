@@ -6,6 +6,7 @@ import PartyBalanceService from "./partyBalance.service";
 import { CreatePartyBalanceBody, DeletePartyBalanceBody, EditPartyBalanceBody, FetchPartyBalanceParams, RepayPartyBalanceBody } from "./partyBalance.types";
 import PurchaseController from "../purchase/purchase/purchase.controller";
 import PurchaseService from "../purchase/purchase/purchase.service";
+import SaleService from "../sale/sale/sale.service";
 
 export default class PartyBalanceController {
 
@@ -32,7 +33,7 @@ export default class PartyBalanceController {
       client
     );
 
-   
+
 
     return `PartyBalance  has been created successfully.`;
 
@@ -80,17 +81,31 @@ export default class PartyBalanceController {
   }
 
   async rePayPartyBalance(data: RepayPartyBalanceBody) {
-
     return transaction(async (client) => {
 
-      const { updated_by, pay_amount, transaction_reference, payment_method_id, payment_amount, company_id, ...rest } = data
+      const {
+        updated_by,
+        pay_amount,
+        transaction_reference,
+        payment_method_id,
+        payment_amount,
+        company_id,
+        ...rest
+      } = data;
+      console.log("data", data)
       const service = new PartyBalanceService();
+
       const remarks = {
         action: `Paid ${pay_amount}`,
         updated_by,
         updated_at: Date.now(),
       };
-      const party_balance = await service.repayPartyBalance({ ...rest, remarks, pay_amount }, client);
+
+      const party_balance = await service.repayPartyBalance(
+        { ...rest, remarks, pay_amount },
+        client
+      );
+
       const entity_type = convertEntityType("Firm" as EntityKey);
 
       const purchase_remark = {
@@ -98,20 +113,40 @@ export default class PartyBalanceController {
         updated_by,
         updated_at: Date.now(),
       };
-      const total_amount = pay_amount + payment_amount
+
+      const total_amount = pay_amount + (payment_amount || 0);
+
+      // ✅ PURCHASE UPDATE
       if (rest.ref_type === "P") {
         const purchase_service = new PurchaseService();
-        await purchase_service.editPurchase({
+
+        await purchase_service.updatePaymentAmount({
           purchase_id: rest.ref_id,
           firm_id: rest.firm_id,
-          branch_id: rest.ref_id,
           remark: purchase_remark,
-          payment_amount: total_amount,
-          company_id: company_id
-        }, client)
+          payment_amount: total_amount
+        }, client);
       }
 
-      const payment_transactions = new PaymentTransactionService()
+      // ✅ SALE UPDATE (FIXED 🚀)
+      if (rest.ref_type === "S") {
+        const sale_service = new SaleService();
+
+        await sale_service.updateSalePayment(
+          {
+           sale_id: rest.ref_id,
+           firm_id: rest.firm_id,
+           payments: rest.payments,
+           remark: purchase_remark,
+           company_id:company_id
+          },
+          client
+        );
+      }
+
+      // ✅ TRANSACTION ENTRY
+      const payment_transactions = new PaymentTransactionService();
+
       await payment_transactions.insertPaymentTransaction({
         ref_id: Number(party_balance.id),
         amount: pay_amount,
@@ -122,7 +157,8 @@ export default class PartyBalanceController {
         business_id: rest.firm_id,
         business_ref: entity_type,
         company_id: company_id
-      }, client)
+      }, client);
+
       return `party balance has been paid successfully, Balance:'${party_balance.balance}'`;
     });
   }

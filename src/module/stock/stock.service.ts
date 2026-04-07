@@ -258,11 +258,14 @@ export default class StockService {
       );
     }
 
-    const calculation = movement_type === "O" ? -qty : qty;
+    const qtyNum = Number(qty);
+    const stockQty = Number(stock.available_quantity);
 
-    const finalAvailableQty =
-      Number(stock.available_quantity) + calculation;
-    console.log("finalAvailableQty", finalAvailableQty)
+    const calculation = movement_type === "O" ? -qtyNum : qtyNum;
+
+    const finalAvailableQty = stockQty + calculation;
+
+    console.log("finalAvailableQty", finalAvailableQty);
     const finalPurchasedQty = is_relate_purchase
       ? Number(stock.purchased_qty) + calculation
       : Number(stock.purchased_qty);

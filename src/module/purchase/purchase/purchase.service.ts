@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { getRecord } from "../../../utils/extra";
-import { PurchaseCreateParams, PurchaseDeleteParams, PurchaseEditParams, PurchaseFetchParams } from "./purchase.types";
+import { PurchaseCreateParams, PurchaseDeleteParams, PurchaseEditParams, PurchaseFetchParams, RepayBalancePurchase } from "./purchase.types";
 
 export default class PurchaseService {
 
@@ -468,24 +468,24 @@ export default class PurchaseService {
       },
     };
   }
- async deletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
-  const { id, remark, firm_id } = data;
+  async deletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
+    const { id, remark, firm_id } = data;
 
-  const isPurchaseExist = await getRecord(
-    id,
-    "purchases",
-    "firm_id",
-    firm_id,
-    client
-  );
+    const isPurchaseExist = await getRecord(
+      id,
+      "purchases",
+      "firm_id",
+      firm_id,
+      client
+    );
 
-  if (!isPurchaseExist) {
-    throw new AppError("Purchase not found or already deleted", 404);
-  }
+    if (!isPurchaseExist) {
+      throw new AppError("Purchase not found or already deleted", 404);
+    }
 
-  await this.canDeletePurchase(data, client);
+    await this.canDeletePurchase(data, client);
 
-  const queryText = `
+    const queryText = `
     UPDATE purchases p
     SET
       status = $1,
@@ -505,40 +505,40 @@ export default class PurchaseService {
     RETURNING p.*, b.company_id;
   `;
 
-  const values = [
-    0,
-    JSON.stringify([remark]), 
-    id,
-    firm_id
-  ];
+    const values = [
+      0,
+      JSON.stringify([remark]),
+      id,
+      firm_id
+    ];
 
-  const row = await executeInTransaction(client, queryText, values);
+    const row = await executeInTransaction(client, queryText, values);
 
-  return row.rows[0];
-}
- async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
-  const { id, firm_id } = data;
+    return row.rows[0];
+  }
+  async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
+    const { id, firm_id } = data;
 
-  const purchaseReturn = await executeInTransaction(
-    client,
-    `SELECT 1 
+    const purchaseReturn = await executeInTransaction(
+      client,
+      `SELECT 1 
      FROM purchase_return 
      WHERE purchase_id = $1 
        AND status = $2 
        AND firm_id = $3`,
-    [id, 0, firm_id]
-  );
-
-  if (purchaseReturn.rows.length > 0) {
-    throw new AppError(
-      "Purchase return already exists, cannot delete",
-      400
+      [id, 0, firm_id]
     );
-  }
 
-  const stockUsedInSales = await executeInTransaction(
-    client,
-    `
+    if (purchaseReturn.rows.length > 0) {
+      throw new AppError(
+        "Purchase return already exists, cannot delete",
+        400
+      );
+    }
+
+    const stockUsedInSales = await executeInTransaction(
+      client,
+      `
     SELECT 1
     FROM stock s
     JOIN sales_items si ON si.stock_id = s.id
@@ -546,16 +546,48 @@ export default class PurchaseService {
       AND s.firm_id = $2
     LIMIT 1
     `,
-    [id, firm_id]
-  );
-
-  if (stockUsedInSales.rows.length > 0) {
-    throw new AppError(
-      "Stock from this purchase is already used in sales, cannot delete",
-      400
+      [id, firm_id]
     );
-  }
 
-  return true;
-}
+    if (stockUsedInSales.rows.length > 0) {
+      throw new AppError(
+        "Stock from this purchase is already used in sales, cannot delete",
+        400
+      );
+    }
+
+    return true;
+  }
+  async updatePaymentAmount(
+    data: RepayBalancePurchase,
+    client: PoolClient
+  ) {
+    const { firm_id, payment_amount, purchase_id, remark } = data
+    // Check if purchase exists
+    const is_purchase_exist = await getRecord(
+      purchase_id,
+      "purchases",
+      "firm_id",
+      firm_id,
+      client
+    );
+
+    if (!is_purchase_exist) {
+      throw new AppError("Purchase not found", 404);
+    }
+
+    const query = `
+    UPDATE purchases
+    SET payment_amount = $1,
+    remarks = COALESCE(remarks, '[]'::jsonb) || $2::jsonb
+    WHERE id = $3 AND firm_id = $4
+    RETURNING *;
+  `;
+
+    const values = [payment_amount, JSON.stringify(remark), purchase_id, firm_id];
+
+    const { rows } = await executeInTransaction(client, query, values);
+
+    return rows[0];
+  }
 }
