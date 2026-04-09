@@ -116,7 +116,6 @@ export default class PartyBalanceController {
 
       const total_amount = pay_amount + (payment_amount || 0);
 
-      // ✅ PURCHASE UPDATE
       if (rest.ref_type === "P") {
         const purchase_service = new PurchaseService();
 
@@ -128,7 +127,6 @@ export default class PartyBalanceController {
         }, client);
       }
 
-      // ✅ SALE UPDATE (FIXED 🚀)
       if (rest.ref_type === "S") {
         const sale_service = new SaleService();
 
@@ -144,7 +142,6 @@ export default class PartyBalanceController {
         );
       }
 
-      // ✅ TRANSACTION ENTRY
       const payment_transactions = new PaymentTransactionService();
 
       await payment_transactions.insertPaymentTransaction({

@@ -29,6 +29,7 @@ import { partyBalanceRouter } from './module/partyBalance/partyBalance.router'
 import { financialYearRouter } from './module/financialYear/financialYear.router'
 import { maintenanceRouter } from './module/maintenance/maintenance.router'
 import { companyBrandingRouter } from './module/companyBranding/companyBranding.router'
+import reportRoutes from './module/reports/report.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -60,4 +61,5 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(financialYearRouter, { prefix: 'financial/year' })
   app.register(maintenanceRouter, { prefix: '/maintenance' })
   app.register(companyBrandingRouter, { prefix: '/company/branding' })
+  app.register(reportRoutes, { prefix: '/reports' })
 }
