@@ -1,17 +1,12 @@
 import { executeInTransaction, transaction } from "../../config/db";
+import { cns } from "../../utils/extra";
+import { GetGSTReportBody, GetReportBody } from "./report.types";
 
 export class ReportService {
   // 
   // PROFIT LOSS REPORT START
   // 
-  async getProfitLossReport(data: {
-    level: "company" | "branch" | "firm";
-    firm_id?: number;
-    branch_id?: number;
-    company_id?: number;
-    start_date?: string;
-    end_date?: string;
-  }) {
+  async getProfitLossReport(data: GetReportBody) {
 
     const { level, firm_id, branch_id, company_id, start_date, end_date } = data;
 
@@ -351,14 +346,10 @@ export class ReportService {
   // PROFIT LOSS REPORT END 
   // 
 
-  async getOutstandingReport(data: {
-    level: "company" | "branch" | "firm";
-    firm_id?: number;
-    branch_id?: number;
-    company_id?: number;
-    start_date?: string;
-    end_date?: string;
-  }) {
+  // 
+  // START OUTSTANDING
+  // 
+  async getOutstandingReport(data: GetReportBody) {
 
     const { level, firm_id, branch_id, company_id, start_date, end_date } = data;
 
@@ -437,8 +428,6 @@ export class ReportService {
     });
   }
 
-  /* ================= CORE ================= */
-
   private async getData(
     client: any,
     firmIds: number[],
@@ -446,11 +435,11 @@ export class ReportService {
     endDate?: string
   ) {
 
- const dateFilter = this.buildDateFilter(
-  "pb_date_placeholder", // will NOT be used directly
-  startDate,
-  endDate
-);
+    const dateFilter = this.buildDateFilter(
+      "pb_date_placeholder", // will NOT be used directly
+      startDate,
+      endDate
+    );
 
     const result = await executeInTransaction(client, `
       SELECT 
@@ -597,6 +586,832 @@ export class ReportService {
     };
   }
 
+  // 
+  // END OUTSTANDING
+  // 
+  // private async getGSTSummarySalesOnly(
+  //   client: any,
+  //   firmIds: number[],
+  //   startDate?: string,
+  //   endDate?: string
+  // ) {
 
+  //   const hasDate = startDate && endDate;
 
+  //   const result = await executeInTransaction(client, `
+  //   SELECT
+  //     SUM(total_cgst) AS cgst,
+  //     SUM(total_sgst) AS sgst,
+  //     SUM(total_igst) AS igst
+  //   FROM (
+
+  //     SELECT total_cgst, total_sgst, total_igst
+  //     FROM sales
+  //     WHERE status != 0 
+  //     AND firm_id = ANY($1)
+  //     ${hasDate ? `AND invoice_date BETWEEN $2 AND $3` : ``}
+
+  //     UNION ALL
+
+  //     SELECT -total_cgst, -total_sgst, -total_igst
+  //     FROM sale_return
+  //     WHERE status != 0 
+  //     AND firm_id = ANY($1)
+  //     ${hasDate ? `AND return_date BETWEEN $2 AND $3` : ``}
+
+  //   ) t
+  // `, hasDate ? [firmIds, startDate, endDate] : [firmIds]);
+
+  //   const row = result.rows[0];
+
+  //   const total_cgst = Number(row.cgst || 0);
+  //   const total_sgst = Number(row.sgst || 0);
+  //   const total_igst = Number(row.igst || 0);
+
+  //   return {
+  //     total_tax: total_cgst + total_sgst + total_igst,
+  //     total_cgst,
+  //     total_sgst,
+  //     total_igst
+  //   };
+  // }
+  // private async getFirmGSTSalesOnly(
+  //   client: any,
+  //   firmIds: number[],
+  //   startDate?: string,
+  //   endDate?: string
+  // ) {
+
+  //   const firms = await executeInTransaction(client, `
+  //   SELECT id, firm_name, gstin
+  //   FROM firm
+  //   WHERE id = ANY($1)
+  // `, [firmIds]);
+
+  //   const result = [];
+
+  //   for (const f of firms.rows) {
+
+  //     const summary = await this.getGSTSummarySalesOnly(
+  //       client,
+  //       [f.id],
+  //       startDate,
+  //       endDate
+  //     );
+
+  //     const hasDate = startDate && endDate;
+
+  //     const invoices = await executeInTransaction(client, `
+  //     SELECT 
+  //       'SALE' as type,
+  //       invoice_number,
+  //       invoice_date,
+  //       net_amount AS taxable_value,
+  //       total_cgst,
+  //       total_sgst,
+  //       total_igst
+  //     FROM sales
+  //     WHERE status != 0 
+  //     AND firm_id = $1
+  //     ${hasDate ? `AND invoice_date BETWEEN $2 AND $3` : ``}
+
+  //     UNION ALL
+
+  //     SELECT 
+  //       'RETURN' as type,
+  //       return_number,
+  //       return_date,
+  //       -sub_total,
+  //       -total_cgst,
+  //       -total_sgst,
+  //       -total_igst
+  //     FROM sale_return
+  //     WHERE status != 0 
+  //     AND firm_id = $1
+  //     ${hasDate ? `AND return_date BETWEEN $2 AND $3` : ``}
+
+  //     ORDER BY invoice_date
+  //   `, hasDate ? [f.id, startDate, endDate] : [f.id]);
+
+  //     result.push({
+  //       firm_id: f.id,
+  //       firm_name: f.firm_name,
+  //       gstin: f.gstin,
+  //       firm_tax_summary: {
+  //         total_cgst: summary.total_cgst,
+  //         total_sgst: summary.total_sgst,
+  //         total_igst: summary.total_igst
+  //       },
+  //       invoices: invoices.rows.map((i: any) => ({
+  //         type: i.type,
+  //         invoice_number: i.invoice_number,
+  //         invoice_date: i.invoice_date,
+  //         taxable_value: Number(i.taxable_value),
+  //         total_cgst: Number(i.total_cgst),
+  //         total_sgst: Number(i.total_sgst),
+  //         total_igst: Number(i.total_igst)
+  //       }))
+  //     });
+  //   }
+
+  //   return result;
+  // }
+  // private async getBranchWiseGST(
+  //   client: any,
+  //   companyId: number,
+  //   startDate?: string,
+  //   endDate?: string
+  // ) {
+
+  //   const branches = await executeInTransaction(client, `
+  //   SELECT id, branch_name
+  //   FROM branches
+  //   WHERE company_id = $1
+  // `, [companyId]);
+
+  //   const result = [];
+
+  //   for (const b of branches.rows) {
+
+  //     const firms = await executeInTransaction(client, `
+  //     SELECT id FROM firm WHERE branch_id = $1
+  //   `, [b.id]);
+
+  //     const firmIds = firms.rows.map((f: any) => f.id);
+
+  //     if (!firmIds.length) continue;
+
+  //     const summary = await this.getGSTSummarySalesOnly(
+  //       client,
+  //       firmIds,
+  //       startDate,
+  //       endDate
+  //     );
+
+  //     const firmData = await this.getFirmGSTSalesOnly(
+  //       client,
+  //       firmIds,
+  //       startDate,
+  //       endDate
+  //     );
+
+  //     result.push({
+  //       branch_id: b.id,
+  //       branch_name: b.branch_name,
+  //       summary,
+  //       firms_data: firmData
+  //     });
+  //   }
+
+  //   return result;
+  // }
+  // async getGSTSalesReport(data: {
+  //   level: "company" | "branch" | "firm";
+  //   firm_id?: number;
+  //   branch_id?: number;
+  //   company_id?: number;
+  //   start_date?: string;
+  //   end_date?: string;
+  // }) {
+
+  //   const { level, firm_id, branch_id, company_id, start_date, end_date } = data;
+
+  //   return transaction(async (client) => {
+
+  //     let firmIds: number[] = [];
+
+  //     if (level === "firm" && firm_id) {
+  //       firmIds = [firm_id];
+  //     }
+
+  //     if (level === "branch" && branch_id) {
+  //       const res = await executeInTransaction(
+  //         client,
+  //         `SELECT id FROM firm WHERE branch_id = $1`,
+  //         [branch_id]
+  //       );
+  //       firmIds = res.rows.map((r: any) => r.id);
+  //     }
+
+  //     if (level === "company" && company_id) {
+  //       const res = await executeInTransaction(client, `
+  //       SELECT f.id
+  //       FROM firm f
+  //       JOIN branches b ON b.id = f.branch_id
+  //       WHERE b.company_id = $1
+  //     `, [company_id]);
+
+  //       firmIds = res.rows.map((r: any) => r.id);
+  //     }
+
+  //     if (!firmIds.length) {
+  //       return { status: "success", data: { summary: {}, firms_data: [] } };
+  //     }
+
+  //     const summary = await this.getGSTSummarySalesOnly(
+  //       client,
+  //       firmIds,
+  //       start_date,
+  //       end_date
+  //     );
+
+  //     /* ===== LEVEL BASED ===== */
+
+  //     if (level === "company") {
+  //       const branchWise = await this.getBranchWiseGST(
+  //         client,
+  //         company_id!,
+  //         start_date,
+  //         end_date
+  //       );
+
+  //       return {
+  //         status: "success",
+  //         data: {
+  //           summary,
+  //           branch_wise: branchWise
+  //         }
+  //       };
+  //     }
+
+  //     /* firm + branch → firm data */
+
+  //     const firms = await this.getFirmGSTSalesOnly(
+  //       client,
+  //       firmIds,
+  //       start_date,
+  //       end_date
+  //     );
+
+  //     return {
+  //       status: "success",
+  //       data: {
+  //         summary,
+  //         firms_data: firms
+  //       }
+  //     };
+  //   });
+  // }
+  // 
+  // 
+  // 
+ 
+  private async getGSTR3BSummary(
+    client: any,
+    firmIds: number[],
+    startDate?: string,
+    endDate?: string
+  ) {
+    const salesFilter = this.buildDateFilter("invoice_date", startDate, endDate, 2);
+    const returnFilter = this.buildDateFilter("return_date", startDate, endDate, 4);
+
+    const result = await executeInTransaction(client, `
+    SELECT
+      SUM(cgst) AS cgst,
+      SUM(sgst) AS sgst,
+      SUM(igst) AS igst
+    FROM (
+
+      SELECT total_cgst AS cgst, total_sgst AS sgst, total_igst AS igst
+      FROM sales
+      WHERE status != 0
+      AND firm_id = ANY($1)
+      ${salesFilter.clause}
+
+      UNION ALL
+
+      SELECT -total_cgst, -total_sgst, -total_igst
+      FROM sale_return
+      WHERE status != 0
+      AND firm_id = ANY($1)
+      ${returnFilter.clause}
+
+    ) t
+  `, [
+      firmIds,
+      ...salesFilter.values,
+      ...returnFilter.values
+    ]);
+
+    const row = result.rows[0];
+
+    return {
+      total_cgst: Number(row.cgst || 0),
+      total_sgst: Number(row.sgst || 0),
+      total_igst: Number(row.igst || 0),
+      total_tax:
+        Number(row.cgst || 0) +
+        Number(row.sgst || 0) +
+        Number(row.igst || 0)
+    };
+  }
+  private async getGSTR1Data(
+    client: any,
+    firmIds: number[],
+    startDate?: string,
+    endDate?: string
+  ) {
+
+    const salesFilter = this.buildDateFilter("s.invoice_date", startDate, endDate, 2);
+    const returnFilter = this.buildDateFilter("sr.return_date", startDate, endDate, 4);
+
+    const result = await executeInTransaction(client, `
+    
+    /* SALES (INVOICE) */
+    SELECT 
+      c.customer_type,
+      c.gstin,
+      c.state_code,
+      s.invoice_number,
+      s.invoice_date,
+      s.net_amount AS taxable_value,
+      s.total_cgst,
+      s.total_sgst,
+      s.total_igst,
+      'INVOICE' as doc_type
+    FROM sales s
+    JOIN customers c ON c.id = s.customer_id
+    WHERE s.status != 0
+    AND c.status != 0
+    AND s.firm_id = ANY($1)
+    ${salesFilter.clause}
+
+    UNION ALL
+
+    /* SALES RETURN (CREDIT NOTE) */
+    SELECT 
+      c.customer_type,
+      c.gstin,
+      c.state_code,
+      sr.return_number AS invoice_number,
+      sr.return_date AS invoice_date,
+      -sr.sub_total AS taxable_value,
+      -sr.total_cgst,
+      -sr.total_sgst,
+      -sr.total_igst,
+      'CREDIT_NOTE'
+    FROM sale_return sr
+    JOIN sales s ON s.id = sr.sale_id
+    JOIN customers c ON c.id = s.customer_id
+    WHERE sr.status != 0
+    AND s.status != 0
+    AND c.status != 0
+    AND sr.firm_id = ANY($1)
+    ${returnFilter.clause}
+
+  `, [
+      firmIds,
+      ...salesFilter.values,
+      ...returnFilter.values
+    ]);
+
+    const rows = result.rows;
+
+    return {
+      B2B: rows.filter((r: any) => r.customer_type === "B2B"),
+      B2C: rows.filter((r: any) => r.customer_type !== "B2B"),
+      credit_notes: rows.filter((r: any) => r.doc_type === "CREDIT_NOTE")
+    };
+  }
+  // private async getBranchWiseData(
+  //   client: any,
+  //   company_id: number,
+  //   startDate?: string,
+  //   endDate?: string
+  // ) {
+
+  //   const branches = await executeInTransaction(client, `
+  //   SELECT id, branch_name
+  //   FROM branches
+  //   WHERE company_id = $1
+  // `, [company_id]);
+
+  //   const result = [];
+
+  //   for (const b of branches.rows) {
+
+  //     const firms = await executeInTransaction(client, `
+  //     SELECT id FROM firm WHERE branch_id = $1
+  //   `, [b.id]);
+
+  //     const firmIds = firms.rows.map((f: any) => f.id);
+
+  //     const summary = await this.getGSTR3BSummary(
+  //       client,
+  //       firmIds,
+  //       startDate,
+  //       endDate
+  //     );
+
+  //     result.push({
+  //       branch_name: b.branch_name,
+  //       summary
+  //     });
+  //   }
+
+  //   return result;
+  // }
+  async getGSTReport(data: GetGSTReportBody) {
+
+    const { type, level, firm_id, branch_id, company_id, start_date, end_date } = data;
+
+    return transaction(async (client) => {
+
+      let firmIds: number[] = [];
+
+      // ✅ FIRM LEVEL
+      if (level === "firm" && firm_id) {
+        firmIds = [firm_id];
+      }
+
+      // ✅ BRANCH LEVEL
+      if (level === "branch" && branch_id) {
+        const res = await executeInTransaction(
+          client,
+          `SELECT id FROM firm WHERE branch_id = $1`,
+          [branch_id]
+        );
+        firmIds = res.rows.map((r: any) => r.id);
+      }
+
+      // ✅ COMPANY LEVEL (FIXED PROPERLY)
+      if (level === "company" && company_id) {
+
+        const branches = await executeInTransaction(client, `
+        SELECT id, branch_name
+        FROM branches
+        WHERE company_id = $1
+      `, [company_id]);
+
+        const result = [];
+
+        for (const b of branches.rows) {
+
+          const firms = await executeInTransaction(
+            client,
+            `SELECT id FROM firm WHERE branch_id = $1`,
+            [b.id]
+          );
+
+          const ids = firms.rows.map((f: any) => f.id);
+
+          // 🔥 IMPORTANT: HANDLE TYPE HERE
+          if (type === "GSTR-3B") {
+
+            const summary = await this.getGSTR3BSummary(
+              client,
+              ids,
+              start_date,
+              end_date
+            );
+
+            result.push({
+              branch_name: b.branch_name,
+              summary
+            });
+
+          } else if (type === "GSTR-1") {
+
+            const gstr1 = await this.getGSTR1Data(
+              client,
+              ids,
+              start_date,
+              end_date
+            );
+
+            result.push({
+              branch_name: b.branch_name,
+              data: gstr1
+            });
+          }
+        }
+
+        return {
+          status: "success",
+          data: result
+        };
+      }
+
+      // ✅ NON-COMPANY FLOW (firm / branch)
+
+      if (type === "GSTR-3B") {
+
+        const summary = await this.getGSTR3BSummary(
+          client,
+          firmIds,
+          start_date,
+          end_date
+        );
+
+        return {
+          status: "success",
+          data: summary
+        };
+      }
+
+      if (type === "GSTR-1") {
+
+        const gstr1 = await this.getGSTR1Data(
+          client,
+          firmIds,
+          start_date,
+          end_date
+        );
+
+        return {
+          status: "success",
+          data: gstr1
+        };
+      }
+
+    });
+  }
+  // 
+  // GST END
+  // 
+
+  private async getExpenseSummary(
+    client: any,
+    whereClause: string,
+    values: any[],
+    dateIndex: number,
+    startDate?: string,
+    endDate?: string
+  ) {
+
+    const dateFilter = this.buildDateFilter(
+      "lt.transaction_date",
+      startDate,
+      endDate,
+      dateIndex
+    );
+
+    const result = await executeInTransaction(client, `
+    SELECT 
+      COALESCE(SUM(lt.amount), 0) AS total_amount
+    FROM ledger_transactions lt
+    JOIN ledger_categories lc ON lc.id = lt.category_id
+    WHERE lt.status != 0
+    AND lc.status != 0
+    AND lc.category_type = 'E'
+    ${whereClause}
+    ${dateFilter.clause}
+  `, [
+      ...values,
+      ...dateFilter.values
+    ]);
+
+    return Number(result.rows[0].total_amount || 0);
+  }
+
+  private async getExpenseCategories(
+    client: any,
+    whereClause: string,
+    values: any[],
+    dateIndex: number,
+    startDate?: string,
+    endDate?: string
+  ) {
+
+    const dateFilter = this.buildDateFilter(
+      "lt.transaction_date",
+      startDate,
+      endDate,
+      dateIndex
+    );
+
+    const result = await executeInTransaction(client, `
+    SELECT 
+      lc.name AS category_name,
+      COALESCE(SUM(lt.amount), 0) AS total_amount
+    FROM ledger_transactions lt
+    JOIN ledger_categories lc ON lc.id = lt.category_id
+    WHERE lt.status != 0
+    AND lc.status != 0
+    AND lc.category_type = 'E'
+    ${whereClause}
+    ${dateFilter.clause}
+    GROUP BY lc.name
+    ORDER BY total_amount DESC
+  `, [
+      ...values,
+      ...dateFilter.values
+    ]);
+
+    return result.rows.map((r: any) => ({
+      category_name: r.category_name,
+      total_amount: Number(r.total_amount)
+    }));
+  }
+
+  private async getFirmExpense(
+    client: any,
+    firm_id: number,
+    startDate?: string,
+    endDate?: string
+  ) {
+
+    const where = `AND lt.entity_type = 'F' AND lt.entity_id = $1`;
+
+    const total = await this.getExpenseSummary(
+      client,
+      where,
+      [firm_id],
+      2,
+      startDate,
+      endDate
+    );
+
+    const categories = await this.getExpenseCategories(
+      client,
+      where,
+      [firm_id],
+      2,
+      startDate,
+      endDate
+    );
+
+    return {
+      summary: { total_amount: total },
+      categories
+    };
+  }
+
+  private async getBranchExpense(
+    client: any,
+    branch_id: number,
+    startDate?: string,
+    endDate?: string
+  ) {
+
+    const where = `
+    AND (
+      (lt.entity_type = 'B' AND lt.entity_id = $1)
+      OR
+      (lt.entity_type = 'F' AND lt.entity_id IN (
+        SELECT id FROM firm WHERE branch_id = $1
+      ))
+    )
+  `;
+
+    const total = await this.getExpenseSummary(
+      client,
+      where,
+      [branch_id],
+      2,
+      startDate,
+      endDate
+    );
+
+    const categories = await this.getExpenseCategories(
+      client,
+      where,
+      [branch_id],
+      2,
+      startDate,
+      endDate
+    );
+
+    // 🔹 Firm breakdown
+    const firms = await executeInTransaction(
+      client,
+      `SELECT id, firm_name FROM firm WHERE branch_id = $1`,
+      [branch_id]
+    );
+
+    const firmData = [];
+
+    for (const f of firms.rows) {
+
+      const firmTotal = await this.getExpenseSummary(
+        client,
+        `AND lt.entity_type = 'F' AND lt.entity_id = $1`,
+        [f.id],
+        2,
+        startDate,
+        endDate
+      );
+
+      firmData.push({
+        firm_name: f.firm_name,
+        total_amount: firmTotal
+      });
+    }
+
+    return {
+      summary: { total_amount: total },
+      categories,
+      firms: firmData
+    };
+  }
+
+  private async getCompanyExpense(
+    client: any,
+    company_id: number,
+    startDate?: string,
+    endDate?: string
+  ) {
+
+    const where = `AND lt.company_id = $1`;
+
+    const total = await this.getExpenseSummary(
+      client,
+      where,
+      [company_id],
+      2,
+      startDate,
+      endDate
+    );
+
+    const categories = await this.getExpenseCategories(
+      client,
+      where,
+      [company_id],
+      2,
+      startDate,
+      endDate
+    );
+
+    // 🔹 Branch breakdown
+    const branches = await executeInTransaction(
+      client,
+      `SELECT id, branch_name FROM branches WHERE company_id = $1`,
+      [company_id]
+    );
+
+    const branchData = [];
+
+    for (const b of branches.rows) {
+
+      const branchTotal = await this.getExpenseSummary(
+        client,
+        `
+      AND (
+        (lt.entity_type = 'B' AND lt.entity_id = $1)
+        OR
+        (lt.entity_type = 'F' AND lt.entity_id IN (
+          SELECT id FROM firm WHERE branch_id = $1
+        ))
+      )
+      `,
+        [b.id],
+        2,
+        startDate,
+        endDate
+      );
+
+      branchData.push({
+        branch_name: b.branch_name,
+        total_amount: branchTotal
+      });
+    }
+
+    return {
+      summary: { total_amount: total },
+      categories,
+      branches: branchData
+    };
+  }
+
+  async getExpenseReport(data: {
+    level: "company" | "branch" | "firm";
+    firm_id?: number;
+    branch_id?: number;
+    company_id?: number;
+    start_date?: string;
+    end_date?: string;
+  }) {
+
+    const { level, firm_id, branch_id, company_id, start_date, end_date } = data;
+
+    return transaction(async (client) => {
+
+      if (level === "firm" && firm_id) {
+        return {
+          status: "success",
+          data: await this.getFirmExpense(client, firm_id, start_date, end_date)
+        };
+      }
+
+      if (level === "branch" && branch_id) {
+        return {
+          status: "success",
+          data: await this.getBranchExpense(client, branch_id, start_date, end_date)
+        };
+      }
+
+      if (level === "company" && company_id) {
+        return {
+          status: "success",
+          data: await this.getCompanyExpense(client, company_id, start_date, end_date)
+        };
+      }
+
+      return {
+        status: "success",
+        data: {}
+      };
+
+    });
+  }
 }
