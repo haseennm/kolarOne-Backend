@@ -15,3 +15,29 @@ export interface GetGSTReportBody {
   start_date?: string;
   end_date?: string;
 }
+
+
+export interface SalesTrendInput {
+  level: "company" | "branch" | "firm";
+  company_id: number;
+  branch_id?: number;
+  firm_id?: number;
+  months?: number;
+};
+
+export type SalesForecastInput = {
+  level: "company" | "branch" | "firm";
+  company_id: number;
+  branch_id?: number;
+  firm_id?: number;
+  forecast_months?: number;
+};
+
+
+export type OpportunityForecastInput = {
+  level: "company" | "branch" | "firm";
+  company_id: number;
+  branch_id?: number;
+  firm_id?: number;
+  top_items_limit?: number;
+};

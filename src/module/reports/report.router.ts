@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ReportController } from "./report.controller";
-import { GetGSTReportBody, GetReportBody } from "./report.types";
+import { GetGSTReportBody, GetReportBody, OpportunityForecastInput, SalesTrendInput } from "./report.types";
 
 export default async function reportRoutes(app: FastifyInstance) {
 
@@ -326,5 +326,199 @@ export default async function reportRoutes(app: FastifyInstance) {
 
     }
   );
+  app.post(
+    "/sales-trend",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["level", "company_id"],
+          properties: {
+            level: {
+              type: "string",
+              enum: ["company", "branch", "firm"]
+            },
 
+            company_id: {
+              type: "number"
+            },
+
+            branch_id: {
+              type: ["number", "null"]
+            },
+
+            firm_id: {
+              type: ["number", "null"]
+            },
+
+            months: {
+              type: "number",
+              minimum: 1,
+              default: 6
+            }
+          },
+
+          allOf: [
+            {
+              if: {
+                properties: { level: { const: "branch" } }
+              },
+              then: {
+                required: ["branch_id"]
+              }
+            },
+            {
+              if: {
+                properties: { level: { const: "firm" } }
+              },
+              then: {
+                required: ["firm_id"]
+              }
+            }
+          ]
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: SalesTrendInput }>,
+      reply: FastifyReply
+    ) => {
+      const data = await controller.salesTrend(request.body);
+      return reply.code(200).send({
+        status: "Success",
+        data
+      });
+
+    }
+  );
+  app.post(
+    "/sales-forecast",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["level", "company_id"],
+          properties: {
+            level: {
+              type: "string",
+              enum: ["company", "branch", "firm"]
+            },
+
+            company_id: {
+              type: "number"
+            },
+
+            branch_id: {
+              type: ["number", "null"]
+            },
+
+            firm_id: {
+              type: ["number", "null"]
+            },
+
+            forecast_months: {
+              type: "number",
+              minimum: 1,
+              default: 6
+            }
+          },
+
+          allOf: [
+            {
+              if: {
+                properties: { level: { const: "branch" } }
+              },
+              then: {
+                required: ["branch_id"]
+              }
+            },
+            {
+              if: {
+                properties: { level: { const: "firm" } }
+              },
+              then: {
+                required: ["firm_id"]
+              }
+            }
+          ]
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: SalesTrendInput }>,
+      reply: FastifyReply
+    ) => {
+      const data = await controller.salesForecast(request.body);
+      return reply.code(200).send({
+        status: "Success",
+        data
+      });
+
+    }
+  );
+  app.post(
+    "/opportunity-forecast",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["level", "company_id"],
+          properties: {
+            level: {
+              type: "string",
+              enum: ["company", "branch", "firm"]
+            },
+
+            company_id: {
+              type: "number"
+            },
+
+            branch_id: {
+              type: ["number", "null"]
+            },
+
+            firm_id: {
+              type: ["number", "null"]
+            },
+
+            top_items_limit: {
+              type: "number",
+              minimum: 1,
+              default: 10
+            }
+          },
+
+          allOf: [
+            {
+              if: {
+                properties: { level: { const: "branch" } }
+              },
+              then: {
+                required: ["branch_id"]
+              }
+            },
+            {
+              if: {
+                properties: { level: { const: "firm" } }
+              },
+              then: {
+                required: ["firm_id"]
+              }
+            }
+          ]
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: OpportunityForecastInput }>,
+      reply: FastifyReply
+    ) => {
+      const data = await controller.opportunityForecast(request.body);
+      return reply.code(200).send({
+        status: "Success",
+        data
+      });
+
+    }
+  );
 }
