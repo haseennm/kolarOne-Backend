@@ -21,12 +21,13 @@ export interface FetchLedgerTransactionBody {
   company_id: number;
   from_date?: string;
   to_date?: string;
-  entity_id?: string;
-  entity_type?: string;
+  firm_id?: string;
+  branch_id?: string;
   category_id?: number;
   status?: number;
   page: number;
   limit: number;
+  level: "company" | "branch" | "firm"
 }
 export interface FetchLedgerTransactionParams {
   offset: number;

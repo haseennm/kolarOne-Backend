@@ -89,16 +89,17 @@ export default class LedgerTransactionService {
 
   async fetchLedgerTransaction(data: FetchLedgerTransactionParams) {
     const { filters, offset } = data;
-
+    console.log(data)
     let where: string[] = [];
     let values: any[] = [];
 
-    where.push(`lt.status != $${values.length + 1}`);
+    // Always exclude status = 0
     values.push(0);
+    where.push(`lt.status != $${values.length}`);
 
     if (filters?.id) {
       values.push(filters.id);
-      where.push(`id = $${values.length}`);
+      where.push(`lt.id = $${values.length}`);
     }
 
     if (filters?.category_id) {
@@ -106,20 +107,22 @@ export default class LedgerTransactionService {
       where.push(`lt.category_id = $${values.length}`);
     }
 
-    if (filters?.entity_type) {
-      values.push(filters.entity_type);
-      where.push(`lt.entity_type = $${values.length}`);
+    // FIX: entity_type quotes + logic grouping
+    if (filters?.branch_id && filters.level === "branch") {
+      values.push(filters.branch_id);
+      where.push(`(lt.entity_type = 'B' AND lt.entity_id = $${values.length})`);
     }
 
-    if (filters?.entity_id) {
-      values.push(filters.entity_id);
-      where.push(`lt.entity_id = $${values.length}`);
+    if (filters?.firm_id && filters.level ==="firm") {
+      values.push(filters.firm_id);
+      where.push(`(lt.entity_type = 'F' AND lt.entity_id = $${values.length})`);
     }
 
-    if (filters?.status) {
+    if (filters?.status !== undefined) {
       values.push(filters.status);
       where.push(`lt.status = $${values.length}`);
     }
+
     if (filters?.from_date) {
       values.push(filters.from_date);
       where.push(`lt.transaction_date >= $${values.length}`);
@@ -130,50 +133,54 @@ export default class LedgerTransactionService {
       where.push(`lt.transaction_date <= $${values.length}`);
     }
 
-    values.push(filters.company_id);
-    where.push(`lt.company_id = $${values.length}`);
+    // FIX: ensure company_id exists
+    if (filters?.company_id && filters.level ==="company") {
+      values.push(filters.company_id);
+      where.push(`(lt.entity_type = 'C' AND lt.entity_id = $${values.length})`);
+      
+    }
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
     const ledgerTransactionQuery = `
-  SELECT 
-    lt.*,
-    lc.name AS category_name,
-    lc.category_type AS flow,
+    SELECT 
+      lt.*,
+      lc.name AS category_name,
+      lc.category_type AS flow,
 
-    CASE 
-      WHEN lt.entity_type = 'C' THEN c.company_name
-      WHEN lt.entity_type = 'B' THEN b.branch_name
-      WHEN lt.entity_type = 'F' THEN f.firm_name
-      ELSE NULL
-    END AS entity_name
+      CASE 
+        WHEN lt.entity_type = 'C' THEN c.company_name
+        WHEN lt.entity_type = 'B' THEN b.branch_name
+        WHEN lt.entity_type = 'F' THEN f.firm_name
+        ELSE NULL
+      END AS entity_name
 
-  FROM ledger_transactions lt
+    FROM ledger_transactions lt
 
-  LEFT JOIN ledger_categories lc 
-    ON lt.category_id = lc.id
+    LEFT JOIN ledger_categories lc 
+      ON lt.category_id = lc.id
 
-  LEFT JOIN company c 
-    ON lt.entity_type = 'C' AND lt.entity_id = c.id
+    LEFT JOIN company c 
+      ON lt.entity_type = 'C' AND lt.entity_id = c.id
 
-  LEFT JOIN branches b 
-    ON lt.entity_type = 'B' AND lt.entity_id = b.id
+    LEFT JOIN branches b 
+      ON lt.entity_type = 'B' AND lt.entity_id = b.id
 
-  LEFT JOIN firm f 
-    ON lt.entity_type = 'F' AND lt.entity_id = f.id
+    LEFT JOIN firm f 
+      ON lt.entity_type = 'F' AND lt.entity_id = f.id
 
-  ${whereClause}
+    ${whereClause}
 
-  ORDER BY lt.id DESC
-  LIMIT $${values.length + 1}
-  OFFSET $${values.length + 2}
-`;
-
-   const countQuery = `
-  SELECT COUNT(*)
-  FROM ledger_transactions lt
-  ${whereClause}
-`;
+    ORDER BY lt.id DESC
+    LIMIT $${values.length + 1}
+    OFFSET $${values.length + 2}
+  `;
+  
+    const countQuery = `
+    SELECT COUNT(*) AS count
+    FROM ledger_transactions lt
+    ${whereClause}
+  `;
 
     const transactions = await query<FetchDbLedgerTransaction>(
       ledgerTransactionQuery,

@@ -6,6 +6,7 @@ import { GetReportSalePurchaseLedger } from "../sale/sale/sale.types";
 import LedgerTransactionService from "./ledgertransaction.service";
 import { CreateLedgerTransactionBody, DeleteLedgerTransactionBody, EditLedgerTransactionBody } from "./ledgertransaction.types";
 import SaleController from "../sale/sale/sale.controller";
+import { AppError } from "../../utils/AppError";
 
 export default class LedgerTransactionController {
 
@@ -99,16 +100,26 @@ export default class LedgerTransactionController {
   }
 
   async fetchTransaction(data: any) {
+    if (data.level === "company" && !data.company_id) {
+      throw new AppError("company_id is required for company level", 400);
+    }
 
+    if (data.level === "branch" && !data.branch_id) {
+      throw new AppError("branch_id is required for branch level", 400);
+    }
+
+    if (data.level === "firm" && !data.firm_id) {
+      throw new AppError("firm_id is required for firm level", 400);
+    }
     const service = new LedgerTransactionService();
 
     const transaction_with_code = await service.fetchLedgerTransaction(data);
     const transaction = transaction_with_code.transactions.map((row) => ({
       ...row,
       status: getStatusText(row.status),
-    entity_type: convertEntityCode(row.entity_type) ?? row.entity_type
+      entity_type: convertEntityCode(row.entity_type) ?? row.entity_type
     }));
-    
+
     return {
       transaction,
       pagination: { ...transaction_with_code.pagination }

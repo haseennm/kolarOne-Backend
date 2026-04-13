@@ -43,7 +43,7 @@ export async function ledgerTransactionRouter(app: FastifyInstance) {
               maxLength: 100
             },
 
-          entity_type: {
+            entity_type: {
               type: "string",
               enum: ["Company", "Branch", "Firm"]
             },
@@ -73,7 +73,7 @@ export async function ledgerTransactionRouter(app: FastifyInstance) {
       request: FastifyRequest<{ Body: CreateLedgerTransactionBody }>,
       reply: FastifyReply
     ) => {
-console.log(request.body)
+      console.log(request.body)
       const controller = new LedgerTransactionController();
       const data = await controller.createTransaction(request.body);
 
@@ -93,15 +93,26 @@ console.log(request.body)
       schema: {
         body: {
           type: "object",
-          required: ["company_id"],
+          required: ["level"],
           properties: {
 
             id: {
               type: "number"
             },
+             level: {
+              type: "string",
+              enum: ["company", "branch", "firm"]
+            },
+             company_id: {
+              type: ["number", "null"]
+            },
 
-            company_id: {
-              type: "number"
+            branch_id: {
+              type: ["number", "null"]
+            },
+
+            firm_id: {
+              type: ["number", "null"]
             },
 
             from_date: {
@@ -113,15 +124,6 @@ console.log(request.body)
               type: "string",
               format: "date"
             },
-
-            entity_id: {
-              type: "string"
-            },
-
-            entity_type: {
-              type: "string"
-            },
-
             category_id: {
               type: "number"
             },
