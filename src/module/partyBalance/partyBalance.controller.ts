@@ -82,7 +82,7 @@ export default class PartyBalanceController {
 
   async rePayPartyBalance(data: RepayPartyBalanceBody) {
     return transaction(async (client) => {
-
+      console.log("first", data)
       const {
         updated_by,
         pay_amount,
@@ -132,29 +132,34 @@ export default class PartyBalanceController {
 
         await sale_service.updateSalePayment(
           {
-           sale_id: rest.ref_id,
-           firm_id: rest.firm_id,
-           payments: rest.payments,
-           remark: purchase_remark,
-           company_id:company_id
+            sale_id: rest.ref_id,
+            firm_id: rest.firm_id,
+            payments: rest.payments,
+            remark: purchase_remark,
+            company_id: company_id
           },
           client
         );
       }
 
       const payment_transactions = new PaymentTransactionService();
+      console.log("payment_method_id", payment_method_id)
 
-      await payment_transactions.insertPaymentTransaction({
-        ref_id: Number(party_balance.id),
-        amount: pay_amount,
-        ref_type: PaymentTransactionTypeCodeMap["balance"],
-        status: getStatusCode("Paid"),
-        payment_method_id: payment_method_id ?? null,
-        transaction_reference: transaction_reference ?? null,
-        business_id: rest.firm_id,
-        business_ref: entity_type,
-        company_id: company_id
-      }, client);
+if (rest.payments && rest.payments.length > 0) {
+  for (const payment of rest.payments) {
+    await payment_transactions.insertPaymentTransaction({
+      ref_id: Number(party_balance.id),
+      amount: payment.amount, // ✅ each payment amount
+      ref_type: PaymentTransactionTypeCodeMap["balance"],
+      status: getStatusCode("Paid"),
+      payment_method_id: payment.payment_method_id ?? null,
+      transaction_reference: payment.reference_number ?? null,
+      business_id: rest.firm_id,
+      business_ref: entity_type,
+      company_id: company_id
+    }, client);
+  }
+}
 
       return `party balance has been paid successfully, Balance:'${party_balance.balance}'`;
     });
