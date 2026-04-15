@@ -41,3 +41,14 @@ export type OpportunityForecastInput = {
   firm_id?: number;
   top_items_limit?: number;
 };
+
+export type PaymentReportInput = {
+  level: "company" | "branch" | "firm";
+  company_id: number;
+  branch_id?: number;
+  firm_id?: number;
+  flow?: "in" | "out" | "all";
+  method_filter?: number | null;
+  start_date?: string;
+  end_date?: string;
+};

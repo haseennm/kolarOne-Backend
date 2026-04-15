@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ReportController } from "./report.controller";
-import { GetGSTReportBody, GetReportBody, OpportunityForecastInput, SalesTrendInput } from "./report.types";
+import { GetGSTReportBody, GetReportBody, OpportunityForecastInput, PaymentReportInput, SalesTrendInput } from "./report.types";
 
 export default async function reportRoutes(app: FastifyInstance) {
 
@@ -514,6 +514,88 @@ export default async function reportRoutes(app: FastifyInstance) {
       reply: FastifyReply
     ) => {
       const data = await controller.opportunityForecast(request.body);
+      return reply.code(200).send({
+        status: "Success",
+        data
+      });
+
+    }
+  );
+  app.post(
+    "/payments",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["level", "company_id"],
+          properties: {
+            level: {
+              type: "string",
+              enum: ["company", "branch", "firm"]
+            },
+
+            company_id: {
+              type: "number"
+            },
+
+            branch_id: {
+              type: ["number", "null"]
+            },
+
+            firm_id: {
+              type: ["number", "null"]
+            },
+
+            flow: {
+              type: "string",
+              enum: ["in", "out", "all"],
+              default: "all"
+            },
+
+            method_filter: {
+              type: ["number", "null"],
+              default: null
+            },
+
+            start_date: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+
+            end_date: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+            }
+          },
+
+          allOf: [
+            {
+              if: {
+                properties: { level: { const: "branch" } }
+              },
+              then: {
+                required: ["branch_id"]
+              }
+            },
+            {
+              if: {
+                properties: { level: { const: "firm" } }
+              },
+              then: {
+                required: ["firm_id"]
+              }
+            }
+          ]
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: PaymentReportInput }>,
+      reply: FastifyReply
+    ) => {
+
+      const data = await controller.paymentReport(request.body);
+
       return reply.code(200).send({
         status: "Success",
         data

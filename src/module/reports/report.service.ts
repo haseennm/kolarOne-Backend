@@ -1,6 +1,6 @@
 import { executeInTransaction, transaction } from "../../config/db";
 import { cns } from "../../utils/extra";
-import { GetGSTReportBody, GetReportBody } from "./report.types";
+import { GetGSTReportBody, GetReportBody, PaymentReportInput } from "./report.types";
 
 export class ReportService {
   // 
@@ -855,7 +855,7 @@ export class ReportService {
   // 
   // 
   // 
- 
+
   private async getGSTR3BSummary(
     client: any,
     firmIds: number[],
@@ -1410,6 +1410,286 @@ export class ReportService {
       return {
         status: "success",
         data: {}
+      };
+
+    });
+  }
+
+  async getPaymentReport(data: PaymentReportInput) {
+
+    const {
+      level,
+      company_id,
+      branch_id,
+      firm_id,
+      flow = "all",
+      method_filter,
+      start_date,
+      end_date
+    } = data;
+
+    return transaction(async (client) => {
+
+      /* ================= GET FIRM IDS ================= */
+
+      let firmIds: number[] = [];
+
+      if (level === "firm" && firm_id) {
+        firmIds = [firm_id];
+      }
+
+      if (level === "branch" && branch_id) {
+        const res = await executeInTransaction(
+          client,
+          `SELECT id FROM firm WHERE branch_id = $1`,
+          [branch_id]
+        );
+        firmIds = res.rows.map((r: any) => r.id);
+      }
+
+      if (level === "company" && company_id) {
+        const res = await executeInTransaction(
+          client,
+          `
+      SELECT f.id
+      FROM firm f
+      JOIN branches b ON b.id = f.branch_id
+      WHERE b.company_id = $1
+      `,
+          [company_id]
+        );
+        firmIds = res.rows.map((r: any) => r.id);
+      }
+
+      if (!firmIds.length) {
+        return {
+          summary: { total_received: 0, total_transactions: 0, top_method: "" },
+          methods: [],
+          branches: [],
+          firms: [],
+          transactions: []
+        };
+      }
+
+      /* ================= MAIN QUERY ================= */
+
+      const result = await executeInTransaction(client, `
+    SELECT
+      pt.id,
+      pt.amount,
+      pt.transaction_reference,
+      pt.payment_method_id,
+      pm.method_name,
+
+      f.id AS firm_id,
+      f.firm_name,
+      b.id AS branch_id,
+      b.branch_name,
+
+      CASE
+        WHEN pt.ref_type = 'SL' THEN 'in'
+        WHEN pt.ref_type = 'SR' THEN 'out'
+        WHEN pt.ref_type = 'PS' THEN 'out'
+        WHEN pt.ref_type = 'PR' THEN 'in'
+        WHEN pt.ref_type = 'BL' THEN 
+          CASE WHEN pb.flow = 'I' THEN 'in' ELSE 'out' END
+      END AS flow,
+
+      CASE
+        WHEN pt.ref_type = 'SL' THEN 'sale'
+        WHEN pt.ref_type = 'SR' THEN 'sale return'
+        WHEN pt.ref_type = 'PS' THEN 'purchase'
+        WHEN pt.ref_type = 'PR' THEN 'purchase return'
+        ELSE 'balance'
+      END AS type,
+
+      COALESCE(
+        s.invoice_date,
+        sr.return_date,
+        p.bill_date,
+        pr.return_date
+      ) AS date,
+
+      COALESCE(
+        s.invoice_number,
+        sr.return_number,
+        p.bill_number,
+        pr.return_number
+      ) AS invoice,
+
+      COALESCE(
+        c.customer_name,
+        c2.customer_name,
+        v.vendor_name,
+        v2.vendor_name
+      ) AS party_name
+
+    FROM payment_transactions pt
+
+    LEFT JOIN payment_methods pm ON pm.id = pt.payment_method_id
+
+    /* SALES */
+    LEFT JOIN sales s 
+      ON pt.ref_id = s.id AND pt.ref_type = 'SL'
+    LEFT JOIN customers c ON c.id = s.customer_id
+    LEFT JOIN firm f1 ON f1.id = s.firm_id
+
+    /* SALE RETURN */
+    LEFT JOIN sale_return sr 
+      ON pt.ref_id = sr.id AND pt.ref_type = 'SR'
+    LEFT JOIN sales s2 ON sr.sale_id = s2.id
+    LEFT JOIN customers c2 ON c2.id = s2.customer_id
+    LEFT JOIN firm f2 ON f2.id = sr.firm_id
+
+    /* PURCHASE */
+    LEFT JOIN purchases p 
+      ON pt.ref_id = p.id AND pt.ref_type = 'PS'
+    LEFT JOIN vendors v ON v.id = p.vendor_id
+    LEFT JOIN firm f3 ON f3.id = p.firm_id
+
+    /* PURCHASE RETURN */
+    LEFT JOIN purchase_return pr 
+      ON pt.ref_id = pr.id AND pt.ref_type = 'PR'
+    LEFT JOIN purchases p2 ON pr.purchase_id = p2.id
+    LEFT JOIN vendors v2 ON v2.id = p2.vendor_id
+    LEFT JOIN firm f4 ON f4.id = pr.firm_id
+
+    /* BALANCE */
+    LEFT JOIN party_balance pb 
+      ON pt.ref_id = pb.id AND pt.ref_type = 'BL'
+    LEFT JOIN firm f5 ON f5.id = pb.firm_id
+
+    /* FINAL FIRM + BRANCH */
+    LEFT JOIN firm f ON f.id = COALESCE(f1.id, f2.id, f3.id, f4.id, f5.id)
+    LEFT JOIN branches b ON b.id = f.branch_id
+
+    WHERE pt.status != 0
+    AND f.id = ANY($1)
+  `, [firmIds]);
+
+      let rows = result.rows;
+
+      /* ================= DATE FILTER ================= */
+
+      if (start_date && end_date) {
+        rows = rows.filter((r: any) => {
+          const d = new Date(r.date);
+          return d >= new Date(start_date) && d <= new Date(end_date);
+        });
+      }
+
+      /* ================= FLOW FILTER ================= */
+
+      if (flow !== "all") {
+        rows = rows.filter((r: any) => r.flow === flow);
+      }
+
+      /* ================= METHOD FILTER ================= */
+
+      if (method_filter) {
+        rows = rows.filter((r: any) => r.payment_method_id === method_filter);
+      }
+
+      /* ================= SUMMARY ================= */
+
+      const total_received = rows.reduce((a: number, b: any) => a + Number(b.amount), 0);
+      const total_transactions = rows.length;
+
+      /* ================= METHODS ================= */
+
+      const methodMap: any = {};
+      rows.forEach((r: any) => {
+        if (!methodMap[r.method_name]) {
+          methodMap[r.method_name] = {
+            method_name: r.method_name,
+            total_amount: 0,
+            transaction_count: 0
+          };
+        }
+        methodMap[r.method_name].total_amount += Number(r.amount);
+        methodMap[r.method_name].transaction_count++;
+      });
+
+      const methods = Object.values(methodMap).map((m: any) => ({
+        ...m,
+        percentage: total_received
+          ? Number(((m.total_amount / total_received) * 100).toFixed(2))
+          : 0
+      }));
+
+      const top_method =
+        methods.sort((a: any, b: any) => b.total_amount - a.total_amount)[0]?.method_name || "";
+
+      /* ================= BRANCHES ================= */
+
+      const branchMap: any = {};
+      rows.forEach((r: any) => {
+        if (!branchMap[r.branch_id]) {
+          branchMap[r.branch_id] = {
+            name: r.branch_name,
+            total_amount: 0,
+            transaction_count: 0
+          };
+        }
+        branchMap[r.branch_id].total_amount += Number(r.amount);
+        branchMap[r.branch_id].transaction_count++;
+      });
+
+      const branches = Object.values(branchMap).map((b: any) => ({
+        ...b,
+        percentage: total_received
+          ? Number(((b.total_amount / total_received) * 100).toFixed(2))
+          : 0
+      }));
+
+      /* ================= FIRMS ================= */
+
+      const firmMap: any = {};
+      rows.forEach((r: any) => {
+        if (!firmMap[r.firm_id]) {
+          firmMap[r.firm_id] = {
+            name: r.firm_name,
+            total_amount: 0,
+            transaction_count: 0
+          };
+        }
+        firmMap[r.firm_id].total_amount += Number(r.amount);
+        firmMap[r.firm_id].transaction_count++;
+      });
+
+      const firms = Object.values(firmMap).map((f: any) => ({
+        ...f,
+        percentage: total_received
+          ? Number(((f.total_amount / total_received) * 100).toFixed(2))
+          : 0
+      }));
+
+      /* ================= TRANSACTIONS ================= */
+
+      const transactions = rows.map((r: any) => ({
+        id: r.id,
+        party_name: r.party_name,
+        flow: r.flow,
+        type: r.type,
+        method_name: r.method_name,
+        amount: Number(r.amount),
+        date: r.date,
+        reference: r.transaction_reference || "",
+        note: r.invoice || ""
+      }));
+
+      /* ================= RESPONSE ================= */
+
+      return {
+        summary: {
+          total_received,
+          total_transactions,
+          top_method
+        },
+        methods,
+        branches: level === "company" ? branches : [],
+        firms: level === "branch" ? firms : [],
+        transactions
       };
 
     });
