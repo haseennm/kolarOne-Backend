@@ -71,7 +71,7 @@ export default class StockService {
       firm_id,
       product_id,
       purchase_id,
-      purchased_qty,
+      available_quantity,
       status,
       batch_number
     )
@@ -548,7 +548,7 @@ export default class StockService {
 
       // 1️⃣ Most purchased product
       const mostPurchased = await executeInTransaction(client, `
-      SELECT p.id, p.name, SUM(s.quantity) AS total_qty
+      SELECT p.id, p.name, SUM(s.purchased_qty) AS total_qty
       FROM stock s
       JOIN products p ON p.id = s.product_id
       WHERE s.firm_id = ANY($1)
@@ -559,12 +559,12 @@ export default class StockService {
 
       // 2️⃣ Least purchased product
       const leastPurchased = await executeInTransaction(client, `
-      SELECT p.id, p.name, SUM(s.quantity) AS total_qty
+      SELECT p.id, p.name, SUM(s.purchased_qty) AS total_qty
       FROM stock s
       JOIN products p ON p.id = s.product_id
       WHERE s.firm_id = ANY($1)
       GROUP BY p.id
-      HAVING SUM(s.quantity) > 0
+      HAVING SUM(s.available_quantity) > 0
       ORDER BY total_qty ASC
       LIMIT 1
     `, [firmIds]);
@@ -601,7 +601,7 @@ export default class StockService {
       FROM stock_movements sm
       JOIN products p ON p.id = sm.product_id
       WHERE sm.branch_id = ANY($1)
-        AND sm.status = 12
+        AND sm.status = 13
       GROUP BY p.id
       ORDER BY damaged_qty DESC
       LIMIT 1
@@ -613,7 +613,7 @@ export default class StockService {
       FROM stock_movements sm
       JOIN products p ON p.id = sm.product_id
       WHERE sm.branch_id = ANY($1)
-        AND sm.status = 12
+        AND sm.status = 13
       GROUP BY p.id
       HAVING SUM(sm.quantity) > 0
       ORDER BY damaged_qty ASC

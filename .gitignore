@@ -140,3 +140,4 @@ vite.config.ts.timestamp-*
 uploads
 module\maintenance
 src\module\maintenance
+TECHNICAL_OVERVIEW.md
