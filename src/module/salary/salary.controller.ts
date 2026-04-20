@@ -1,6 +1,6 @@
 import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { convertEntityType, EntityKey, getStatusCode, PaymentTransactionTypeCodeMap } from "../../utils/extra";
+import { convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
 import { PaymentTransactionService } from "../paymentTransaction/paymenttransaction.services";
 import SalaryService from "./salary.service";
 import { ConfirmSalary, GenerateSalaryBody, GetSalaryBody } from "./salary.types";
@@ -36,7 +36,7 @@ export default class SalaryController {
   }
   async confimSalary(data: ConfirmSalary) {
 
-    const { status, updated_by, transaction_reference, payment_method_id, ...rest } = data;
+    const { status, updated_by, transaction_reference, payment_method_id, company_id, ...rest } = data;
 
     return transaction(async (client) => {
 
@@ -71,9 +71,9 @@ export default class SalaryController {
           status: statusCode,
           payment_method_id: payment_method_id ?? null,
           transaction_reference: transaction_reference ?? null,
-          business_id: rest.branch_id,
+          business_id: rest.entity_id,
           business_ref: entity_type,
-          company_id: salary.company_id
+          company_id: company_id
         }, client)
       }
 
@@ -81,19 +81,17 @@ export default class SalaryController {
     });
   }
   async getSalary(data: GetSalaryBody) {
-
-   
-
     return transaction(async (client) => {
-
-   
       const service = new SalaryService();
-
-      const salary = await service.getSalary(
+      const salary_with_code = await service.getSalary(
         data,
         client
       );
-    
+
+      const salary = salary_with_code.map((row) => ({
+        ...row,
+        status: getStatusText(row.status),
+      }));
 
       return salary;
     });

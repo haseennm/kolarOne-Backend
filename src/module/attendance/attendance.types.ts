@@ -1,10 +1,12 @@
 export interface FingerprintAttendanceBody {
   fingerprint_id: string;
-  branch_id: number;
+  branch_id?: number;
+  company_id?: number;
 }
 export interface ManualAttendanceBody {
   staff_id: string;
-  branch_id: number;
+  branch_id?: number;
+  company_id?: number;
 }
 
 export interface StaffRow {
@@ -21,7 +23,7 @@ export interface AttendanceRow {
 }
 
 export interface MarkHolidayBody {
-  branch_id: number;
+  branch_id?: number;
   attendance_date?: string;
   created_by: number;
   description?: string;
@@ -29,7 +31,8 @@ export interface MarkHolidayBody {
 }
 
 export interface HolidayListBody {
-  branch_id: number;
+  entity_id: number,
+  entity_type: "B" | "C",
 }
 
 export interface HolidayListItem {
@@ -43,9 +46,8 @@ export interface HolidayListResponse {
   data: HolidayListItem[];
 }
 
-export interface DailyAttendanceBody {
+export interface DailyAttendanceBody extends HolidayListBody {
   date: string;
-  branch_id: number;
 }
 
 export interface DailyAttendanceRow {
@@ -56,10 +58,9 @@ export interface DailyAttendanceRow {
   status: 'Absent' | 'HalfDay' | 'FullDay';
 }
 
-export interface MonthlyAttendanceBody {
+export interface MonthlyAttendanceBody extends HolidayListBody {
   from_date: string;
   to_date: string;
-  branch_id: number;
 }
 
 export interface MonthlyStaffSummary {
@@ -85,6 +86,7 @@ export interface MonthlyAttendanceResponse {
   data: MonthlyStaffSummary[];
 }
 export interface DeleteHoliday {
-  branch_id: number;
+  branch_id?: number;
+  company_id?: number;
   r_id: number
 }

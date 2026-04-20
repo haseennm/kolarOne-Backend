@@ -2,7 +2,8 @@ export interface GenerateSalaryBody {
   from_date: string;        // YYYY-MM-DD
   to_date: string;          // YYYY-MM-DD
   month_salary: string;     // YYYY-MM (will be normalized to YYYY-MM-01)
-  branch_id: number;        // ← changed from client_id
+  entity_id: number,
+  entity_type: string
   created_by: string;
   staff_ids: string[];      // array of staff IDs
 }
@@ -27,13 +28,14 @@ export interface SalaryGenerationRow {
   branch_id: number;
   // created_by: string;
   remarks: any;             // JSON array
-  status: string;
+  status: number;
   full_name: string;        // from join
 }
 
 export interface GetSalaryBody {
   salary_month: string;
-  branch_id: number;
+  entity_type: string;
+  entity_id: number;
   staff_ids?: string[];
 }
 export interface GenerateSalaryResponse {
@@ -43,15 +45,17 @@ export interface GenerateSalaryResponse {
 
 export interface ConfirmSalary {
   r_id: string;
-  branch_id: number;
+ entity_type: string;
+  entity_id: number;
   final_salary: number;
   updated_by: string;
   status: string;
   payment_method_id?: number;
   transaction_reference?: string;
+  company_id:number
 }
 export interface ConfirmSalaryParams
-  extends Omit<ConfirmSalary, "status" | "updated_by"> {
+  extends Omit<ConfirmSalary, "status" | "updated_by"|"company_id"> {
   statusCode: number;
   remark: object;
 }

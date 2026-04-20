@@ -10,7 +10,7 @@ export async function attendanceRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["fingerprint_id", "branch_id"],
+          required: ["fingerprint_id"],
           properties: {
 
             fingerprint_id: {
@@ -19,8 +19,10 @@ export async function attendanceRouter(app: FastifyInstance) {
 
             branch_id: {
               type: "number"
+            },
+            company_id: {
+              type: "number"
             }
-
           }
         }
       }
@@ -46,7 +48,7 @@ export async function attendanceRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["staff_id", "branch_id"],
+          required: ["staff_id"],
           properties: {
 
             staff_id: {
@@ -54,6 +56,9 @@ export async function attendanceRouter(app: FastifyInstance) {
             },
 
             branch_id: {
+              type: "number"
+            },
+            company_id: {
               type: "number"
             }
 
@@ -82,7 +87,7 @@ export async function attendanceRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["branch_id", "created_by", "company_id"],
+          required: ["created_by", "company_id"],
           properties: {
 
             branch_id: {
@@ -131,13 +136,13 @@ export async function attendanceRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["branch_id"],
+          required: ["entity_id", "entity_type"],
           properties: {
-            branch_id: { type: "number" }
-          }
+            entity_id: { type: "number" },
+            entity_type: { type: "string", enum: ["B", "C"] }
+          },
         }
       },
-
     },
     async (
       request: FastifyRequest<{ Body: HolidayListBody }>,
@@ -159,10 +164,11 @@ export async function attendanceRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["date", "branch_id"],
+          required: ["date", "entity_id", "entity_type"],
           properties: {
             date: { type: "string", format: "date" },
-            branch_id: { type: "number" }
+            entity_id: { type: "number" },
+            entity_type: { type: "string", enum: ["B", "C"] }
           }
         }
       }
@@ -176,18 +182,18 @@ export async function attendanceRouter(app: FastifyInstance) {
       });
     }
   );
-
   app.post<{ Body: MonthlyAttendanceBody }>(
     "/monthly",
     {
       schema: {
         body: {
           type: "object",
-          required: ["from_date", "to_date", "branch_id"],
+          required: ["from_date", "to_date", "entity_id", "entity_type"],
           properties: {
             from_date: { type: "string", format: "date" },
             to_date: { type: "string", format: "date" },
-            branch_id: { type: "number" }
+            entity_id: { type: "number" },
+            entity_type: { type: "string", enum: ["B", "C"] }
           }
         }
       }
@@ -217,12 +223,12 @@ export async function attendanceRouter(app: FastifyInstance) {
         body: {
           type: 'object',
           required: [
-            'r_id',
-            "branch_id"
+            'r_id'
           ],
           properties: {
             r_id: { type: 'number' },
             branch_id: { type: 'number' },
+            company_id: { type: 'number' },
           },
         },
       },

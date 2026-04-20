@@ -208,7 +208,8 @@ export const isValidTransactionType = (
 export const isValidDay = async (
   client: PoolClient,
   today: string,
-  branch_id: number
+  entity_id: number,
+  entity_type:string
 ): Promise<boolean> => {
 
   const result = await executeInTransaction(
@@ -216,12 +217,13 @@ export const isValidDay = async (
     `
     SELECT 1
     FROM attendance
-    WHERE branch_id = $1
+    WHERE entity_id = $1
       AND staff_id = 'HOLIDAY'
       AND attendance_date = $2
+      AND entity_type = $3
     LIMIT 1
     `,
-    [branch_id, today]
+    [entity_id, today,entity_type]
   );
 
   if (result.rows.length > 0) {

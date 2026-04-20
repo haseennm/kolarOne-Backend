@@ -10,13 +10,29 @@ export async function salaryRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["from_date", "to_date", "month_salary", "branch_id", "created_by", "staff_ids"],
+          required: [
+            "from_date",
+            "to_date",
+            "month_salary",
+            "entity_id",
+            "entity_type",
+            "created_by",
+            "staff_ids"
+          ],
           properties: {
             from_date: { type: "string", format: "date" },
             to_date: { type: "string", format: "date" },
             month_salary: { type: "string", format: "date" },
-            branch_id: { type: "number" },
+
+            entity_id: { type: "number" },
+
+            entity_type: {
+              type: "string",
+              enum: ["B", "C"], // Branch or Company
+            },
+
             created_by: { type: "string" },
+
             staff_ids: {
               type: "array",
               items: { type: "string" },
@@ -26,11 +42,16 @@ export async function salaryRouter(app: FastifyInstance) {
         },
       },
     },
-    async (request: FastifyRequest<{ Body: GenerateSalaryBody }>, reply: FastifyReply) => {
+    async (
+      request: FastifyRequest<{ Body: GenerateSalaryBody }>,
+      reply: FastifyReply
+    ) => {
       const controller = new SalaryController();
-      if (request.body.staff_ids.length === 0) {
+
+      if (!request.body.staff_ids || request.body.staff_ids.length === 0) {
         throw new AppError("At least one staff member must be selected", 400);
       }
+
       const result = await controller.generateSalary(request.body);
 
       return reply.code(200).send({
@@ -46,15 +67,21 @@ export async function salaryRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["r_id", "branch_id", "updated_by", "status", "final_salary"],
+          required: ["r_id", "entity_id", "entity_type", "updated_by", "status", "final_salary","company_id"],
           properties: {
 
             r_id: {
               type: "number"
             },
-
-            branch_id: {
+            company_id: {
               type: "number"
+            },
+
+            entity_id: { type: "number" },
+
+            entity_type: {
+              type: "string",
+              enum: ["B", "C"],
             },
             final_salary: {
               type: "number"
@@ -87,42 +114,46 @@ export async function salaryRouter(app: FastifyInstance) {
 
     }
   );
- app.post<{ Body: GetSalaryBody }>(
-  "/get",
-  {
-    schema: {
-      body: {
-        type: "object",
-        required: ["salary_month", "branch_id"],
-        properties: {
-          salary_month: {
-            type: "string"
-          },
-          branch_id: {
-            type: "number"
-          },
-          staff_ids: { 
-            type: "array",
-            items: {
+  app.post<{ Body: GetSalaryBody }>(
+    "/get",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["salary_month", "entity_id", "entity_type"],
+          properties: {
+            salary_month: {
+              type: "string"
+            },
+            entity_id: {
               type: "number"
+            },
+            entity_type: {
+              type: "string",
+              enum: ["B", "C"], // Branch or Company
+            },
+            staff_ids: {
+              type: "array",
+              items: {
+                type: "string"
+              }
             }
           }
         }
       }
-    }
-  },
-  async (
-    request: FastifyRequest<{ Body: GetSalaryBody }>,
-    reply: FastifyReply
-  ) => {
-    const controller = new SalaryController();
-    const data = await controller.getSalary(request.body);
+    },
+    async (
+      request: FastifyRequest<{ Body: GetSalaryBody }>,
+      reply: FastifyReply
+    ) => {
+      const controller = new SalaryController();
+      const data = await controller.getSalary(request.body);
 
-    return reply.code(200).send({
-      status: "Success",
-      message: data
-    });
-  }
-);
+      return reply.code(200).send({
+        status: "Success",
+        message: data
+      });
+    }
+  );
 
 }
