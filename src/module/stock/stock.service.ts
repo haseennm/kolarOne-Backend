@@ -71,11 +71,11 @@ export default class StockService {
       firm_id,
       product_id,
       purchase_id,
-      available_quantity,
       status,
-      batch_number
+      batch_number,
+      purchased_qty
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8 ,$9)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     RETURNING *;
   `;
 
@@ -86,9 +86,9 @@ export default class StockService {
       firm_id,
       product_id,
       purchase_id,
-      purchased_qty,
       statusCode,
-      batch_number
+      batch_number,
+      purchased_qty
     ];
 
     const { rows } = await executeInTransaction(client, stockQuery, values);
