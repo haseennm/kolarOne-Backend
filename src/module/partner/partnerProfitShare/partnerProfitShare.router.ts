@@ -9,15 +9,22 @@ export async function profitShareRouter(app: FastifyInstance) {
     schema: {
       body: {
         type: "object",
-        required: ["partner_id", "entity_id", "entity_type", "profit_share", "status", "created_by", "parent_id"],
+        required: ["partner_id", "entities", "created_by"],
         properties: {
           partner_id: { type: "string", format: "uuid" },
-          entity_id: { type: "number" },
-          parent_id: { type: "number" }, // Optional, used for Firm validation
-          entity_type: { type: "string", enum: ["Branch", "Firm", "Company"] },
-          profit_share: { type: "number", minimum: 0, maximum: 100 },
-          status: { type: "string", enum: ["Active", "Inactive"] },
-          created_by: { type: "string" }
+          entities: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["entity_id", "entity_type", "profit_share"],
+              properties: {
+                entity_id: { type: "number" },
+                entity_type: { type: "string", enum: ["Branch", "Firm", "Company"] },
+                profit_share: { type: "number", minimum: 0, maximum: 100 }
+              }
+            }
+          },
+          created_by: { type: "string" },
         }
       }
     }
@@ -69,7 +76,7 @@ export async function profitShareRouter(app: FastifyInstance) {
         body: {
           type: "object",
           properties: {
-            partner_id: { type: "number" },
+            partner_id: { type: "string" },
             partner_name: { type: "string" },
             profit_share_gt: { type: "number" },
             profit_share_lt: { type: "number" },
@@ -83,20 +90,20 @@ export async function profitShareRouter(app: FastifyInstance) {
       return reply.send(res);
     });
 
-    app.post<{ Body: DeletePartnerProfitBody }>("/delete", {
-        schema: {
-          body: {
-            type: "object",
-            required: ["id", "entity_id", "deleted_by"],
-            properties: {
-              id: { type: "number" },
-              entity_id: { type: "number" },
-              deleted_by: { type: "string" }
-            }
-          }
+  app.post<{ Body: DeletePartnerProfitBody }>("/delete", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["id", "entity_id", "deleted_by"],
+        properties: {
+          id: { type: "number" },
+          entity_id: { type: "number" },
+          deleted_by: { type: "string" }
         }
-      }, async (req, reply) => {
-        const res = await controller.deletePartnerProfit(req.body);
-        return reply.send({ status: "Success", message: res });
-      });
+      }
+    }
+  }, async (req, reply) => {
+    const res = await controller.deletePartnerProfit(req.body);
+    return reply.send({ status: "Success", message: res });
+  });
 }

@@ -1,3 +1,4 @@
+import { transaction } from "../../../config/db";
 import { convertEntityType, EntityKey, getStatusCode, getStatusText } from "../../../utils/extra";
 import ProfitShareService from "./partnerProfitShare.service";
 import { CreateProfitShareBody, DeletePartnerProfitBody, EditProfitShareBody, ProfitShareFilters, ProfitShareRow } from "./partnerProfitShare.types";
@@ -6,20 +7,36 @@ import { CreateProfitShareBody, DeletePartnerProfitBody, EditProfitShareBody, Pr
 export default class ProfitShareController {
   private service = new ProfitShareService();
 
-  async createProfitShare(data: CreateProfitShareBody) {
-    const { created_by, status, entity_type, ...rest } = data;
+ async createProfitShare(data: CreateProfitShareBody) {
+  const { created_by, entities, ...rest } = data;
 
-    const remark = { action: "Created", created_by, created_at: Date.now() };
-    const statusCode = getStatusCode(status);
-    const dbEntityType = convertEntityType(entity_type as EntityKey);
+  const remark = { action: "Created", created_by, created_at: Date.now() };
+  const statusCode = getStatusCode("Active");
 
-    return this.service.createProfitShare({
-      ...rest,
-      entity_type: dbEntityType,
-      remark,
-      statusCode
-    });
-  }
+  return transaction(async (client) => {
+    const results = [];
+
+    for (const entity of entities) {
+      const dbEntityType = convertEntityType(entity.entity_type as EntityKey);
+
+      const result = await this.service.createProfitShare(
+        {
+          ...rest,
+          entity_id: entity.entity_id,
+          entity_type: dbEntityType,
+          profit_share: entity.profit_share,
+          remark,
+          statusCode
+        },
+        client
+      );
+
+      results.push(result);
+    }
+
+    return results;
+  });
+}
 
   async fetchProfitShares(filters: ProfitShareFilters) {
     const result = await this.service.fetchProfitShares(filters);

@@ -1,17 +1,22 @@
-
-export interface CreateProfitShareBody {
-  partner_id: string;
+export interface EntityItem {
   entity_id: number;
-  entity_type: string; 
+  entity_type: "Branch" | "Firm" | "Company";
   profit_share: number;
-  status: string;
-  created_by: string;
-  parent_id: number;
 }
 
-export interface CreateProfitShareParams extends Omit<CreateProfitShareBody, "created_by" | "status"> {
+export interface CreateProfitShareBody {
+  partner_id: string; // UUID
+  entities: EntityItem[];
+  created_by: string;
+}
+
+export interface CreateProfitShareParams {
   remark: object;
+  partner_id: string; // UUID
   statusCode: number;
+  entity_id: number;
+  entity_type:string;
+  profit_share: number;
 }
 
 export interface FetchProfitShareBody {
@@ -31,7 +36,7 @@ export interface EditProfitShareBody {
   updated_by: string;
 }
 export interface EditProfitShareParams extends Omit<EditProfitShareBody, "updated_by" | "status" | "entity_type"> {
-  entity_type: string;  
+  entity_type: string;
   remark: object;
   statusCode?: number;
 }
@@ -46,7 +51,7 @@ export interface ProfitShareFilters {
 
 export interface ProfitShareRow extends Omit<CreateProfitShareBody, "created_by" | "status"> {
   status: number;
-  id:number
+  id: number
 }
 export interface DeletePartnerProfitBody {
   id: string;

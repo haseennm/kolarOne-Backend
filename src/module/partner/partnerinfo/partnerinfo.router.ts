@@ -21,6 +21,7 @@ export async function partnerRouter(app: FastifyInstance) {
           state: { type: ["string", "null"], maxLength: 100 },
           pincode: { type: "string", minLength: 6, maxLength: 10 },
           status: { type: "string" },
+          email: { type: "string" },
           created_by: { type: "string" }
         }
       }
@@ -59,7 +60,7 @@ export async function partnerRouter(app: FastifyInstance) {
       );
 
       if (extraFields.length) {
-        throw new AppError(`Invalid fields: ${extraFields.join(", ")}`,500);
+        throw new AppError(`Invalid fields: ${extraFields.join(", ")}`, 500);
       }
       const res = await controller.fetchPartners({
         offset: (page - 1) * limit,
@@ -79,9 +80,20 @@ export async function partnerRouter(app: FastifyInstance) {
         properties: {
           id: { type: "string", format: "uuid" },
           company_id: { type: "number" },
+
           name: { type: "string" },
-          status: { type: ["string", "null"] }
-        }
+          email: { type: "string", format: "email" },
+          address: { type: "string" },
+          phone_number: { type: "string" },
+          city: { type: "string" },
+          district: { type: "string" },
+          state: { type: ["string", "null"] },
+          pincode: { type: "string" },
+          status: { type: ["string", "null"] },
+
+          updated_by: { type: "string" }
+        },
+        additionalProperties: false
       }
     }
   }, async (req, reply) => {

@@ -6,6 +6,7 @@ export interface CreatePartnerBody {
   city: string;
   district: string;
   state?: string | null;
+  email?: string ;
   pincode: string;
   status: string; 
   created_by: string;
@@ -34,6 +35,7 @@ export interface EditPartnerBody {
   id: string;
   company_id: number;
   name?: string;
+  email?: string;
   address?: string;
   phone_number?: string;
   city?: string;

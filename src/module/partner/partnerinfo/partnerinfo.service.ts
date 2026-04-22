@@ -15,13 +15,13 @@ export default class PartnerService {
       if (!company) throw new AppError("Company not found", 404);
 
       const queryText = `
-        INSERT INTO partners_info (name, address, phone_number, city, district, state, pincode, status, remarks, company_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO partners_info (name, address, phone_number, city, district, state, pincode, status, remarks, company_id,email)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11)
         RETURNING *;
       `;
       const values = [
         data.name, data.address, data.phone_number, data.city, data.district, 
-        data.state, data.pincode, data.statusCode, JSON.stringify([data.remark]), data.company_id
+        data.state, data.pincode, data.statusCode, JSON.stringify([data.remark]), data.company_id,data.email
       ];
 
       const { rows } = await executeInTransaction(client, queryText, values);
@@ -39,7 +39,7 @@ export default class PartnerService {
 
     if (filters.search) {
       values.push(`%${filters.search}%`);
-      where.push(`(name ILIKE $${values.length} OR phone_number ILIKE $${values.length} OR city ILIKE $${values.length})`);
+      where.push(`(name ILIKE $${values.length} OR phone_number ILIKE $${values.length} OR email ILIKE $${values.length} OR city ILIKE $${values.length})`);
     }
 
     if (filters.company_id) {
@@ -65,13 +65,13 @@ export default class PartnerService {
           remarks = CASE 
             WHEN jsonb_typeof(remarks)='array' THEN remarks || $9::jsonb 
             ELSE jsonb_build_array(remarks) || $9::jsonb 
-          END
-        WHERE id = $10 RETURNING *;
+          END,email =$10
+        WHERE id = $11 RETURNING *;
       `;
       const values = [
         data.name ?? partner.name, data.address ?? partner.address, data.phone_number ?? partner.phone_number,
         data.city ?? partner.city, data.district ?? partner.district, data.state ?? partner.state,
-        data.pincode ?? partner.pincode, data.statusCode ?? partner.status, JSON.stringify(data.remark), data.id
+        data.pincode ?? partner.pincode, data.statusCode ?? partner.status, JSON.stringify(data.remark),data.email ?? partner.email, data.id
       ];
 
       const { rows } = await executeInTransaction(client, queryText, values);

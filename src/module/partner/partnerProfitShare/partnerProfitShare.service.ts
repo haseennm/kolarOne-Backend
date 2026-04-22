@@ -1,3 +1,4 @@
+import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { getRecord } from "../../../utils/extra";
@@ -5,64 +6,103 @@ import { CreateProfitShareParams, DeletePartnerProfitParams, EditProfitSharePara
 
 
 export default class ProfitShareService {
-  async createProfitShare(data: CreateProfitShareParams) {
-    const { partner_id, entity_id, entity_type, profit_share, statusCode, remark, parent_id } = data;
-    return transaction(async (client) => {
-      let company_id = null
-      if (entity_type === "F") {
-        const company = await executeInTransaction(
-          client,
-          `SELECT company_id 
+  async createProfitShare(data: CreateProfitShareParams, client: PoolClient) {
+    const { partner_id, entity_id, entity_type, profit_share, statusCode, remark } = data;
+    let company_id = null
+    let branch_id = null
+    if (entity_type === "F") {
+      const branch = await executeInTransaction(
+        client,
+        `SELECT branch_id FROM firm WHERE id = $1 AND status != 0`,
+        [entity_id]
+      );
+
+      if (!branch.rows.length) {
+        throw new AppError("Firm not found", 404);
+      }
+
+      branch_id = branch.rows[0].branch_id;
+
+      const company = await executeInTransaction(
+        client,
+        `SELECT company_id FROM branches WHERE id = $1 AND status != 0`,
+        [branch_id]
+      );
+
+      if (!company.rows.length) {
+        throw new AppError("Branch not found", 404);
+      }
+
+      company_id = company.rows[0].company_id;
+    }
+    if (entity_type === "B") {
+
+      branch_id = entity_id
+      const company = await executeInTransaction(
+        client,
+        `SELECT company_id 
    FROM branches 
    WHERE id = $1 AND status != 0`,
-          [parent_id]
-        );
-        company_id = company.rows[0].company_id
-      } else {
-        company_id = parent_id
-      }
-      const check_partner = await getRecord(
-        partner_id,
-        "partners_info",
-        "company_id",
-        company_id,
-        client
+        [branch_id]
       );
+        if (!company.rows.length) {
+    throw new AppError("Branch not found", 404);
+  }
+      company_id = company.rows[0].company_id
+    }
+    if (entity_type === "C") company_id = entity_id
+    const check_partner = await getRecord(
+      partner_id,
+      "partners_info",
+      "company_id",
+      company_id,
+      client
+    );
 
-      if (!check_partner) {
-        throw new AppError(`Partner Not found`, 404);
-      }
-      type EntityType = "F" | "B" | "C";
+    if (!check_partner) {
+      throw new AppError(`Partner Not found`, 404);
+    }
+    type EntityType = "F" | "B" | "C";
 
-      const TABLE_MAP: Record<EntityType, { table: string; parent: string }> = {
-        F: { table: "firm", parent: "branch_id" },
-        B: { table: "branches", parent: "company_id" },
-        C: { table: "company", parent: "company_id" },
-      };
+    const TABLE_MAP: Record<EntityType, { table: string; parent: string, parent_id: number }> = {
+      F: { table: "firm", parent: "branch_id", parent_id: branch_id },
+      B: { table: "branches", parent: "company_id", parent_id: company_id },
+      C: { table: "company", parent: "id", parent_id: company_id },
+    };
 
-      const config = TABLE_MAP[entity_type as EntityType];
+    const config = TABLE_MAP[entity_type as EntityType];
 
-      const check_exist = await getRecord(
-        entity_id,
-        config.table,
-        config.parent,
-        parent_id,
-        client
-      );
+    const check_exist = await getRecord(
+      entity_id,
+      config.table,
+      config.parent,
+      config.parent_id,
+      client
+    );
 
-      if (!check_exist) {
-        throw new AppError(`${config.table} Not found`, 404);
-      }
-      const queryText = `
+    if (!check_exist) {
+      throw new AppError(`${config.table} Not found`, 404);
+    }
+    const existing = await executeInTransaction(
+  client,
+  `SELECT 1 FROM partner_profit_shares 
+   WHERE partner_id = $1 AND entity_id = $2 AND entity_type = $3 AND status !=0`,
+  [partner_id, entity_id, entity_type]
+);
+
+if (existing.rows.length) {
+  throw new AppError("Profit share already exists for this entity", 409);
+}
+    const queryText = `
         INSERT INTO partner_profit_shares (partner_id, entity_id, entity_type, profit_share, status, remarks)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *;
       `;
-      const values = [partner_id, entity_id, entity_type, profit_share, statusCode, JSON.stringify([remark])];
+    const values = [partner_id, entity_id, entity_type, profit_share, statusCode, JSON.stringify([remark])];
+console.log(entity_type)
+    const { rows } = await executeInTransaction(client, queryText, values);
+    return rows[0];
 
-      const { rows } = await executeInTransaction(client, queryText, values);
-      return rows[0];
-    });
   }
   async editProfitShare(data: EditProfitShareParams) {
 
@@ -142,6 +182,7 @@ export default class ProfitShareService {
     let i = 1;
 
     if (partner_id) {
+      console.log(partner_id)
       conditions.push(`pps.partner_id = $${i++}`);
       values.push(partner_id);
     }
