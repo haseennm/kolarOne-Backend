@@ -104,66 +104,62 @@ console.log(entity_type)
     return rows[0];
 
   }
-  async editProfitShare(data: EditProfitShareParams) {
+ async editProfitShare(data: EditProfitShareParams, client: PoolClient) {
+  const { entity_id, entity_type, id, remark, statusCode, profit_share } = data;
 
-    const { entity_id, entity_type, id, remark, statusCode, profit_share } = data;
+  type EntityType = "F" | "B" | "C";
 
-    return transaction(async (client) => {
+  const TABLE_MAP: Record<EntityType, { table: string }> = {
+    F: { table: "firm" },
+    B: { table: "branches" },
+    C: { table: "company" },
+  };
 
-      type EntityType = "F" | "B" | "C";
+  const config = TABLE_MAP[entity_type as EntityType];
 
-      const TABLE_MAP: Record<EntityType, { table: string }> = {
-        F: { table: "firm" },
-        B: { table: "branches" },
-        C: { table: "company" },
-      };
+  const check_exist = await getRecord(
+    id,
+    "partner_profit_shares",
+    "entity_id",
+    entity_id,
+    client
+  );
 
-      const config = TABLE_MAP[entity_type as EntityType];
+  if (!check_exist) {
+    throw new AppError(`${config.table} not found`, 404);
+  }
 
-      const check_exist = await getRecord(
-        id,
-        "partner_profit_shares",
-        "entity_id",
-        entity_id,
-        client
-      );
-
-      if (!check_exist) {
-        throw new AppError(`${config.table} not found`, 404);
-      }
-
-      const queryText = `
-      UPDATE partner_profit_shares
-      SET
-        profit_share = $1,
-        status = $2,
-        remarks =
-          CASE
-            WHEN remarks IS NULL THEN $3::jsonb
-            WHEN jsonb_typeof(remarks) = 'array'
-              THEN remarks || $3::jsonb
-            ELSE jsonb_build_array(remarks) || $3::jsonb
-          END
-      WHERE id = $4
+  const queryText = `
+    UPDATE partner_profit_shares
+    SET
+      profit_share = $1,
+      status = $2,
+      remarks =
+        CASE
+          WHEN remarks IS NULL THEN $3::jsonb
+          WHEN jsonb_typeof(remarks) = 'array'
+            THEN remarks || $3::jsonb
+          ELSE jsonb_build_array(remarks) || $3::jsonb
+        END
+    WHERE id = $4
       AND entity_id = $5
       AND entity_type = $6
-      RETURNING *
-    `;
+    RETURNING *
+  `;
 
-      const values = [
-        profit_share ?? check_exist.profit_share,
-        statusCode ?? check_exist.status,
-        JSON.stringify([remark]),
-        id,
-        entity_id,
-        entity_type
-      ];
+  const values = [
+    profit_share ?? check_exist.profit_share,
+    statusCode ?? check_exist.status,
+    JSON.stringify([remark]),
+    id,
+    entity_id,
+    entity_type
+  ];
 
-      const { rows } = await executeInTransaction(client, queryText, values);
+  const { rows } = await executeInTransaction(client, queryText, values);
 
-      return rows[0];
-    });
-  }
+  return rows[0];
+}
 
   async fetchProfitShares(data: ProfitShareFilters) {
     const {

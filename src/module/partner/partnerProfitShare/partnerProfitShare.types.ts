@@ -27,18 +27,29 @@ export interface FetchProfitShareBody {
   entity_type?: string;
 }
 
-export interface EditProfitShareBody {
-  id: string;
-  profit_share?: number;
-  status?: string;
-  entity_id: number;
-  entity_type: string
+export interface EditProfitShareBulkBody {
   updated_by: string;
+  entities: EditProfitShareItem[];
 }
-export interface EditProfitShareParams extends Omit<EditProfitShareBody, "updated_by" | "status" | "entity_type"> {
+
+export interface EditProfitShareItem {
+  id: number;
+  entity_id: number;
+  entity_type: "Branch" | "Firm" | "Company";
+  profit_share?: number;
+  status?: "Active" | "Inactive";
+}
+export interface EditProfitShareParams {
+  id: number;
+  entity_id: number;
   entity_type: string;
-  remark: object;
+  profit_share?: number;
   statusCode?: number;
+  remark: {
+    action: string;
+    updated_by: string;
+    updated_at: number;
+  };
 }
 export interface ProfitShareFilters {
   partner_id?: number;

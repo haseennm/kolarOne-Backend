@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import ProfitShareController from "./partnerProfitShare.controller";
-import { CreateProfitShareBody, DeletePartnerProfitBody, EditProfitShareBody, ProfitShareFilters } from "./partnerProfitShare.types";
+import { CreateProfitShareBody, DeletePartnerProfitBody, EditProfitShareBulkBody, ProfitShareFilters } from "./partnerProfitShare.types";
 
 export async function profitShareRouter(app: FastifyInstance) {
   const controller = new ProfitShareController();
@@ -44,20 +44,31 @@ export async function profitShareRouter(app: FastifyInstance) {
     schema: {
       body: {
         type: "object",
-        required: ["id", "entity_id", "entity_type", "updated_by"],
+        required: ["updated_by", "entities"],
         properties: {
-          id: { type: "number" },
-          entity_id: { type: "number" },
-          entity_type: { type: "string", enum: ["Branch", "Firm", "Company"] },
-          profit_share: { type: "number", minimum: 0, maximum: 100 },
-          status: { type: "string", enum: ["Active", "Inactive"] },
-          updated_by: { type: "string" }
+          updated_by: { type: "string" },
+          entities: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["id", "entity_id", "entity_type"],
+              properties: {
+                id: { type: "number" },
+                entity_id: { type: "number" },
+                entity_type: {
+                  type: "string",
+                  enum: ["Branch", "Firm", "Company"]
+                },
+                profit_share: { type: "number", minimum: 0, maximum: 100 },
+                status: { type: "string", enum: ["Active", "Inactive"] }
+              }
+            }
+          }
         }
       }
     }
   }, async (req, reply) => {
-
-    const body = req.body as EditProfitShareBody;
+    const body = req.body as EditProfitShareBulkBody;
 
     const res = await controller.editProfitShare(body);
 
@@ -65,7 +76,6 @@ export async function profitShareRouter(app: FastifyInstance) {
       status: "Success",
       message: res
     });
-
   });
 
   app.post<{ Body: ProfitShareFilters }>(

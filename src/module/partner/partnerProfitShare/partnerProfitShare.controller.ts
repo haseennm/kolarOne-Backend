@@ -1,7 +1,7 @@
 import { transaction } from "../../../config/db";
 import { convertEntityType, EntityKey, getStatusCode, getStatusText } from "../../../utils/extra";
 import ProfitShareService from "./partnerProfitShare.service";
-import { CreateProfitShareBody, DeletePartnerProfitBody, EditProfitShareBody, ProfitShareFilters, ProfitShareRow } from "./partnerProfitShare.types";
+import { CreateProfitShareBody, DeletePartnerProfitBody, EditProfitShareBulkBody, ProfitShareFilters, ProfitShareRow } from "./partnerProfitShare.types";
 
 
 export default class ProfitShareController {
@@ -51,16 +51,44 @@ export default class ProfitShareController {
     };
   }
 
+  async editProfitShare(data: EditProfitShareBulkBody) {
+  const { updated_by, entities } = data;
 
-  async editProfitShare(data: EditProfitShareBody) {
-    const { updated_by, status, entity_type, ...rest } = data;
-    const remark = { action: "Updated", updated_by, updated_at: Date.now() };
-    let statusCode;
-    if (status) statusCode = getStatusCode(status);
-    const dbEntityType = convertEntityType(entity_type as EntityKey);
+  const remark = {
+    action: "Updated",
+    updated_by,
+    updated_at: Date.now()
+  };
 
-    return this.service.editProfitShare({ ...rest, remark, entity_type: dbEntityType, statusCode });
-  }
+  return transaction(async (client) => {
+    const results = [];
+
+    for (const entity of entities) {
+      const dbEntityType = convertEntityType(entity.entity_type as EntityKey);
+
+      let statusCode;
+      if (entity.status) {
+        statusCode = getStatusCode(entity.status);
+      }
+
+      const result = await this.service.editProfitShare(
+        {
+          id: entity.id,
+          entity_id: entity.entity_id,
+          entity_type: dbEntityType,
+          profit_share: entity.profit_share,
+          statusCode,
+          remark
+        },
+        client
+      );
+
+      results.push(result);
+    }
+
+    return results;
+  });
+}
    async deletePartnerProfit(data: DeletePartnerProfitBody) {
       const { deleted_by, ...rest } = data;
       const remark = { action: "Deleted", deleted_by, updated_at: Date.now() };
