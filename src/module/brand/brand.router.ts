@@ -54,6 +54,7 @@ export async function brandRouter(app: FastifyInstance): Promise<void> {
       schema: {
         body: {
           type: "object",
+          required: ["company_id"],
           properties: {
             page: { type: "number", minimum: 1 },
             limit: { type: "number", minimum: 1 },

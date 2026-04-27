@@ -54,7 +54,8 @@ export default class BrandService {
   }
   async fetchBrand(data: FetchBrandParams) {
     const { offset, filters = {} } = data;
-
+    console.log("filters", data)
+    console.log("filters.filter?.company_id", filters.company_id)
     const limit = filters.limit ?? 10;
     const page = filters.page ?? 1;
 
@@ -64,17 +65,18 @@ export default class BrandService {
     where.push(`status != $${values.length + 1}`);
     values.push(0);
 
-    if (filters.filter?.search) {
-      values.push(`%${filters.filter.search}%`);
+    if (filters.search) {
+      values.push(`%${filters.search}%`);
       where.push(`name ILIKE $${values.length}`);
     }
 
-    if (filters.filter?.id) {
-      values.push(filters.filter.id);
+    if (filters.id) {
+      values.push(filters.id);
       where.push(`id = $${values.length}`);
     }
-    if (filters.filter?.company_id) {
-      values.push(filters.filter.company_id);
+
+    if (filters.company_id) {
+      values.push(filters.company_id);
       where.push(`company_id = $${values.length}`);
     }
 
@@ -177,7 +179,7 @@ export default class BrandService {
       `;
 
       const values = [
-        0,  
+        0,
         JSON.stringify(remark),
         id,
       ];

@@ -59,7 +59,9 @@ export interface BrandFilter {
 export interface FetchBrandBody {
   page?: number;
   limit?: number;
-  filter?: BrandFilter
+  company_id?: number;
+  id?: number;
+  search?: string | null;
 }
 export interface FetchBrandParams {
   offset: number;
