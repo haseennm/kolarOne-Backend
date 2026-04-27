@@ -31,6 +31,7 @@ export interface FetchBranchBody {
   page?: number
   limit?: number
   id?: number
+  company_id?:number
   search?: string | null
 }
 export interface FetchBranchParams {

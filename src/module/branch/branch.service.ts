@@ -108,7 +108,6 @@ export default class BranchService {
 
     async fetchBranch(data: FetchBranchParams) {
         const { filters = {} } = data
-
         const limit = filters.limit ?? 10
         const page = filters.page ?? 1
         const offset = (page - 1) * limit
@@ -143,6 +142,10 @@ export default class BranchService {
         `)
         }
 
+        if (filters?.company_id) {
+            values.push(filters.company_id)
+            where.push(`company_id = $${values.length}`)
+        }
         if (filters?.id) {
             values.push(filters.id)
             where.push(`id = $${values.length}`)
