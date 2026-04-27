@@ -76,8 +76,7 @@ export default class RoleService {
       values.push(filters.branch_id);
       where.push(`id = ANY(SELECT unnest(role) FROM branches WHERE id = $${values.length})`);
     }
-    values.push(filters.company_id);
-    where.push(`company_id = $${values.length}`);
+   
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 

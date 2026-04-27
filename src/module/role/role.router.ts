@@ -67,16 +67,16 @@ export async function roleRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["company_id"],
+          // required: ["company_id"],
           properties: {
 
             id: {
               type: "number"
             },
 
-            company_id: {
-              type: "number"
-            },
+            // company_id: {
+            //   type: "number"
+            // },
             branch_id: {
               type: "number"
             },
