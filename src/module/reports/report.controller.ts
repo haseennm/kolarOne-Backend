@@ -1,10 +1,11 @@
-import { FastifyReply, FastifyRequest } from "fastify";
 import { AppError } from "../../utils/AppError";
 import { ReportService } from "./report.service";
-import { GetGSTReportBody, GetReportBody, OpportunityForecastInput, PaymentReportInput, SalesForecastInput, SalesTrendInput } from "./report.types";
+import { CompanyDashboardBody, GetGSTReportBody, GetReportBody, OpportunityForecastInput, PaymentReportInput, SalesForecastInput, SalesTrendInput } from "./report.types";
 import { SalesTrendService } from "./salesTrend.service";
 import { SalesForecastService } from "./salesForecast.service";
 import { OpportunityForecastService } from "./opportunityForecast.service";
+import { CompanyDashboardService } from "./companyDashboard.service";
+import { getStatusText } from "../../utils/extra";
 
 
 
@@ -381,6 +382,27 @@ export class ReportController {
 
     /* ================= RESPONSE ================= */
 
+    return data;
+  }
+  async companyDashboardReport(
+    body: CompanyDashboardBody
+  ) {
+    const { company_id } = body
+    const dashboardService = new CompanyDashboardService()
+    const data = await dashboardService.getCompanySummary({ company_id })
+    return data;
+  }
+  async companyDashboardBranchReport(
+    body: CompanyDashboardBody
+  ) {
+    const { company_id } = body
+    const dashboardService = new CompanyDashboardService()
+    const data_with_code = await dashboardService.getBranchPerformance({ company_id })
+     const data = data_with_code.branches.map((row) => ({
+          ...row,
+          status: getStatusText(row.status)
+        }));
+    
     return data;
   }
 }

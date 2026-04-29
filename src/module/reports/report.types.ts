@@ -52,3 +52,6 @@ export type PaymentReportInput = {
   start_date?: string;
   end_date?: string;
 };
+export type CompanyDashboardBody = {
+  company_id: number;
+};

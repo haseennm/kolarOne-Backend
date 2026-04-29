@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ReportController } from "./report.controller";
-import { GetGSTReportBody, GetReportBody, OpportunityForecastInput, PaymentReportInput, SalesTrendInput } from "./report.types";
+import { CompanyDashboardBody, GetGSTReportBody, GetReportBody, OpportunityForecastInput, PaymentReportInput, SalesTrendInput } from "./report.types";
 
 export default async function reportRoutes(app: FastifyInstance) {
 
@@ -595,6 +595,66 @@ export default async function reportRoutes(app: FastifyInstance) {
     ) => {
 
       const data = await controller.paymentReport(request.body);
+
+      return reply.code(200).send({
+        status: "Success",
+        data
+      });
+
+    }
+  );
+  app.post(
+    "/company/dashboard/summary",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["company_id"],
+          properties: {
+
+            company_id: {
+              type: "number"
+            },
+          }
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: CompanyDashboardBody }>,
+      reply: FastifyReply
+    ) => {
+
+      const data = await controller.companyDashboardReport(request.body);
+
+      return reply.code(200).send({
+        status: "Success",
+        data
+      });
+
+    }
+  );
+  app.post(
+    "/company/dashboard/branches",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["company_id"],
+          properties: {
+
+            company_id: {
+              type: "number"
+            },
+          }
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: CompanyDashboardBody }>,
+      reply: FastifyReply
+    ) => {
+
+      const data = await controller.companyDashboardBranchReport(request.body);
 
       return reply.code(200).send({
         status: "Success",
