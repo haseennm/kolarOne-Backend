@@ -38,8 +38,7 @@ export default class BranchService {
             }
 
             for (const roleId of role) {
-                const isRoleExist = await getRecord(roleId, "role", "id", roleId, client);
-
+                const isRoleExist = await getRecord(roleId, "role", "id", Number(roleId), client);
                 if (!isRoleExist) {
                     throw new AppError("One or more roles do not exist", 404);
                 }
@@ -214,12 +213,11 @@ export default class BranchService {
             }
             if (role) {
                 for (const roleId of role) {
-                const isRoleExist = await getRecord(roleId, "role", "id", roleId, client);
-
-                if (!isRoleExist) {
-                    throw new AppError("One or more roles do not exist", 404);
+                    const isRoleExist = await getRecord(roleId, "role", "id", Number(roleId), client);
+                    if (!isRoleExist) {
+                        throw new AppError("One or more roles do not exist", 404);
+                    }
                 }
-            }
             }
             const query = `
         UPDATE branches 

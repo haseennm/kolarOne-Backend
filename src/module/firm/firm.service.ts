@@ -39,7 +39,7 @@ export default class FirmService {
         throw new AppError("Branch not found", 404);
       }
       for (const roleId of role) {
-        const isRoleExist = await getRecord(roleId, "role", "id", roleId, client);
+        const isRoleExist = await getRecord(roleId, "role", "id", Number(roleId), client);
 
         if (!isRoleExist) {
           throw new AppError("One or more roles do not exist", 404);
@@ -193,8 +193,7 @@ export default class FirmService {
       }
       if (role) {
         for (const roleId of role) {
-          const isRoleExist = await getRecord(roleId, "role", "id", roleId, client);
-
+        const isRoleExist = await getRecord(roleId, "role", "id", Number(roleId), client);
           if (!isRoleExist) {
             throw new AppError("One or more roles do not exist", 404);
           }

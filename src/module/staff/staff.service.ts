@@ -77,13 +77,7 @@ export default class StaffService {
     // Check roles
     if (role) {
       for (const roleId of role) {
-        const isRoleExist = await getRecord(
-          roleId,
-          "role",
-          "company_id",
-          company_id,
-          client
-        );
+        const isRoleExist = await getRecord(roleId, "role", "id", Number(roleId), client);
 
         if (!isRoleExist) {
           throw new AppError("One or more roles do not exist", 404);
