@@ -45,7 +45,7 @@ export interface StockChangeBody {
 export interface StockChangeParams extends StockChangeBody {
   statusCode?: number
 }
-export interface StockFetchBody {
+export interface  StockFetchBody {
   page?: number;
   limit?: number;
   sort_by?: string;
@@ -55,7 +55,8 @@ export interface StockFetchBody {
   firm_id?: number;
   branch_id?: number;
   company_id: number;
-
+  
+  product_id: number;
   available_qty_min: number;
   available_qty_max: number;
   purchased_qty_min: number;

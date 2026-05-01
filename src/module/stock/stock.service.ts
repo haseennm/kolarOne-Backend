@@ -338,7 +338,6 @@ export default class StockService {
 
   async fetchStock(data: StockFetchParams) {
     const { filters, offset } = data;
-
     let where: string[] = [];
     let values: any[] = [];
 
@@ -349,7 +348,10 @@ export default class StockService {
       values.push(filters.id);
       where.push(`s.id = $${values.length}`);
     }
-
+    if (filters?.product_id) {
+      values.push(filters.product_id);
+      where.push(`s.product_id = $${values.length}`);
+    }
     if (filters?.firm_id) {
       values.push(filters.firm_id);
       where.push(`s.firm_id = $${values.length}`);

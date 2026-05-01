@@ -17,6 +17,7 @@ export async function stockRouter(app: FastifyInstance) {
             company_id: { type: "number" },
             branch_id: { type: "number" },
             firm_id: { type: "number" },
+            product_id: { type: "number" },
 
             status: { type: "number" },
 
@@ -64,7 +65,6 @@ export async function stockRouter(app: FastifyInstance) {
           limit
         }
       });
-
       return reply.code(200).send(data);
     }
   );
