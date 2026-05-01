@@ -91,8 +91,29 @@ export async function profitShareRouter(app: FastifyInstance) {
             profit_share_gt: { type: "number" },
             profit_share_lt: { type: "number" },
             page: { type: "number", minimum: 1, default: 1 },
-            limit: { type: "number", minimum: 1, maximum: 100, default: 10 }
-          }
+            limit: { type: "number", minimum: 1, maximum: 100, default: 10 },
+            entity_id: { type: "number" },
+            entity_type: { type: "string", enum: ["Branch", "Firm", "Company"] }
+          },
+
+          allOf: [
+            {
+              if: {
+                required: ["entity_type"]
+              },
+              then: {
+                required: ["entity_id"]
+              }
+            },
+            {
+              if: {
+                required: ["entity_id"]
+              },
+              then: {
+                required: ["entity_type"]
+              }
+            }
+          ]
         }
       }
     }, async (req, reply) => {

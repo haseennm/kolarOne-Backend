@@ -15,7 +15,7 @@ export interface CreateProfitShareParams {
   partner_id: string; // UUID
   statusCode: number;
   entity_id: number;
-  entity_type:string;
+  entity_type: string;
   profit_share: number;
 }
 
@@ -58,6 +58,8 @@ export interface ProfitShareFilters {
   profit_share_lt?: number;
   page?: number;
   limit?: number;
+  entity_id: number;
+  entity_type: string;
 }
 
 export interface ProfitShareRow extends Omit<CreateProfitShareBody, "created_by" | "status"> {
