@@ -114,7 +114,10 @@ export default class SaleController {
         )
       );
 
-      return `Sale ${sale.invoice_number} has been created successfully.`;
+      return {
+        msg: `Sale ${sale.invoice_number} has been created successfully.`,
+        id: sale.id
+      };
     });
   }
 

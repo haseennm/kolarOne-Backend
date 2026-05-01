@@ -105,7 +105,7 @@ export default class SaleReturnController {
         client
       );
 
-      return `sale return ${sale_return.return_number} has been created successfully.`;
+      return { msg: `sale return ${sale_return.return_number} has been updated successfully.`, id: sale_return.id };
     });
   }
 

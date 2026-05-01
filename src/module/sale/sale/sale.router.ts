@@ -39,7 +39,7 @@ export async function saleRouter(app: FastifyInstance) {
             company_id: { type: "number" },
             created_by: { type: "string", minLength: 1 },
 
-            customer_id: { type: "string",format:"uuid" },
+            customer_id: { type: "string", format: "uuid" },
             invoice_date: { type: "string", format: "date" },
 
             subtotal: { type: "number" },

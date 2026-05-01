@@ -106,7 +106,7 @@ export default class PurchaseReturnController {
         client
       );
 
-      return `purchase return ${purchase_return.return_number} has been created successfully.`;
+      return {msg:`purchase return ${purchase_return.return_number} has been created successfully.`,id:purchase_return.id};
     });
   }
   async purchaseReturnEdit(data: PurchaseReturnEditBody) {
