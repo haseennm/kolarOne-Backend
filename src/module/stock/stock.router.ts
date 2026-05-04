@@ -118,14 +118,14 @@ export async function stockRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["company_id", "qty", "product_id", "branch_id"],
+          required: ["company_id", "qty", "product_id", "branch_id","firm_id"],
           properties: {
             company_id: { type: "number" },
             qty: { type: "number" },
             product_id: { type: "number" },
             branch_id: { type: "number" },
 
-            firm_id: { type: ["number", "null"] },
+            firm_id: { type: ["number"] },
             insert_batch_number: { type: ["number", "null"] }
           }
         }
@@ -151,11 +151,11 @@ export async function stockRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["branch_id", "r_id", "selling_price"],
+          required: ["firm_id", "r_id", "selling_price"],
           properties: {
             r_id: { type: "number" },
             selling_price: { type: "number" },
-            branch_id: { type: "number" },
+            firm_id: { type: "number" },
           }
         }
       }

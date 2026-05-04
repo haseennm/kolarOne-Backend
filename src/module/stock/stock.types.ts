@@ -82,12 +82,12 @@ export interface StockReport {
 }
 
 export interface StockPriceSet {
-  branch_id: number;
+  firm_id: number;
   r_id: number;
   selling_price: number;
 }
 export interface StockAdditionalBody {
-  firm_id: number | null;
+  firm_id: number;
   branch_id: number;
   product_id: number;
   selling_price?: number;

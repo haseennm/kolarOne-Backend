@@ -406,10 +406,12 @@ export default class StockService {
     const stockQuery = `
   SELECT 
     s.*, 
-    p.name
+    p.name,
+    f.firm_name
   FROM stock s
   LEFT JOIN products p ON s.product_id = p.id
-  LEFT JOIN branches b ON s.branch_id = b.id   -- ✅ ADD THIS
+  LEFT JOIN branches b ON s.branch_id = b.id  
+  LEFT JOIN firm f ON s.firm_id = f.id  
   ${whereClause}
   ORDER BY ${sortBy} ${sortOrder}
   LIMIT $${values.length + 1}
@@ -421,6 +423,7 @@ export default class StockService {
   FROM stock s
   LEFT JOIN products p ON s.product_id = p.id
   LEFT JOIN branches b ON s.branch_id = b.id
+  LEFT JOIN firm f ON s.firm_id = f.id
   ${whereClause}
 `;
     const limit = filters.limit ?? 50
@@ -689,7 +692,10 @@ export default class StockService {
     });
   }
 
-  async createManualStock(data: StockAdditionalParams, client: PoolClient) {
+  async createManualStock(
+    data: StockAdditionalParams,
+    client: PoolClient
+  ) {
     const {
       branch_id,
       selling_price,
@@ -702,37 +708,8 @@ export default class StockService {
       insert_batch_number
     } = data;
 
-    // 🔍 Validate existing stock (if batch provided)
-    if (insert_batch_number) {
-      const is_stock_exist = await getRecord(
-        insert_batch_number,
-        "stock",
-        "branch_id",
-        branch_id,
-        client
-      );
-
-      if (!is_stock_exist) {
-        throw new AppError("Stock not found", 404);
-      }
-    }
-
-    if (firm_id !== null && firm_id !== undefined) {
-      const isFirmExist = await getRecord(
-        firm_id,
-        "firm",
-        "branch_id",
-        branch_id,
-        client
-      );
-
-      if (!isFirmExist) {
-        throw new AppError("Firm not found", 404);
-      }
-    }
-
-    // 🔍 Validate product
-    const is_product_exist = await getRecord(
+    // ✅ Validate product
+    const isProductExist = await getRecord(
       product_id,
       "products",
       "company_id",
@@ -740,33 +717,250 @@ export default class StockService {
       client
     );
 
-    if (!is_product_exist) {
+    if (!isProductExist) {
       throw new AppError("Product not found", 404);
     }
 
+    // ✅ Validate firm
+    const isFirmExist = await getRecord(
+      firm_id,
+      "firm",
+      "branch_id",
+      branch_id,
+      client
+    );
+
+    if (!isFirmExist) {
+      throw new AppError("Firm not found", 404);
+    }
+
+    // 🎯 SCENARIO 1 & 3 → Batch provided
     if (insert_batch_number) {
-      const updated_stock = await executeInTransaction(
+      return await this.handleBatchStock({
+        batch_number: `BATCH-${insert_batch_number}`,
+        branch_id,
+        selling_price,
+        firm_id,
+        product_id,
+        qty,
+        statusCode,
+        reason,
+        client
+      });
+    }
+
+    // 🎯 SCENARIO 2 → Auto batch
+    return await this.createWithAutoBatch({
+      branch_id,
+      selling_price,
+      firm_id,
+      product_id,
+      qty,
+      statusCode,
+      reason,
+      client
+    });
+  }
+
+  // ============================================
+  // 🔹 HANDLE EXISTING OR NEW CUSTOM BATCH
+  // ============================================
+  private async handleBatchStock(params: any) {
+    const {
+      batch_number,
+      branch_id,
+      selling_price,
+      firm_id,
+      product_id,
+      qty,
+      statusCode,
+      reason,
+      client
+    } = params;
+
+    // 🔒 Lock row if exists
+    const existingStock = await executeInTransaction(
+      client,
+      `
+      SELECT * FROM stock
+      WHERE batch_number = $1 AND firm_id = $2
+      FOR UPDATE;
+      `,
+      [batch_number, firm_id]
+    );
+
+    // ✅ SCENARIO 1 → Update existing
+    if (existingStock.rows.length > 0) {
+      const updatedStock = await executeInTransaction(
         client,
         `
-      UPDATE stock SET
-        available_quantity = available_quantity + $1,
-        purchased_qty = purchased_qty + $2
-      WHERE id = $3
-        AND branch_id = $4
-      RETURNING *;
-      `,
-        [qty, qty, insert_batch_number, branch_id]
+        UPDATE stock SET
+          available_quantity = available_quantity + $1,
+          purchased_qty = purchased_qty + $2
+        WHERE batch_number = $3 AND firm_id = $4
+        RETURNING *;
+        `,
+        [qty, qty, batch_number, firm_id]
       );
 
-      if (!updated_stock.rows.length) {
-        throw new AppError("Stock update failed", 400);
-      }
-
-      const stock_id = updated_stock.rows[0].id;
-
-      await executeInTransaction(
+      await this.insertMovement({
         client,
-        `
+        product_id,
+        branch_id,
+        qty,
+        reason,
+        stock_id: updatedStock.rows[0].id,
+        statusCode
+      });
+
+      return updatedStock.rows[0];
+    }
+
+    // ✅ SCENARIO 3 → Insert new with custom batch
+    const stockInsert = await this.insertStock({
+      client,
+      qty,
+      branch_id,
+      selling_price,
+      firm_id,
+      product_id,
+      statusCode,
+      batch_number
+    });
+
+    await this.insertMovement({
+      client,
+      product_id,
+      branch_id,
+      qty,
+      reason,
+      stock_id: stockInsert.id,
+      statusCode
+    });
+
+    return stockInsert;
+  }
+
+  // ============================================
+  // 🔹 AUTO BATCH CREATION
+  // ============================================
+  private async createWithAutoBatch(params: any) {
+    const {
+      branch_id,
+      selling_price,
+      firm_id,
+      product_id,
+      qty,
+      statusCode,
+      reason,
+      client
+    } = params;
+
+    const lastStock = await executeInTransaction(
+      client,
+      `
+      SELECT MAX(batch_num) AS last_batch FROM (
+        SELECT CAST(SUBSTRING(batch_number FROM 7) AS INTEGER) AS batch_num
+        FROM stock
+        WHERE branch_id = $1
+        FOR UPDATE
+      ) AS locked_rows;
+      `,
+      [branch_id]
+    );
+
+    const nextBatch = (lastStock.rows[0]?.last_batch || 0) + 1;
+    const batch_number = `BATCH-${nextBatch}`;
+
+    const stockInsert = await this.insertStock({
+      client,
+      qty,
+      branch_id,
+      selling_price,
+      firm_id,
+      product_id,
+      statusCode,
+      batch_number
+    });
+
+    await this.insertMovement({
+      client,
+      product_id,
+      branch_id,
+      qty,
+      reason,
+      stock_id: stockInsert.id,
+      statusCode
+    });
+
+    return stockInsert;
+  }
+
+  // ============================================
+  // 🔹 INSERT STOCK
+  // ============================================
+  private async insertStock(params: any) {
+    const {
+      client,
+      qty,
+      branch_id,
+      selling_price,
+      firm_id,
+      product_id,
+      statusCode,
+      batch_number
+    } = params;
+
+    const result = await executeInTransaction(
+      client,
+      `
+      INSERT INTO stock (
+        available_quantity,
+        branch_id,
+        selling_price,
+        firm_id,
+        product_id,
+        purchase_id,
+        purchased_qty,
+        status,
+        batch_number
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      RETURNING *;
+      `,
+      [
+        qty,
+        branch_id,
+        selling_price ?? 0,
+        firm_id,
+        product_id,
+        null,
+        qty,
+        statusCode,
+        batch_number
+      ]
+    );
+
+    return result.rows[0];
+  }
+
+  // ============================================
+  // 🔹 INSERT MOVEMENT
+  // ============================================
+  private async insertMovement(params: any) {
+    const {
+      client,
+      product_id,
+      branch_id,
+      qty,
+      reason,
+      stock_id,
+      statusCode
+    } = params;
+
+    await executeInTransaction(
+      client,
+      `
       INSERT INTO stock_movements (
         product_id,
         branch_id,
@@ -776,111 +970,20 @@ export default class StockService {
         stock_id,
         status
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
-      RETURNING *;
+      VALUES ($1,$2,$3,$4,$5,$6,$7);
       `,
-        [
-          product_id,
-          branch_id,
-          "I",
-          qty,
-          reason,
-          stock_id,
-          statusCode
-        ]
-      );
-
-      return updated_stock.rows[0]; // ✅ stop here
-    }
-
-    const lastStock = await executeInTransaction(
-      client,
-      `
-    SELECT MAX(batch_num) AS last_batch FROM (
-      SELECT CAST(SUBSTRING(batch_number FROM 7) AS INTEGER) AS batch_num
-      FROM stock
-      WHERE branch_id = $1
-      FOR UPDATE
-    ) AS locked_rows;
-    `,
-      [branch_id]
+      [product_id, branch_id, "I", qty, reason, stock_id, statusCode]
     );
-
-    const nextBatch = (lastStock.rows[0]?.last_batch || 0) + 1;
-    const batch_number = `BATCH-${nextBatch}`;
-
-    // 📦 Insert into stock
-    const stockInsert = await executeInTransaction(
-      client,
-      `
-    INSERT INTO stock (
-      available_quantity,
-      branch_id,
-      selling_price,
-      firm_id,
-      product_id,
-      purchase_id,
-      purchased_qty,
-      status,
-      batch_number
-    )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-    RETURNING *;
-    `,
-      [
-        qty,
-        branch_id,
-        selling_price ?? 0,
-        firm_id ?? null,
-        product_id,
-        null,
-        qty,
-        statusCode,
-        batch_number
-      ]
-    );
-
-    const stock_id = stockInsert.rows[0].id;
-
-    // 📦 Insert movement
-    await executeInTransaction(
-      client,
-      `
-    INSERT INTO stock_movements (
-      product_id,
-      branch_id,
-      movement_type,
-      quantity,
-      reason,
-      stock_id,
-      status
-    )
-    VALUES ($1,$2,$3,$4,$5,$6,$7)
-    RETURNING *;
-    `,
-      [
-        product_id,
-        branch_id,
-        "I",
-        qty,
-        reason,
-        stock_id,
-        statusCode
-      ]
-    );
-
-    return stockInsert.rows[0];
   }
 
   async updateSellingPrice(data: StockPriceSet, client: PoolClient) {
-    const { branch_id, r_id, selling_price } = data;
+    const { firm_id, r_id, selling_price } = data;
 
-    // 🔍 Check stock exists
     const isStockExist = await getRecord(
       r_id,
       "stock",
-      "branch_id",
-      branch_id,
+      "firm_id",
+      firm_id,
       client
     );
 
@@ -894,10 +997,10 @@ export default class StockService {
     UPDATE stock
     SET selling_price = $1
     WHERE id = $2
-      AND branch_id = $3
+      AND firm_id = $3
     RETURNING *;
     `,
-      [selling_price, r_id, branch_id]
+      [selling_price, r_id, firm_id]
     );
 
     if (!updatedStock.rows.length) {
