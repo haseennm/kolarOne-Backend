@@ -25,7 +25,6 @@ export default class ProductService {
       barcode,
       hsn_sac_code,
       unit,
-      base_price,
       cgst_rate,
       sgst_rate,
       igst_rate,
@@ -78,7 +77,6 @@ export default class ProductService {
           barcode,
           hsn_sac_code,
           unit,
-          base_price,
           cgst_rate,
           sgst_rate,
           igst_rate,
@@ -89,7 +87,7 @@ export default class ProductService {
         )
         VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,
-          $10,$11,$12,$13,$14,$15,$16,$17
+          $10,$11,$12,$13,$14,$15,$16
         )
         RETURNING *;
       `;
@@ -104,7 +102,6 @@ export default class ProductService {
         barcode,
         hsn_sac_code,
         unit,
-        base_price,
         cgst_rate ?? 0,
         sgst_rate ?? 0,
         igst_rate ?? 0,
@@ -134,33 +131,52 @@ export default class ProductService {
     const whereConditions: string[] = [];
     const queryParams: any[] = [];
 
-
+    // ❌ Exclude deleted
     queryParams.push(0);
     whereConditions.push(`p.status != $${queryParams.length}`);
 
+    // 🔍 Search
     if (filters.search) {
       queryParams.push(`%${filters.search}%`);
       const i = queryParams.length;
 
       whereConditions.push(`
-        (
-          p.name ILIKE $${i} OR
-          p.sku ILIKE $${i} OR
-          p.barcode ILIKE $${i} OR
-          c.name ILIKE $${i} OR
-          b.name ILIKE $${i}
-        )
-      `);
+      (
+        p.name ILIKE $${i} OR
+        p.sku ILIKE $${i} OR
+        p.barcode ILIKE $${i} OR
+        c.name ILIKE $${i} OR
+        b.name ILIKE $${i}
+      )
+    `);
     }
 
+    // 🏢 Company filter
     if (filters.company_id) {
       queryParams.push(filters.company_id);
       whereConditions.push(`p.company_id = $${queryParams.length}`);
     }
 
+    // 🆔 Product filter
     if (filters.id) {
       queryParams.push(filters.id);
       whereConditions.push(`p.id = $${queryParams.length}`);
+    }
+
+    // 🏬 Firm filter (important for stock)
+    if (filters.firm_id) {
+      queryParams.push(filters.firm_id);
+      whereConditions.push(`s.firm_id = $${queryParams.length}`);
+    }
+
+    // 🛒 Only products that exist in stock (for sale)
+    if (filters.is_sale) {
+      whereConditions.push(`
+      EXISTS (
+        SELECT 1 FROM stock s2
+        WHERE s2.product_id = p.id
+      )
+    `);
     }
 
     const whereClause =
@@ -168,35 +184,68 @@ export default class ProductService {
         ? `WHERE ${whereConditions.join(" AND ")}`
         : "";
 
+    // ============================
+    // 📦 DATA QUERY
+    // ============================
     const dataQuery = `
-  SELECT 
-    p.*,
-    c.name AS category_name,
-    b.name AS brand_name
-  FROM products p
-  LEFT JOIN product_categories c
-    ON p.category_id = c.id
-  LEFT JOIN brand b
-    ON p.brand_id = b.id
-  ${whereClause}
-  ORDER BY p.id DESC
-  LIMIT $${queryParams.length + 1}
-  OFFSET $${queryParams.length + 2}
-`;
+    SELECT 
+      p.*,
+      c.name AS category_name,
+      b.name AS brand_name,
+
+      COALESCE(SUM(s.available_quantity), 0) AS total_quantity,
+
+      CASE 
+        WHEN COALESCE(SUM(s.available_quantity), 0) > 0 THEN true
+        ELSE false
+      END AS is_available
+
+    FROM products p
+
+    LEFT JOIN product_categories c
+      ON p.category_id = c.id
+
+    LEFT JOIN brand b
+      ON p.brand_id = b.id
+
+    LEFT JOIN stock s
+      ON s.product_id = p.id
+
+    ${whereClause}
+
+    GROUP BY p.id, c.name, b.name
+
+    ORDER BY p.id DESC
+
+    LIMIT $${queryParams.length + 1}
+    OFFSET $${queryParams.length + 2}
+  `;
+
+    // ============================
+    // 🔢 COUNT QUERY
+    // ============================
     const countQuery = `
-      SELECT COUNT(*)
-      FROM products p
-      LEFT JOIN product_categories c
-        ON p.category_id = c.id
-      ${whereClause}
-    `;
+    SELECT COUNT(DISTINCT p.id)
+    FROM products p
+
+    LEFT JOIN product_categories c
+      ON p.category_id = c.id
+
+    LEFT JOIN brand b
+      ON p.brand_id = b.id
+
+    LEFT JOIN stock s
+      ON s.product_id = p.id
+
+    ${whereClause}
+  `;
 
     const products = await query<Product>(
       dataQuery,
       [...queryParams, limit, offset]
     );
 
-    const totalResult = await query<CountResult>(
+    const totalResult = await query<{ count: string }>(
       countQuery,
       queryParams
     );
@@ -213,6 +262,7 @@ export default class ProductService {
       },
     };
   }
+
 
   async updateProduct(data: EditProductParams) {
     const { id, company_id, remarks, statusCode, category_id, brand_id, ...rest } = data;
@@ -262,19 +312,18 @@ export default class ProductService {
     barcode = $7,
     hsn_sac_code = $8,
     unit = $9,
-    base_price = $10,
-    cgst_rate = $11,
-    sgst_rate = $12,
-    igst_rate = $13,
-    status = $14,
-    image = $15,
+    cgst_rate = $10,
+    sgst_rate = $11,
+    igst_rate = $12,
+    status = $13,
+    image = $14,
     remarks = CASE
-      WHEN remarks IS NULL THEN $16::jsonb
+      WHEN remarks IS NULL THEN $15::jsonb
       WHEN jsonb_typeof(remarks) = 'array'
-        THEN remarks || $16::jsonb
-      ELSE jsonb_build_array(remarks) || $16::jsonb
+        THEN remarks || $15::jsonb
+      ELSE jsonb_build_array(remarks) || $15::jsonb
     END
-  WHERE id = $17
+  WHERE id = $16
   RETURNING *;
 `;
 
@@ -288,7 +337,6 @@ export default class ProductService {
         rest.barcode ?? existing.barcode,
         rest.hsn_sac_code ?? existing.hsn_sac_code,
         rest.unit ?? existing.unit,
-        rest.base_price ?? existing.base_price,
         rest.cgst_rate ?? existing.cgst_rate,
         rest.sgst_rate ?? existing.sgst_rate,
         rest.igst_rate ?? existing.igst_rate,

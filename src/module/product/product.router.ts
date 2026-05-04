@@ -99,6 +99,8 @@ export async function productRouter(app: FastifyInstance): Promise<void> {
             category_id: { type: "number" },
             company_id: { type: "number" },
             search: { type: ["string", "null"] },
+            firm_id: { type: ["number", "null"] },
+            is_sale: { type: ["boolean", "null"] },
           },
         },
       },

@@ -12,7 +12,9 @@ import {
 export default class ProductController {
   async fetchProducts(data: FetchProductParams) {
     const service = new ProductService();
-
+    if (data.filters.is_sale && !data.filters.firm_id) {
+      throw new AppError("firm id is required", 400)
+    }
     const products_with_code = await service.fetchProducts(data);
 
     const products = products_with_code.data.map((row) => ({

@@ -8,7 +8,6 @@ export interface CreateProductBody {
   barcode: string | null;
   hsn_sac_code: string | null;
   unit: string | null;
-  base_price: number;
   cgst_rate: number | null;
   sgst_rate: number | null;
   igst_rate: number | null;
@@ -31,6 +30,8 @@ export interface FetchProductBody {
   company_id?: number;
   search?: string | null;
   status?: number;
+  is_sale?:boolean;
+  firm_id?:number
 }
 
 export interface FetchProductParams {
@@ -53,9 +54,6 @@ export interface Product {
 
   hsn_sac_code?: string | null;
   unit?: string | null;
-
-  base_price: number;
-
   cgst_rate?: number | null;
   sgst_rate?: number | null;
   igst_rate?: number | null;
@@ -83,7 +81,6 @@ export interface EditProductBody {
   barcode?: string | null;
   hsn_sac_code?: string | null;
   unit?: string | null;
-  base_price?: number;
   cgst_rate?: number | null;
   sgst_rate?: number | null;
   igst_rate?: number | null;
