@@ -1,6 +1,6 @@
 import { executeInTransaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { cns, getRecord } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import { CreatePaymentTransaction, DeletePaymentTransaction, EditPaymentTransaction } from "./paymenttransaction.types";
 
 export class PaymentTransactionService {
@@ -9,7 +9,6 @@ export class PaymentTransactionService {
     data: CreatePaymentTransaction,
     client: any
   ) {
-    cns("payment inserting", data)
 
     if (data.payment_method_id) {
       const isPaymentMethodExist = await getRecord(
@@ -67,8 +66,6 @@ export class PaymentTransactionService {
       transaction_reference,
       business_id, business_ref
     } = data;
-    cns("chaek",[company_id, ref_type, 0, ref_id, business_ref, business_id]
-)
     const payment_exist = await executeInTransaction(
       client,
       `SELECT * FROM payment_transactions

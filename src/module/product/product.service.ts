@@ -170,7 +170,7 @@ export default class ProductService {
     }
 
     // 🛒 Only products that exist in stock (for sale)
-    if (filters.is_sale) {
+    if (filters.is_sale === true) {
       whereConditions.push(`
       EXISTS (
         SELECT 1 FROM stock s2
@@ -187,59 +187,66 @@ export default class ProductService {
     // ============================
     // 📦 DATA QUERY
     // ============================
+    const shouldJoinStock =
+      filters.is_sale === true || !!filters.firm_id;
+
+    const stockJoin = shouldJoinStock
+      ? `
+    LEFT JOIN stock s
+      ON s.product_id = p.id
+  `
+      : "";
     const dataQuery = `
-    SELECT 
-      p.*,
-      c.name AS category_name,
-      b.name AS brand_name,
+  SELECT 
+    p.*,
+    c.name AS category_name,
+    b.name AS brand_name,
 
-      COALESCE(SUM(s.available_quantity), 0) AS total_quantity,
+    ${shouldJoinStock
+        ? `COALESCE(SUM(s.available_quantity), 0) AS total_quantity,
 
-      CASE 
-        WHEN COALESCE(SUM(s.available_quantity), 0) > 0 THEN true
-        ELSE false
-      END AS is_available
+           CASE 
+             WHEN COALESCE(SUM(s.available_quantity), 0) > 0 THEN true
+             ELSE false
+           END AS is_available`
+        : `0 AS total_quantity,
+           false AS is_available`
+      }
 
-    FROM products p
+  FROM products p
 
-    LEFT JOIN product_categories c
-      ON p.category_id = c.id
+  LEFT JOIN product_categories c
+    ON p.category_id = c.id
 
-    LEFT JOIN brand b
-      ON p.brand_id = b.id
+  LEFT JOIN brand b
+    ON p.brand_id = b.id
 
-    LEFT JOIN stock s
-      ON s.product_id = p.id
+  ${stockJoin}
 
-    ${whereClause}
+  ${whereClause}
 
-    GROUP BY p.id, c.name, b.name
+  GROUP BY p.id, c.name, b.name
 
-    ORDER BY p.id DESC
+  ORDER BY p.id DESC
 
-    LIMIT $${queryParams.length + 1}
-    OFFSET $${queryParams.length + 2}
-  `;
+  LIMIT $${queryParams.length + 1}
+  OFFSET $${queryParams.length + 2}
+`;
 
-    // ============================
-    // 🔢 COUNT QUERY
-    // ============================
-    const countQuery = `
-    SELECT COUNT(DISTINCT p.id)
-    FROM products p
+  const countQuery = `
+  SELECT COUNT(DISTINCT p.id)
+  FROM products p
 
-    LEFT JOIN product_categories c
-      ON p.category_id = c.id
+  LEFT JOIN product_categories c
+    ON p.category_id = c.id
 
-    LEFT JOIN brand b
-      ON p.brand_id = b.id
+  LEFT JOIN brand b
+    ON p.brand_id = b.id
 
-    LEFT JOIN stock s
-      ON s.product_id = p.id
+  ${stockJoin}
 
-    ${whereClause}
-  `;
-
+  ${whereClause}
+`;
     const products = await query<Product>(
       dataQuery,
       [...queryParams, limit, offset]
