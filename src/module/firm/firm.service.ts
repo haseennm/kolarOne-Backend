@@ -79,7 +79,7 @@ export default class FirmService {
         logo,
         statusCode,
         JSON.stringify(remark),
-        gstin || null,
+        gstin || isBranchExist.gstin,
         pan_number || null,
         firm_name,
         firm_code,
