@@ -1,6 +1,6 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../config/db";
-import { cns, convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
+import {convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
 import { PaymentTransactionService } from "../paymentTransaction/paymenttransaction.services";
 import { GetReportSalePurchaseLedger } from "../sale/sale/sale.types";
 import LedgerTransactionService from "./ledgertransaction.service";
@@ -56,7 +56,6 @@ export default class LedgerTransactionController {
     })
   }
   async editTransaction(data: EditLedgerTransactionBody) {
-
     const { id, updated_by, status, company_id, amount, entity_type, entity_id, ...rest } = data;
 
     const remark = {
@@ -82,8 +81,8 @@ export default class LedgerTransactionController {
         amount,
         statusCode, entity_type, entity_id
       }, client);
-      cns("transaction in edir", transaction)
       const payment_transactions_service = new PaymentTransactionService()
+      console.log(entity_id, entity_type)
       await payment_transactions_service.editPaymentTransaction({
         company_id,
         amount,
@@ -93,7 +92,7 @@ export default class LedgerTransactionController {
         status: statusCode,
         transaction_reference: null,
         business_id: entity_id,
-        business_ref: entity_type
+        business_ref: convertEntityType(entity_type as EntityKey)
       }, client)
       return `Ledger transaction has been updated successfully.`;
     })

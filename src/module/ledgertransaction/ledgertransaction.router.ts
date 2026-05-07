@@ -99,11 +99,11 @@ export async function ledgerTransactionRouter(app: FastifyInstance) {
             id: {
               type: "number"
             },
-             level: {
+            level: {
               type: "string",
               enum: ["company", "branch", "firm"]
             },
-             company_id: {
+            company_id: {
               type: ["number", "null"]
             },
 
@@ -213,7 +213,14 @@ export async function ledgerTransactionRouter(app: FastifyInstance) {
               type: "string",
               enum: ["Unpaid", "Paid"]
             },
+            entity_type: {
+              type: "string",
+              enum: ["Company", "Branch", "Firm"]
+            },
 
+            entity_id: {
+              type: "number"
+            }
           }
         }
       }
