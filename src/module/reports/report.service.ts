@@ -585,329 +585,134 @@ export class ReportService {
       parties: Object.values(map)
     };
   }
+  private async getGSTINMap(client: any, level: string, ids: number[]) {
+    let query = "";
 
-  // 
-  // END OUTSTANDING
-  // 
-  // private async getGSTSummarySalesOnly(
-  //   client: any,
-  //   firmIds: number[],
-  //   startDate?: string,
-  //   endDate?: string
-  // ) {
+    if (level === "firm") {
+      query = `SELECT id, gstin FROM firm WHERE id = ANY($1)`;
+    }
 
-  //   const hasDate = startDate && endDate;
+    if (level === "branch") {
+      query = `SELECT id, gstin FROM branches WHERE id = ANY($1)`;
+    }
 
-  //   const result = await executeInTransaction(client, `
-  //   SELECT
-  //     SUM(total_cgst) AS cgst,
-  //     SUM(total_sgst) AS sgst,
-  //     SUM(total_igst) AS igst
-  //   FROM (
+    if (level === "company") {
+      query = `SELECT id, gstin FROM company WHERE id = ANY($1)`; // ✅
+    }
 
-  //     SELECT total_cgst, total_sgst, total_igst
-  //     FROM sales
-  //     WHERE status != 0 
-  //     AND firm_id = ANY($1)
-  //     ${hasDate ? `AND invoice_date BETWEEN $2 AND $3` : ``}
+    const res = await executeInTransaction(client, query, [ids]);
+    const map: any = {};
+    res.rows.forEach((r: any) => {
+      map[r.id] = r.gstin;
+    });
 
-  //     UNION ALL
+    return map;
+  }
 
-  //     SELECT -total_cgst, -total_sgst, -total_igst
-  //     FROM sale_return
-  //     WHERE status != 0 
-  //     AND firm_id = ANY($1)
-  //     ${hasDate ? `AND return_date BETWEEN $2 AND $3` : ``}
+  // 🔹 GSTR-3B SUMMARY (UNCHANGED LOGIC)
+ private async getGSTR3BWithGrouping(
+  client: any,
+  firmIds: number[],
+  startDate?: string,
+  endDate?: string
+) {
+  const salesFilter = this.buildDateFilter("s.invoice_date", startDate, endDate, 2);
+  const returnFilter = this.buildDateFilter("sr.return_date", startDate, endDate, 4);
 
-  //   ) t
-  // `, hasDate ? [firmIds, startDate, endDate] : [firmIds]);
+  const result = await executeInTransaction(
+    client,
+    `
+    SELECT 
+      f.gstin,
 
-  //   const row = result.rows[0];
+      SUM(data.cgst) AS total_cgst,
+      SUM(data.sgst) AS total_sgst,
+      SUM(data.igst) AS total_igst
 
-  //   const total_cgst = Number(row.cgst || 0);
-  //   const total_sgst = Number(row.sgst || 0);
-  //   const total_igst = Number(row.igst || 0);
-
-  //   return {
-  //     total_tax: total_cgst + total_sgst + total_igst,
-  //     total_cgst,
-  //     total_sgst,
-  //     total_igst
-  //   };
-  // }
-  // private async getFirmGSTSalesOnly(
-  //   client: any,
-  //   firmIds: number[],
-  //   startDate?: string,
-  //   endDate?: string
-  // ) {
-
-  //   const firms = await executeInTransaction(client, `
-  //   SELECT id, firm_name, gstin
-  //   FROM firm
-  //   WHERE id = ANY($1)
-  // `, [firmIds]);
-
-  //   const result = [];
-
-  //   for (const f of firms.rows) {
-
-  //     const summary = await this.getGSTSummarySalesOnly(
-  //       client,
-  //       [f.id],
-  //       startDate,
-  //       endDate
-  //     );
-
-  //     const hasDate = startDate && endDate;
-
-  //     const invoices = await executeInTransaction(client, `
-  //     SELECT 
-  //       'SALE' as type,
-  //       invoice_number,
-  //       invoice_date,
-  //       net_amount AS taxable_value,
-  //       total_cgst,
-  //       total_sgst,
-  //       total_igst
-  //     FROM sales
-  //     WHERE status != 0 
-  //     AND firm_id = $1
-  //     ${hasDate ? `AND invoice_date BETWEEN $2 AND $3` : ``}
-
-  //     UNION ALL
-
-  //     SELECT 
-  //       'RETURN' as type,
-  //       return_number,
-  //       return_date,
-  //       -sub_total,
-  //       -total_cgst,
-  //       -total_sgst,
-  //       -total_igst
-  //     FROM sale_return
-  //     WHERE status != 0 
-  //     AND firm_id = $1
-  //     ${hasDate ? `AND return_date BETWEEN $2 AND $3` : ``}
-
-  //     ORDER BY invoice_date
-  //   `, hasDate ? [f.id, startDate, endDate] : [f.id]);
-
-  //     result.push({
-  //       firm_id: f.id,
-  //       firm_name: f.firm_name,
-  //       gstin: f.gstin,
-  //       firm_tax_summary: {
-  //         total_cgst: summary.total_cgst,
-  //         total_sgst: summary.total_sgst,
-  //         total_igst: summary.total_igst
-  //       },
-  //       invoices: invoices.rows.map((i: any) => ({
-  //         type: i.type,
-  //         invoice_number: i.invoice_number,
-  //         invoice_date: i.invoice_date,
-  //         taxable_value: Number(i.taxable_value),
-  //         total_cgst: Number(i.total_cgst),
-  //         total_sgst: Number(i.total_sgst),
-  //         total_igst: Number(i.total_igst)
-  //       }))
-  //     });
-  //   }
-
-  //   return result;
-  // }
-  // private async getBranchWiseGST(
-  //   client: any,
-  //   companyId: number,
-  //   startDate?: string,
-  //   endDate?: string
-  // ) {
-
-  //   const branches = await executeInTransaction(client, `
-  //   SELECT id, branch_name
-  //   FROM branches
-  //   WHERE company_id = $1
-  // `, [companyId]);
-
-  //   const result = [];
-
-  //   for (const b of branches.rows) {
-
-  //     const firms = await executeInTransaction(client, `
-  //     SELECT id FROM firm WHERE branch_id = $1
-  //   `, [b.id]);
-
-  //     const firmIds = firms.rows.map((f: any) => f.id);
-
-  //     if (!firmIds.length) continue;
-
-  //     const summary = await this.getGSTSummarySalesOnly(
-  //       client,
-  //       firmIds,
-  //       startDate,
-  //       endDate
-  //     );
-
-  //     const firmData = await this.getFirmGSTSalesOnly(
-  //       client,
-  //       firmIds,
-  //       startDate,
-  //       endDate
-  //     );
-
-  //     result.push({
-  //       branch_id: b.id,
-  //       branch_name: b.branch_name,
-  //       summary,
-  //       firms_data: firmData
-  //     });
-  //   }
-
-  //   return result;
-  // }
-  // async getGSTSalesReport(data: {
-  //   level: "company" | "branch" | "firm";
-  //   firm_id?: number;
-  //   branch_id?: number;
-  //   company_id?: number;
-  //   start_date?: string;
-  //   end_date?: string;
-  // }) {
-
-  //   const { level, firm_id, branch_id, company_id, start_date, end_date } = data;
-
-  //   return transaction(async (client) => {
-
-  //     let firmIds: number[] = [];
-
-  //     if (level === "firm" && firm_id) {
-  //       firmIds = [firm_id];
-  //     }
-
-  //     if (level === "branch" && branch_id) {
-  //       const res = await executeInTransaction(
-  //         client,
-  //         `SELECT id FROM firm WHERE branch_id = $1`,
-  //         [branch_id]
-  //       );
-  //       firmIds = res.rows.map((r: any) => r.id);
-  //     }
-
-  //     if (level === "company" && company_id) {
-  //       const res = await executeInTransaction(client, `
-  //       SELECT f.id
-  //       FROM firm f
-  //       JOIN branches b ON b.id = f.branch_id
-  //       WHERE b.company_id = $1
-  //     `, [company_id]);
-
-  //       firmIds = res.rows.map((r: any) => r.id);
-  //     }
-
-  //     if (!firmIds.length) {
-  //       return { status: "success", data: { summary: {}, firms_data: [] } };
-  //     }
-
-  //     const summary = await this.getGSTSummarySalesOnly(
-  //       client,
-  //       firmIds,
-  //       start_date,
-  //       end_date
-  //     );
-
-  //     /* ===== LEVEL BASED ===== */
-
-  //     if (level === "company") {
-  //       const branchWise = await this.getBranchWiseGST(
-  //         client,
-  //         company_id!,
-  //         start_date,
-  //         end_date
-  //       );
-
-  //       return {
-  //         status: "success",
-  //         data: {
-  //           summary,
-  //           branch_wise: branchWise
-  //         }
-  //       };
-  //     }
-
-  //     /* firm + branch → firm data */
-
-  //     const firms = await this.getFirmGSTSalesOnly(
-  //       client,
-  //       firmIds,
-  //       start_date,
-  //       end_date
-  //     );
-
-  //     return {
-  //       status: "success",
-  //       data: {
-  //         summary,
-  //         firms_data: firms
-  //       }
-  //     };
-  //   });
-  // }
-  // 
-  // 
-  // 
-
-  private async getGSTR3BSummary(
-    client: any,
-    firmIds: number[],
-    startDate?: string,
-    endDate?: string
-  ) {
-    const salesFilter = this.buildDateFilter("invoice_date", startDate, endDate, 2);
-    const returnFilter = this.buildDateFilter("return_date", startDate, endDate, 4);
-
-    const result = await executeInTransaction(client, `
-    SELECT
-      SUM(cgst) AS cgst,
-      SUM(sgst) AS sgst,
-      SUM(igst) AS igst
     FROM (
 
-      SELECT total_cgst AS cgst, total_sgst AS sgst, total_igst AS igst
-      FROM sales
-      WHERE status != 0
-      AND firm_id = ANY($1)
+      -- SALES
+      SELECT 
+        s.firm_id,
+        s.total_cgst AS cgst,
+        s.total_sgst AS sgst,
+        s.total_igst AS igst
+      FROM sales s
+      WHERE s.status != 0
+      AND s.firm_id = ANY($1)
       ${salesFilter.clause}
 
       UNION ALL
 
-      SELECT -total_cgst, -total_sgst, -total_igst
-      FROM sale_return
-      WHERE status != 0
-      AND firm_id = ANY($1)
+      -- RETURNS (NEGATIVE)
+      SELECT 
+        sr.firm_id,
+        -sr.total_cgst,
+        -sr.total_sgst,
+        -sr.total_igst
+      FROM sale_return sr
+      WHERE sr.status != 0
+      AND sr.firm_id = ANY($1)
       ${returnFilter.clause}
 
-    ) t
-  `, [
+    ) data
+
+    JOIN firm f ON f.id = data.firm_id
+
+    GROUP BY f.gstin
+    `,
+    [
       firmIds,
       ...salesFilter.values,
       ...returnFilter.values
-    ]);
+    ]
+  );
 
-    const row = result.rows[0];
+  const rows = result.rows;
+
+  // ✅ GSTIN GROUPS
+  const gstin_groups = rows.map((r: any) => {
+    const cgst = Number(r.total_cgst || 0);
+    const sgst = Number(r.total_sgst || 0);
+    const igst = Number(r.total_igst || 0);
 
     return {
-      total_cgst: Number(row.cgst || 0),
-      total_sgst: Number(row.sgst || 0),
-      total_igst: Number(row.igst || 0),
-      total_tax:
-        Number(row.cgst || 0) +
-        Number(row.sgst || 0) +
-        Number(row.igst || 0)
+      gstin: r.gstin || "UNKNOWN",
+      total_cgst: cgst,
+      total_sgst: sgst,
+      total_igst: igst,
+      total_tax: cgst + sgst + igst
     };
-  }
+  });
+
+  // ✅ TOTAL SUMMARY
+  const summary = gstin_groups.reduce(
+    (acc: any, g: any) => {
+      acc.total_cgst += g.total_cgst;
+      acc.total_sgst += g.total_sgst;
+      acc.total_igst += g.total_igst;
+      acc.total_tax += g.total_tax;
+      return acc;
+    },
+    {
+      total_cgst: 0,
+      total_sgst: 0,
+      total_igst: 0,
+      total_tax: 0
+    }
+  );
+
+  return {
+    summary,
+    gstin_groups
+  };
+}
+
+  // 🔹 GSTR-1 WITH PROPER SEPARATION + GROUPING
   private async getGSTR1Data(
     client: any,
     firmIds: number[],
+    gstin: string,
     startDate?: string,
     endDate?: string
   ) {
@@ -916,50 +721,46 @@ export class ReportService {
     const returnFilter = this.buildDateFilter("sr.return_date", startDate, endDate, 4);
 
     const result = await executeInTransaction(client, `
-    
-    /* SALES (INVOICE) */
-    SELECT 
-      c.customer_type,
-      c.gstin,
-      c.state_code,
-      s.invoice_number,
-      s.invoice_date,
-      s.net_amount AS taxable_value,
-      s.total_cgst,
-      s.total_sgst,
-      s.total_igst,
-      'INVOICE' as doc_type
-    FROM sales s
-    JOIN customers c ON c.id = s.customer_id
-    WHERE s.status != 0
-    AND c.status != 0
-    AND s.firm_id = ANY($1)
-    ${salesFilter.clause}
+      SELECT 
+        c.customer_type,
+        c.gstin,
+        c.state_code,
+        s.invoice_number,
+        s.invoice_date,
+        s.net_amount AS taxable_value,
+        s.total_cgst,
+        s.total_sgst,
+        s.total_igst,
+        'INVOICE' as doc_type
+      FROM sales s
+      JOIN customers c ON c.id = s.customer_id
+      WHERE s.status != 0
+      AND c.status != 0
+      AND s.firm_id = ANY($1)
+      ${salesFilter.clause}
 
-    UNION ALL
+      UNION ALL
 
-    /* SALES RETURN (CREDIT NOTE) */
-    SELECT 
-      c.customer_type,
-      c.gstin,
-      c.state_code,
-      sr.return_number AS invoice_number,
-      sr.return_date AS invoice_date,
-      -sr.sub_total AS taxable_value,
-      -sr.total_cgst,
-      -sr.total_sgst,
-      -sr.total_igst,
-      'CREDIT_NOTE'
-    FROM sale_return sr
-    JOIN sales s ON s.id = sr.sale_id
-    JOIN customers c ON c.id = s.customer_id
-    WHERE sr.status != 0
-    AND s.status != 0
-    AND c.status != 0
-    AND sr.firm_id = ANY($1)
-    ${returnFilter.clause}
-
-  `, [
+      SELECT 
+        c.customer_type,
+        c.gstin,
+        c.state_code,
+        sr.return_number,
+        sr.return_date,
+        -sr.sub_total,
+        -sr.total_cgst,
+        -sr.total_sgst,
+        -sr.total_igst,
+        'CREDIT_NOTE'
+      FROM sale_return sr
+      JOIN sales s ON s.id = sr.sale_id
+      JOIN customers c ON c.id = s.customer_id
+      WHERE sr.status != 0
+      AND s.status != 0
+      AND c.status != 0
+      AND sr.firm_id = ANY($1)
+      ${returnFilter.clause}
+    `, [
       firmIds,
       ...salesFilter.values,
       ...returnFilter.values
@@ -967,50 +768,71 @@ export class ReportService {
 
     const rows = result.rows;
 
+    // ✅ STEP 1: Separate
+    const invoices = rows.filter((r: any) => r.doc_type === "INVOICE");
+    const creditNotes = rows.filter((r: any) => r.doc_type === "CREDIT_NOTE");
+
+    // ✅ STEP 2: Split
+    const B2B = invoices.filter((r: any) => r.customer_type === "B2B");
+    const B2C = invoices.filter((r: any) => r.customer_type !== "B2B");
+
+    // ✅ STEP 3: GROUP B2B BY CUSTOMER GSTIN
+    const groupedB2B = Object.values(
+      B2B.reduce((acc: any, row: any) => {
+        const key = row.gstin;
+
+        if (!acc[key]) {
+          acc[key] = {
+            gstin: row.gstin,
+            invoices: [],
+            total_taxable: 0,
+            total_tax: 0
+          };
+        }
+
+        acc[key].invoices.push(row);
+        acc[key].total_taxable += Number(row.taxable_value);
+        acc[key].total_tax +=
+          Number(row.total_cgst) +
+          Number(row.total_sgst) +
+          Number(row.total_igst);
+
+        return acc;
+      }, {})
+    );
+
+    // ✅ STEP 4: GROUP B2C BY STATE
+    const groupedB2C = Object.values(
+      B2C.reduce((acc: any, row: any) => {
+        const key = row.state_code;
+
+        if (!acc[key]) {
+          acc[key] = {
+            state_code: row.state_code,
+            total_taxable: 0,
+            total_tax: 0
+          };
+        }
+
+        acc[key].total_taxable += Number(row.taxable_value);
+        acc[key].total_tax +=
+          Number(row.total_cgst) +
+          Number(row.total_sgst) +
+          Number(row.total_igst);
+
+        return acc;
+      }, {})
+    );
+
     return {
-      B2B: rows.filter((r: any) => r.customer_type === "B2B"),
-      B2C: rows.filter((r: any) => r.customer_type !== "B2B"),
-      credit_notes: rows.filter((r: any) => r.doc_type === "CREDIT_NOTE")
+      gstin, // 🔥 MAIN GROUPING KEY
+      B2B: groupedB2B,
+      B2C: groupedB2C,
+      credit_notes: creditNotes
     };
   }
-  // private async getBranchWiseData(
-  //   client: any,
-  //   company_id: number,
-  //   startDate?: string,
-  //   endDate?: string
-  // ) {
 
-  //   const branches = await executeInTransaction(client, `
-  //   SELECT id, branch_name
-  //   FROM branches
-  //   WHERE company_id = $1
-  // `, [company_id]);
-
-  //   const result = [];
-
-  //   for (const b of branches.rows) {
-
-  //     const firms = await executeInTransaction(client, `
-  //     SELECT id FROM firm WHERE branch_id = $1
-  //   `, [b.id]);
-
-  //     const firmIds = firms.rows.map((f: any) => f.id);
-
-  //     const summary = await this.getGSTR3BSummary(
-  //       client,
-  //       firmIds,
-  //       startDate,
-  //       endDate
-  //     );
-
-  //     result.push({
-  //       branch_name: b.branch_name,
-  //       summary
-  //     });
-  //   }
-
-  //   return result;
-  // }
+  // 🔥 MAIN ENTRY
   async getGSTReport(data: GetGSTReportBody) {
 
     const { type, level, firm_id, branch_id, company_id, start_date, end_date } = data;
@@ -1018,95 +840,72 @@ export class ReportService {
     return transaction(async (client) => {
 
       let firmIds: number[] = [];
+      let entityIds: number[] = [];
 
-      // ✅ FIRM LEVEL
+      // 🔹 RESOLVE IDS
       if (level === "firm" && firm_id) {
         firmIds = [firm_id];
+        entityIds = [firm_id];
       }
 
-      // ✅ BRANCH LEVEL
       if (level === "branch" && branch_id) {
+        entityIds = [branch_id];
+
         const res = await executeInTransaction(
           client,
           `SELECT id FROM firm WHERE branch_id = $1`,
           [branch_id]
         );
+
         firmIds = res.rows.map((r: any) => r.id);
       }
 
-      // ✅ COMPANY LEVEL (FIXED PROPERLY)
       if (level === "company" && company_id) {
+        entityIds = [company_id];
 
-        const branches = await executeInTransaction(client, `
-        SELECT id, branch_name
-        FROM branches
-        WHERE company_id = $1
-      `, [company_id]);
-
-        const result = [];
-
-        for (const b of branches.rows) {
-
-          const firms = await executeInTransaction(
-            client,
-            `SELECT id FROM firm WHERE branch_id = $1`,
-            [b.id]
-          );
-
-          const ids = firms.rows.map((f: any) => f.id);
-
-          // 🔥 IMPORTANT: HANDLE TYPE HERE
-          if (type === "GSTR-3B") {
-
-            const summary = await this.getGSTR3BSummary(
-              client,
-              ids,
-              start_date,
-              end_date
-            );
-
-            result.push({
-              branch_name: b.branch_name,
-              summary
-            });
-
-          } else if (type === "GSTR-1") {
-
-            const gstr1 = await this.getGSTR1Data(
-              client,
-              ids,
-              start_date,
-              end_date
-            );
-
-            result.push({
-              branch_name: b.branch_name,
-              data: gstr1
-            });
-          }
-        }
-
-        return {
-          status: "success",
-          data: result
-        };
-      }
-
-      // ✅ NON-COMPANY FLOW (firm / branch)
-
-      if (type === "GSTR-3B") {
-
-        const summary = await this.getGSTR3BSummary(
+        // 🔹 Step 1: Get branch IDs
+        const branchRes = await executeInTransaction(
           client,
-          firmIds,
-          start_date,
-          end_date
+          `SELECT id FROM branches WHERE company_id = $1`,
+          [company_id]
         );
 
-        return {
-          status: "success",
-          data: summary
-        };
+        const branchIds = branchRes.rows.map((b: any) => b.id);
+
+        if (branchIds.length === 0) {
+          firmIds = [];
+          return;
+        }
+
+        // 🔹 Step 2: Get firm IDs using ANY()
+        const firmRes = await executeInTransaction(
+          client,
+          `SELECT id FROM firm WHERE branch_id = ANY($1)`,
+          [branchIds]
+        );
+
+        firmIds = firmRes.rows.map((r: any) => r.id);
+      }
+
+      // 🔹 GET GSTIN
+      const gstinMap = await this.getGSTINMap(client, level, entityIds);
+      const gstin = gstinMap[entityIds[0]];
+
+      // 🔹 TYPE HANDLING
+      if (type === "GSTR-3B") {
+
+   const report = await this.getGSTR3BWithGrouping(
+  client,
+  firmIds,
+  start_date,
+  end_date
+);
+
+return {
+  status: "success",
+  level,
+  data: report
+};
       }
 
       if (type === "GSTR-1") {
@@ -1114,6 +913,7 @@ export class ReportService {
         const gstr1 = await this.getGSTR1Data(
           client,
           firmIds,
+          gstin,
           start_date,
           end_date
         );
