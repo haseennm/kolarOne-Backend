@@ -2,20 +2,38 @@ export interface CreateStaffBody {
   role?: number[];
   email: string;
   password?: string;
-  designation?: string;
   full_name: string;
-
+  father_name?: string;
+  spouse_name?: string;
   address?: string;
   phone_number: string;
-  status: string;
+  residence_phone?: string;
+  date_of_birth?: string;
+  driving_license_no?: string;
+  languages_known?: string[]
+  passport_no?: string;
+  qualification?: string;
+  technical_qualification?: string;
+  salary?: number;
+  previous_organization?: string;
+  blood_group?: string;
+  identification_mark?: string;
+  working_from?: string; // "09:00"
+  working_to?: string;   // "18:00"
+  expected_salary?: number;
+  designation?: string;
+  status?: "Active" | "Inactive";
   entity_type: string;
   entity_id: number;
   company_id: number;
-
-  finger_id: string;
-  salary?: number;
+  branch_id?: number;
+  finger_id?: string;
   created_by: string;
-  branch_id?: number
+  image?: string | null //passport image
+  attachments?: {
+    type: string;
+    url: string;
+  }[];
 }
 
 export interface CreateStaffParams
@@ -56,35 +74,52 @@ export type StaffCountResult = {
 export interface EditStaffBody {
   id: string;
   company_id: number;
-  designation?: string;
-  role?: string;
-
+  updated_by: string;
+  entity_type: string;
+  entity_id: number;
+  role?: number[];
   full_name?: string;
-
+  father_name?: string;
+  spouse_name?: string;
   address?: string;
   phone_number?: string;
-
-  entity_type?: string;
-  entity_id?: number;
-
-  finger_id?: string;
+  residence_phone?: string;
+  designation?: string;
+  previous_organization?: string;
   salary?: number;
+  expected_salary?: number;
+  finger_id?: string;
+  blood_group?: string;
+  identification_mark?: string;
+  driving_license_no?: string;
+  passport_no?: string;
+  qualification?: string;
+  technical_qualification?: string;
+  working_from?: string;
+  working_to?: string;
+  date_of_birth?: string;
+  languages_known?: string[];
+  image?: string;
 
-  status?: number;
-  updated_by: string;
+  attachments?: {
+    type: string;
+    url: string;
+  }[];
+
+  status?: "active" | "inactive" | "terminated";
 }
 
 export interface EditStaffParams
   extends Omit<EditStaffBody, "status" | "updated_by"> {
   remark: object;
-  statusCode: number;
-  entity_table: string;
+  statusCode: number | undefined;
 }
 
 export interface DeleteStaffBody {
   r_id: string;
   company_id: number;
   entity_id: number;
+  entity_type: number;
   deleted_by: string;
 }
 

@@ -1,6 +1,6 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { getRecord } from "../../utils/extra";
+import { cns, getRecord } from "../../utils/extra";
 import { CreateStaffParams, DeleteStaffParams, EditStaffParams, FetchDbStaff, FetchStaffParams, StaffCountResult, StaffLoginBody } from "./staff.types";
 
 
@@ -24,10 +24,26 @@ export default class StaffService {
       salary,
       entity_table,
       branch_id,
-      designation
+      designation, attachments,
+      blood_group,
+      date_of_birth,
+      driving_license_no,
+      expected_salary,
+      father_name,
+      identification_mark,
+      image,
+      languages_known,
+      passport_no,
+      previous_organization,
+      qualification,
+      residence_phone,
+      spouse_name,
+      technical_qualification,
+      working_from,
+      working_to,
+
     } = data;
 
-    // Check company
     const isCompanyExist = await getRecord(
       company_id,
       "company",
@@ -113,33 +129,59 @@ export default class StaffService {
     }
 
     const queryText = `
-    INSERT INTO staff (
-      company_id,
-      entity_type,
-      entity_id,
-      role,
-      status,
-      email,
-      password_hash,
-      full_name,
-      phone_number,
-      address,
-      salary,
-      finger_id,
-      remarks,
-      designation
-    )
-    VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
-    )
-    RETURNING *;
-  `;
+  INSERT INTO staff (
+    company_id,
+    entity_type,
+    entity_id,
+    role,
+    status,
+    email,
+    password_hash,
+    full_name,
+    phone_number,
+    address,
+    salary,
+    finger_id,
+    remarks,
+    designation,
 
+    image,
+    languages_known,
+    attachments,
+
+    father_name,
+    spouse_name,
+    residence_phone,
+    date_of_birth,
+    driving_license_no,
+    passport_no,
+
+    qualification,
+    technical_qualification,
+    previous_organization,
+
+    blood_group,
+    identification_mark,
+
+    working_from,
+    working_to,
+    expected_salary
+  )
+  VALUES (
+    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
+    $15,$16,$17,
+    $18,$19,$20,$21,$22,$23,
+    $24,$25,$26,
+    $27,$28,
+    $29,$30,$31
+  )
+  RETURNING *;
+`;
     const values = [
       company_id,
       entity_type,
       entity_id,
-      role, // SMALLINT[]
+      role,
       statusCode,
       email,
       password_hash,
@@ -147,11 +189,32 @@ export default class StaffService {
       phone_number,
       address,
       salary ?? 0,
-      finger_id,
+      finger_id ?? null,
       JSON.stringify(remark || {}),
-      designation
-    ];
+      designation,
 
+      image ?? null,
+      languages_known ?? null, // TEXT[]
+      JSON.stringify(attachments || []), // JSONB
+
+      father_name ?? null,
+      spouse_name ?? null,
+      residence_phone ?? null,
+      date_of_birth ?? null,
+      driving_license_no ?? null,
+      passport_no ?? null,
+
+      qualification ?? null,
+      technical_qualification ?? null,
+      previous_organization ?? null,
+
+      blood_group ?? null,
+      identification_mark ?? null,
+
+      working_from ?? null,
+      working_to ?? null,
+      expected_salary ?? null
+    ];
     const { rows } = await executeInTransaction(client, queryText, values);
 
     return rows[0];
@@ -255,104 +318,138 @@ OFFSET $${values.length + 2}
   }
 
   async updateStaff(data: EditStaffParams, client: any) {
-
     const {
       id,
-      company_id,
       role,
       full_name,
+      father_name,
+      spouse_name,
       address,
       phone_number,
-      entity_type,
-      entity_id,
+      residence_phone,
       finger_id,
       salary,
+      expected_salary,
       statusCode,
       remark,
-      entity_table,
-      designation
+      designation,
+      previous_organization,
+      blood_group,
+      identification_mark,
+      date_of_birth,
+      driving_license_no,
+      passport_no,
+      qualification,
+      technical_qualification,
+      working_from,
+      working_to,
+      languages_known,
+      image,
+      attachments,
+      entity_id,
+      entity_type
     } = data;
 
-    const isStaffExist = await getRecord(
-      id,
-      "staff",
-      "company_id",
-      company_id,
-      client
+    const isStaffExistResult = await executeInTransaction(
+      client,
+      `SELECT * FROM staff WHERE entity_id =$1 AND entity_type =$2 AND status!=$3`, [entity_id, entity_type, 0]
     );
-
+    const isStaffExist = isStaffExistResult.rows[0]
     if (!isStaffExist) {
       throw new AppError("Staff not found", 404);
     }
-    const isFinger_exist = await executeInTransaction(
-      client,
-      `
-  SELECT id
-  FROM staff
-  WHERE finger_id = $1
-  AND entity_id = $2
-  AND entity_type = $3
-  `,
-      [finger_id, entity_id, entity_type]
-    );
 
-    if (isFinger_exist.rowCount) {
-      throw new AppError("Finger print already exist", 400);
-    }
-    if (entity_id) {
-      const isEntityExist = await getRecord(
-        entity_id,
-        entity_table,
-        "company_id",
-        company_id,
-        client
+    if (finger_id) {
+      const isFingerExist = await executeInTransaction(
+        client,
+        `
+      SELECT id
+      FROM staff
+      WHERE finger_id = $1
+      AND entity_id = $2
+      AND entity_type = $3
+      AND id != $4
+      `,
+        [
+          finger_id,
+          isStaffExist.entity_id,
+          isStaffExist.entity_type,
+          id,
+        ]
       );
 
-      if (!isEntityExist) {
-        throw new AppError(`${entity_table} not found`, 404);
+      if (isFingerExist.rowCount) {
+        throw new AppError("Finger print already exist", 400);
       }
     }
+
     const updateQuery = `
     UPDATE staff
     SET
-      role = $1,
-      full_name = $2,
-      address = $3,
-      phone_number = $4,
-      entity_type = $5,
-      entity_id = $6,
-      finger_id = $7,
-      salary = $8,
-      status = $9,
+      role = COALESCE($1, role),
+      full_name = COALESCE($2, full_name),
+      father_name = COALESCE($3, father_name),
+      spouse_name = COALESCE($4, spouse_name),
+      address = COALESCE($5, address),
+      phone_number = COALESCE($6, phone_number),
+      residence_phone = COALESCE($7, residence_phone),
+      finger_id = COALESCE($8, finger_id),
+      salary = COALESCE($9, salary),
+      expected_salary = COALESCE($10, expected_salary),
+      status = COALESCE($11, status),
+      designation = COALESCE($12, designation),
+      previous_organization = COALESCE($13, previous_organization),
+      blood_group = COALESCE($14, blood_group),
+      identification_mark = COALESCE($15, identification_mark),
+      date_of_birth = COALESCE($16, date_of_birth),
+      driving_license_no = COALESCE($17, driving_license_no),
+      passport_no = COALESCE($18, passport_no),
+      qualification = COALESCE($19, qualification),
+      technical_qualification = COALESCE($20, technical_qualification),
+      working_from = COALESCE($21, working_from),
+      working_to = COALESCE($22, working_to),
+      languages_known = COALESCE($23, languages_known),
+      image = COALESCE($24, image),
+      attachments = COALESCE($25, attachments),
       remarks =
         CASE
-          WHEN remarks IS NULL THEN $10::jsonb
+          WHEN remarks IS NULL THEN $26::jsonb
           WHEN jsonb_typeof(remarks) = 'array'
-            THEN remarks || $10::jsonb
-          ELSE jsonb_build_array(remarks) || $10::jsonb
-        END,
-        designation = $11
-    WHERE id = $12
+            THEN remarks || $26::jsonb
+          ELSE jsonb_build_array(remarks) || $26::jsonb
+        END
+    WHERE id = $27
     RETURNING *;
   `;
 
-    const status =
-      statusCode === 99
-        ? isStaffExist.status
-        : statusCode;
-
+    // ✅ Values
     const values = [
-      role ? role : isStaffExist.role,
+      role ?? isStaffExist.role,
       full_name ?? isStaffExist.full_name,
+      father_name ?? isStaffExist.father_name,
+      spouse_name ?? isStaffExist.spouse_name,
       address ?? isStaffExist.address,
       phone_number ?? isStaffExist.phone_number,
-      entity_type ?? isStaffExist.entity_type,
-      entity_id ?? isStaffExist.entity_id,
+      residence_phone ?? isStaffExist.residence_phone,
       finger_id ?? isStaffExist.finger_id,
       salary ?? isStaffExist.salary,
-      status,
-      JSON.stringify(remark),
-      designation,
+      expected_salary ?? isStaffExist.expected_salary,
+      statusCode ?? isStaffExist.status,
+      designation ?? isStaffExist.designation,
+      previous_organization ?? isStaffExist.previous_organization,
+      blood_group ?? isStaffExist.blood_group,
+      identification_mark ?? isStaffExist.identification_mark,
+      date_of_birth ?? isStaffExist.date_of_birth,
+      driving_license_no ?? isStaffExist.driving_license_no,
+      passport_no ?? isStaffExist.passport_no,
+      qualification ?? isStaffExist.qualification,
+      technical_qualification ?? isStaffExist.technical_qualification,
+      working_from ?? isStaffExist.working_from,
+      working_to ?? isStaffExist.working_to,
+      languages_known ?? isStaffExist.languages_known,
+      image ?? isStaffExist.image,
+      attachments ? JSON.stringify(attachments) : isStaffExist.attachments,
+      JSON.stringify(remark || {}),
       id
     ];
 
@@ -363,9 +460,9 @@ OFFSET $${values.length + 2}
 
   async deleteStaff(data: DeleteStaffParams, client: any) {
 
-    const { r_id, remark, company_id, entity_id } = data;
+    const { r_id, remark, company_id, entity_id, entity_type } = data;
 
-
+    console.log(data)
     const isStaffExist = await getRecord(
       r_id,
       "staff",
@@ -377,9 +474,12 @@ OFFSET $${values.length + 2}
     if (!isStaffExist) {
       throw new AppError("Staff not found or already deleted", 404);
     }
-
     if (Number(isStaffExist.entity_id) !== entity_id) {
       throw new AppError("Entity id not matching", 400);
+    }
+    if (isStaffExist.entity_type !== entity_type) {
+      console.log(isStaffExist.entity_type, entity_type)
+      throw new AppError("Entity type not matching", 400);
     }
 
     const queryText = `

@@ -8,107 +8,160 @@ import {
 } from "./staff.types";
 
 import StaffController from "./staff.controller";
+import path from "path";
+import fs from "fs";
+import { pipeline } from "stream/promises";
 
 export async function staffRouter(app: FastifyInstance) {
 
   // CREATE STAFF 
-  app.post<{ Body: CreateStaffBody }>(
-    "/create",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: [
-            "company_id",
-            "entity_type",
-            "entity_id",
-            "email",
-            // "password",
-            "full_name",
-            // "role",
-            "created_by"
-          ],
-          properties: {
+  app.post("/create", async (request, reply) => {
+    const parts = request.parts();
 
-            company_id: { type: "number" },
+    const body: any = {};
+    let imagePath: string | null = null;
 
-            entity_type: {
-              type: "string",
-              enum: ["Company", "Branch", "Firm"]
-            },
+    const attachments: { type: string; url: string }[] = [];
+    const uploadedFiles: string[] = [];
 
-            entity_id: { type: "number" },
+    try {
+      const uploadDir = path.join(process.cwd(), "uploads");
 
-            branch_id: { type: "number" },
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
 
-            email: {
-              type: "string",
-              format: "email"
-            },
+      for await (const part of parts) {
+        // ================= FILE HANDLING =================
+        if (part.type === "file") {
+          if (!part.filename) continue;
 
-            password: {
-              type: "string",
-              minLength: 6
-            },
+          const fileName = `${Date.now()}-${part.filename}`;
+          const fullPath = path.join(uploadDir, fileName);
 
-            full_name: {
-              type: "string",
-              minLength: 2
-            },
+          await pipeline(part.file, fs.createWriteStream(fullPath));
 
-            role: {
-              type: "array",
-              items: { type: "number" }
-            },
+          uploadedFiles.push(fullPath);
 
-            phone_number: { type: "string" },
-            designation: { type: "string" },
+          const fileUrl = `/uploads/${fileName}`;
 
-            address: { type: "string" },
+          // Image
+          if (part.fieldname === "image") {
+            imagePath = fileUrl;
+          }
 
-            salary: { type: "number" },
+          // Attachment file
+          else if (part.fieldname.startsWith("attachments")) {
+            const match = part.fieldname.match(/attachments\[(\d+)\]\[file\]/);
 
-            finger_id: { type: "string" },
+            if (match) {
+              const index = Number(match[1]);
 
-            status: {
-              type: "string",
-              enum: ["Active", "Inactive"]
-            },
-
-            created_by: { type: "string" }
-
-          },
-
-          allOf: [
-            {
-              if: {
-                properties: {
-                  entity_type: { const: "Firm" }
-                }
-              },
-              then: {
-                required: ["branch_id"]
+              if (!attachments[index]) {
+                attachments[index] = { type: "", url: "" };
               }
+
+              attachments[index].url = fileUrl;
             }
-          ]
+          }
+        }
+
+        // ================= FIELD HANDLING =================
+        else {
+          const field = part.fieldname.trim();
+          let value: any = part.value;
+
+          // Multi-value fields
+          if (field === "role" || field === "languages_known") {
+            if (!body[field]) {
+              body[field] = [];
+            }
+            body[field].push(value);
+            continue;
+          }
+
+          // Attachment type parsing
+          if (field.startsWith("attachments[")) {
+            const match = field.match(/attachments\[(\d+)\]\[(\w+)\]/);
+
+            if (match) {
+              const index = Number(match[1]);
+              const key = match[2] as "type" | "url";
+
+              if (!attachments[index]) {
+                attachments[index] = { type: "", url: "" };
+              }
+
+              attachments[index][key] = value;
+            }
+            continue;
+          }
+
+          body[field] = value;
         }
       }
-    },
-    async (
-      request: FastifyRequest<{ Body: CreateStaffBody }>,
-      reply: FastifyReply
-    ) => {
 
+      // ================= VALIDATION =================
+      const requiredFields = [
+        "full_name",
+        "phone_number",
+        "entity_type",
+        "entity_id",
+        "company_id",
+        "created_by",
+      ];
+
+      for (const field of requiredFields) {
+        if (!body[field]) {
+          throw new Error(`${field} is required`);
+        }
+      }
+
+      // ================= TYPE CONVERSION =================
+      body.entity_id = Number(body.entity_id);
+      body.company_id = Number(body.company_id);
+      body.branch_id = body.branch_id ? Number(body.branch_id) : null;
+
+      body.salary = body.salary ? Number(body.salary) : null;
+      body.expected_salary = body.expected_salary
+        ? Number(body.expected_salary)
+        : null;
+
+      // Convert roles to numbers
+      if (body.role) {
+        body.role = body.role.map((r: any) => Number(r));
+      }
+
+      body.image = imagePath;
+      body.attachments = attachments.filter(Boolean);
+
+      // ================= DEBUG LOG =================
+      console.log("FINAL BODY:", body);
+
+      // ================= CONTROLLER =================
       const controller = new StaffController();
-      const data = await controller.createStaff(request.body);
+
+      const result = await controller.createStaff(body);
 
       return reply.code(201).send({
         status: "Success",
-        message: data
+        message: result,
       });
+    } catch (error: any) {
+      // Cleanup uploaded files on error
+      for (const file of uploadedFiles) {
+        if (fs.existsSync(file)) {
+          fs.unlinkSync(file);
+        }
+      }
 
+      console.error(error);
+      return reply.status(500).send({
+        status: "Error",
+        message: error.message,
+      });
     }
-  );
+  });
 
 
 
@@ -199,67 +252,139 @@ export async function staffRouter(app: FastifyInstance) {
 
 
   // EDIT STAFF
-  app.post<{ Body: EditStaffBody }>(
-    "/edit",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: ["id", "company_id", "updated_by"],
-          properties: {
+  app.post("/edit", async (request, reply) => {
+    const parts = request.parts();
 
-            id: { type: "string" },
+    const body: any = {};
+    let imagePath: string | null = null;
 
-            company_id: { type: "number" },
+    const attachments: { type: string; url: string }[] = [];
+    const uploadedFiles: string[] = [];
 
-            updated_by: { type: "string" },
+    try {
+      const uploadDir = path.join(process.cwd(), "uploads");
 
-            role: {
-              type: "array",
-              items: { type: "number" }
-            },
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
 
-            full_name: { type: "string" },
+      for await (const part of parts) {
+        if (part.type === "file") {
+          if (!part.filename) continue;
 
-            address: { type: "string" },
+          const fileName = `${Date.now()}-${part.filename}`;
+          const fullPath = path.join(uploadDir, fileName);
 
-            phone_number: { type: "string" },
+          await pipeline(part.file, fs.createWriteStream(fullPath));
 
-            entity_type: {
-              type: "string",
-              enum: ["Company", "Branch", "Firm"]
-            },
+          uploadedFiles.push(fullPath);
 
-            entity_id: { type: "number" },
+          const fileUrl = `/uploads/${fileName}`;
 
-            finger_id: { type: "string" },
+          if (part.fieldname === "image") {
+            imagePath = fileUrl;
+          }
 
-            salary: { type: "number" },
+          else if (part.fieldname.startsWith("attachments")) {
+            const match = part.fieldname.match(/attachments\[(\d+)\]\[file\]/);
 
-            status: {
-              type: "string",
-              enum: ["Active", "Inactive"]
+            if (match) {
+              const index = Number(match[1]);
+
+              if (!attachments[index]) {
+                attachments[index] = { type: "", url: "" };
+              }
+
+              attachments[index].url = fileUrl;
             }
-
           }
         }
+
+        else {
+          const field = part.fieldname.trim();
+          let value: any = part.value;
+
+          if (field === "languages_known") {
+            if (!body.languages_known) body.languages_known = [];
+            body.languages_known.push(value);
+            continue;
+          }
+
+          if (field === "role") {
+            if (!body.role) body.role = [];
+            body.role.push(Number(value));
+            continue;
+          }
+
+          if (field.startsWith("attachments[")) {
+            const match = field.match(/attachments\[(\d+)\]\[(\w+)\]/);
+
+            if (match) {
+              const index = Number(match[1]);
+              const key = match[2];
+
+              if (!attachments[index]) {
+                attachments[index] = { type: "", url: "" };
+              }
+
+              if (key === "type") {
+                attachments[index].type = value;
+              }
+            }
+            continue;
+          }
+
+          body[field] = value;
+        }
       }
-    },
-    async (
-      request: FastifyRequest<{ Body: EditStaffBody }>,
-      reply: FastifyReply
-    ) => {
+
+      const requiredFields = ["id", "updated_by", "entity_id", "entity_type"];
+
+      for (const field of requiredFields) {
+        if (!body[field]) {
+          throw new Error(`${field} is required`);
+        }
+      }
+      body.company_id = body.company_id ? Number(body.company_id) : undefined;
+      body.entity_id = body.entity_id ? Number(body.entity_id) : undefined;
+
+      body.salary = body.salary ? Number(body.salary) : undefined;
+      body.expected_salary = body.expected_salary
+        ? Number(body.expected_salary)
+        : undefined;
+
+      if (imagePath) body.image = imagePath;
+
+      if (attachments.length) {
+        body.attachments = attachments.filter(Boolean);
+      }
+
+      console.log("EDIT BODY:", body);
 
       const controller = new StaffController();
-      const data = await controller.editStaff(request.body);
+
+      const result = await controller.editStaff(body);
 
       return reply.code(200).send({
         status: "Success",
-        message: data
+        message: result,
       });
 
+    } catch (error: any) {
+      for (const file of uploadedFiles) {
+        if (fs.existsSync(file)) {
+          fs.unlinkSync(file);
+        }
+      }
+
+      console.error(error);
+
+      return reply.status(500).send({
+        status: "Error",
+        message: error.message,
+      });
     }
-  );
+  });
 
 
 
@@ -274,11 +399,9 @@ export async function staffRouter(app: FastifyInstance) {
           properties: {
 
             r_id: { type: "string" },
-
             company_id: { type: "number" },
-
             entity_id: { type: "number" },
-
+            entity_type: { type: "string", enum: ["B", "C", "F"] },
             deleted_by: { type: "string" }
 
           }

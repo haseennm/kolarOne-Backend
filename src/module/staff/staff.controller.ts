@@ -1,7 +1,7 @@
 import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { generateToken, hashPassword, verifyPassword } from "../../utils/auth.util";
-import { convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText } from "../../utils/extra";
+import { cns, convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText } from "../../utils/extra";
 import StaffService from "./staff.service";
 import { CreateStaffBody, DeleteStaffBody, EditStaffBody, StaffLoginBody } from "./staff.types";
 
@@ -9,9 +9,18 @@ export default class LedgerTransactionController {
 
 
   async createStaff(data: CreateStaffBody) {
-
+    cns("request.body",data)
     let { created_by, status, entity_type, password, ...rest } = data;
+    const validBloodGroups = [
+      "A+", "A-",
+      "B+", "B-",
+      "AB+", "AB-",
+      "O+", "O-"
+    ];
 
+    if (data.blood_group && !validBloodGroups.includes(data.blood_group)) {
+      throw new AppError("Invalid blood group", 400);
+    }
     const remark = {
       action: "Created",
       created_by,
@@ -22,7 +31,7 @@ export default class LedgerTransactionController {
       let hashed = undefined
       if (password) { hashed = await hashPassword(password) }
 
-      const statusCode = getStatusCode(status);
+      const statusCode = getStatusCode(status ?? "Active");
       entity_type = convertEntityType(entity_type as EntityKey);
       const service = new StaffService();
       let entity_table = ""
@@ -69,6 +78,16 @@ export default class LedgerTransactionController {
       ...rest
     } = data;
 
+    const validBloodGroups = [
+      "A+", "A-",
+      "B+", "B-",
+      "AB+", "AB-",
+      "O+", "O-"
+    ];
+
+    if (data.blood_group && !validBloodGroups.includes(data.blood_group)) {
+      throw new AppError("Invalid blood group", 400);
+    }
     const remark = {
       action: "Updated",
       updated_by,
@@ -82,7 +101,7 @@ export default class LedgerTransactionController {
 
     return transaction(async (client) => {
 
-      let statusCode = 99;
+      let statusCode = undefined;
 
       if (typeof status === "string") {
         statusCode = getStatusCode(status);
@@ -96,8 +115,8 @@ export default class LedgerTransactionController {
           id,
           company_id,
           remark,
-          statusCode,
-          entity_table
+          entity_type,
+          statusCode
         },
         client
       );
@@ -109,7 +128,7 @@ export default class LedgerTransactionController {
 
   async deleteStaff(data: DeleteStaffBody) {
 
-    const { deleted_by, company_id, ...rest } = data;
+    const { deleted_by, ...rest } = data;
 
     return transaction(async (client) => {
 
@@ -124,7 +143,6 @@ export default class LedgerTransactionController {
       const staff = await service.deleteStaff(
         {
           ...rest,
-          company_id,
           remark,
         },
         client
