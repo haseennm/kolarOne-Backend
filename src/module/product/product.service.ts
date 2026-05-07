@@ -123,7 +123,6 @@ export default class ProductService {
 
   async fetchProducts(params: FetchProductParams) {
     const { filters = {} } = params;
-
     const limit = filters.limit ?? 10;
     const page = filters.page ?? 1;
     const offset = (page - 1) * limit;
@@ -164,7 +163,7 @@ export default class ProductService {
     }
 
     // 🏬 Firm filter (important for stock)
-    if (filters.firm_id) {
+    if (filters.firm_id && filters.is_sale === true) {
       queryParams.push(filters.firm_id);
       whereConditions.push(`s.firm_id = $${queryParams.length}`);
     }
@@ -233,7 +232,7 @@ export default class ProductService {
   OFFSET $${queryParams.length + 2}
 `;
 
-  const countQuery = `
+    const countQuery = `
   SELECT COUNT(DISTINCT p.id)
   FROM products p
 
