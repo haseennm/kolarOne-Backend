@@ -436,7 +436,7 @@ export class ReportService {
   ) {
 
     const dateFilter = this.buildDateFilter(
-      "pb_date_placeholder", // will NOT be used directly
+      "pb_date_placeholder",
       startDate,
       endDate
     );
@@ -597,7 +597,7 @@ export class ReportService {
     }
 
     if (level === "company") {
-      query = `SELECT id, gstin FROM company WHERE id = ANY($1)`; // ✅
+      query = `SELECT id, gstin FROM company WHERE id = ANY($1)`; 
     }
 
     const res = await executeInTransaction(client, query, [ids]);
@@ -609,19 +609,18 @@ export class ReportService {
     return map;
   }
 
-  // 🔹 GSTR-3B SUMMARY (UNCHANGED LOGIC)
- private async getGSTR3BWithGrouping(
-  client: any,
-  firmIds: number[],
-  startDate?: string,
-  endDate?: string
-) {
-  const salesFilter = this.buildDateFilter("s.invoice_date", startDate, endDate, 2);
-  const returnFilter = this.buildDateFilter("sr.return_date", startDate, endDate, 4);
+  private async getGSTR3BWithGrouping(
+    client: any,
+    firmIds: number[],
+    startDate?: string,
+    endDate?: string
+  ) {
+    const salesFilter = this.buildDateFilter("s.invoice_date", startDate, endDate, 2);
+    const returnFilter = this.buildDateFilter("sr.return_date", startDate, endDate, 4);
 
-  const result = await executeInTransaction(
-    client,
-    `
+    const result = await executeInTransaction(
+      client,
+      `
     SELECT 
       f.gstin,
 
@@ -661,54 +660,51 @@ export class ReportService {
 
     GROUP BY f.gstin
     `,
-    [
-      firmIds,
-      ...salesFilter.values,
-      ...returnFilter.values
-    ]
-  );
+      [
+        firmIds,
+        ...salesFilter.values,
+        ...returnFilter.values
+      ]
+    );
 
-  const rows = result.rows;
+    const rows = result.rows;
 
-  // ✅ GSTIN GROUPS
-  const gstin_groups = rows.map((r: any) => {
-    const cgst = Number(r.total_cgst || 0);
-    const sgst = Number(r.total_sgst || 0);
-    const igst = Number(r.total_igst || 0);
+    const gstin_groups = rows.map((r: any) => {
+      const cgst = Number(r.total_cgst || 0);
+      const sgst = Number(r.total_sgst || 0);
+      const igst = Number(r.total_igst || 0);
+
+      return {
+        gstin: r.gstin || "UNKNOWN",
+        total_cgst: cgst,
+        total_sgst: sgst,
+        total_igst: igst,
+        total_tax: cgst + sgst + igst
+      };
+    });
+
+    const summary = gstin_groups.reduce(
+      (acc: any, g: any) => {
+        acc.total_cgst += g.total_cgst;
+        acc.total_sgst += g.total_sgst;
+        acc.total_igst += g.total_igst;
+        acc.total_tax += g.total_tax;
+        return acc;
+      },
+      {
+        total_cgst: 0,
+        total_sgst: 0,
+        total_igst: 0,
+        total_tax: 0
+      }
+    );
 
     return {
-      gstin: r.gstin || "UNKNOWN",
-      total_cgst: cgst,
-      total_sgst: sgst,
-      total_igst: igst,
-      total_tax: cgst + sgst + igst
+      summary,
+      gstin_groups
     };
-  });
+  }
 
-  // ✅ TOTAL SUMMARY
-  const summary = gstin_groups.reduce(
-    (acc: any, g: any) => {
-      acc.total_cgst += g.total_cgst;
-      acc.total_sgst += g.total_sgst;
-      acc.total_igst += g.total_igst;
-      acc.total_tax += g.total_tax;
-      return acc;
-    },
-    {
-      total_cgst: 0,
-      total_sgst: 0,
-      total_igst: 0,
-      total_tax: 0
-    }
-  );
-
-  return {
-    summary,
-    gstin_groups
-  };
-}
-
-  // 🔹 GSTR-1 WITH PROPER SEPARATION + GROUPING
   private async getGSTR1Data(
     client: any,
     firmIds: number[],
@@ -751,7 +747,7 @@ export class ReportService {
         -sr.total_cgst,
         -sr.total_sgst,
         -sr.total_igst,
-        'CREDIT_NOTE'
+        'SALE_RETURN'
       FROM sale_return sr
       JOIN sales s ON s.id = sr.sale_id
       JOIN customers c ON c.id = s.customer_id
@@ -768,15 +764,12 @@ export class ReportService {
 
     const rows = result.rows;
 
-    // ✅ STEP 1: Separate
     const invoices = rows.filter((r: any) => r.doc_type === "INVOICE");
-    const creditNotes = rows.filter((r: any) => r.doc_type === "CREDIT_NOTE");
+    const creditNotes = rows.filter((r: any) => r.doc_type === "SALE_RETURN");
 
-    // ✅ STEP 2: Split
     const B2B = invoices.filter((r: any) => r.customer_type === "B2B");
     const B2C = invoices.filter((r: any) => r.customer_type !== "B2B");
 
-    // ✅ STEP 3: GROUP B2B BY CUSTOMER GSTIN
     const groupedB2B = Object.values(
       B2B.reduce((acc: any, row: any) => {
         const key = row.gstin;
@@ -801,20 +794,24 @@ export class ReportService {
       }, {})
     );
 
-    // ✅ STEP 4: GROUP B2C BY STATE
+   
     const groupedB2C = Object.values(
       B2C.reduce((acc: any, row: any) => {
-        const key = row.state_code;
+        const key = row.state_code || "UNKNOWN";
 
         if (!acc[key]) {
           acc[key] = {
             state_code: row.state_code,
             total_taxable: 0,
-            total_tax: 0
+            total_tax: 0,
+            invoices: []
           };
         }
 
+        acc[key].invoices.push(row);
+
         acc[key].total_taxable += Number(row.taxable_value);
+
         acc[key].total_tax +=
           Number(row.total_cgst) +
           Number(row.total_sgst) +
@@ -825,14 +822,13 @@ export class ReportService {
     );
 
     return {
-      gstin, // 🔥 MAIN GROUPING KEY
+      gstin, 
       B2B: groupedB2B,
       B2C: groupedB2C,
       credit_notes: creditNotes
     };
   }
 
-  // 🔥 MAIN ENTRY
   async getGSTReport(data: GetGSTReportBody) {
 
     const { type, level, firm_id, branch_id, company_id, start_date, end_date } = data;
@@ -842,7 +838,6 @@ export class ReportService {
       let firmIds: number[] = [];
       let entityIds: number[] = [];
 
-      // 🔹 RESOLVE IDS
       if (level === "firm" && firm_id) {
         firmIds = [firm_id];
         entityIds = [firm_id];
@@ -863,7 +858,6 @@ export class ReportService {
       if (level === "company" && company_id) {
         entityIds = [company_id];
 
-        // 🔹 Step 1: Get branch IDs
         const branchRes = await executeInTransaction(
           client,
           `SELECT id FROM branches WHERE company_id = $1`,
@@ -877,7 +871,6 @@ export class ReportService {
           return;
         }
 
-        // 🔹 Step 2: Get firm IDs using ANY()
         const firmRes = await executeInTransaction(
           client,
           `SELECT id FROM firm WHERE branch_id = ANY($1)`,
@@ -887,25 +880,23 @@ export class ReportService {
         firmIds = firmRes.rows.map((r: any) => r.id);
       }
 
-      // 🔹 GET GSTIN
       const gstinMap = await this.getGSTINMap(client, level, entityIds);
       const gstin = gstinMap[entityIds[0]];
 
-      // 🔹 TYPE HANDLING
       if (type === "GSTR-3B") {
 
-   const report = await this.getGSTR3BWithGrouping(
-  client,
-  firmIds,
-  start_date,
-  end_date
-);
+        const report = await this.getGSTR3BWithGrouping(
+          client,
+          firmIds,
+          start_date,
+          end_date
+        );
 
-return {
-  status: "success",
-  level,
-  data: report
-};
+        return {
+          status: "success",
+          level,
+          data: report
+        };
       }
 
       if (type === "GSTR-1") {
