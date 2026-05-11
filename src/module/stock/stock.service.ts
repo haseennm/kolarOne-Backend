@@ -4,6 +4,30 @@ import { AppError } from "../../utils/AppError";
 import { getRecord } from "../../utils/extra";
 import { StockAdditionalParams, StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams, StockPriceSet, StockReport } from "./stock.types";
 
+const generateBarcode = (): string => {
+  return Math.floor(10000000000 + Math.random() * 90000000000).toString();
+};
+
+const generateUniqueBarcode = async (
+  client: PoolClient
+): Promise<string> => {
+  let barcode: string;
+  let exists = true;
+
+  while (exists) {
+    barcode = generateBarcode();
+
+    const result = await executeInTransaction(
+      client,
+      `SELECT id FROM stock WHERE barcode = $1 LIMIT 1`,
+      [barcode]
+    );
+
+    exists = result.rows.length > 0;
+  }
+
+  return barcode!;
+};
 export default class StockService {
 
   async createStock(data: StockCreateParams, client: PoolClient) {
@@ -57,27 +81,26 @@ export default class StockService {
   `,
       [branch_id]
     );
-
+    const barcode = await generateUniqueBarcode(client);
     const nextBatch = (lastStock.rows[0]?.last_batch || 0) + 1;
     const batch_number = `BATCH-${nextBatch}`;
 
-
-    // ✅ Insert into stock table
     const stockQuery = `
-    INSERT INTO stock (
-      available_quantity,
-      branch_id,
-      selling_price,
-      firm_id,
-      product_id,
-      purchase_id,
-      status,
-      batch_number,
-      purchased_qty
-    )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-    RETURNING *;
-  `;
+  INSERT INTO stock (
+    available_quantity,
+    branch_id,
+    selling_price,
+    firm_id,
+    product_id,
+    purchase_id,
+    status,
+    batch_number,
+    purchased_qty,
+    barcode
+  )
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+  RETURNING *;
+`;
 
     const values = [
       available_qty,
@@ -88,7 +111,7 @@ export default class StockService {
       purchase_id,
       statusCode,
       batch_number,
-      purchased_qty
+      purchased_qty, barcode
     ];
 
     const { rows } = await executeInTransaction(client, stockQuery, values);
@@ -369,6 +392,10 @@ export default class StockService {
       values.push(filters.status);
       where.push(`s.status = $${values.length}`);
     }
+    if (filters?.barcode) {
+      values.push(filters.barcode);
+      where.push(`s.barcode = $${values.length}`);
+    }
 
     if (filters?.available_qty_min !== undefined) {
       values.push(filters.available_qty_min);
@@ -395,6 +422,7 @@ export default class StockService {
       where.push(`(
   s.batch_number ILIKE $${values.length}
   OR p.name ILIKE $${values.length}
+  OR s.barcode ILIKE $${values.length}
 )`);
     }
 

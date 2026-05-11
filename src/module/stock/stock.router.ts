@@ -22,18 +22,15 @@ export async function stockRouter(app: FastifyInstance) {
             status: { type: "number" },
 
             search: { type: "string" },
+            barcode: { type: "string" },
 
-            // ✅ Quantity filters
             available_qty_min: { type: "number" },
             available_qty_max: { type: "number" },
             purchased_qty_min: { type: "number" },
             purchased_qty_max: { type: "number" },
-
-            // ✅ Sorting
             sort_by: { type: "string" },
             sort_order: { type: "string", enum: ["asc", "desc"] },
 
-            // ✅ Pagination
             page: {
               type: "number",
               minimum: 1,
@@ -65,6 +62,7 @@ export async function stockRouter(app: FastifyInstance) {
           limit
         }
       });
+      console.log(data)
       return reply.code(200).send(data);
     }
   );

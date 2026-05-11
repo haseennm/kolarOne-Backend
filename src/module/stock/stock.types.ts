@@ -55,7 +55,7 @@ export interface  StockFetchBody {
   firm_id?: number;
   branch_id?: number;
   company_id: number;
-  
+  barcode:string;
   product_id: number;
   available_qty_min: number;
   available_qty_max: number;
