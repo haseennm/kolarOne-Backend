@@ -44,7 +44,6 @@ export async function productRouter(app: FastifyInstance): Promise<void> {
       const requiredFields = [
         "category_id",
         "name",
-        "base_price",
         "company_id",
         "created_by",
       ];
@@ -57,7 +56,6 @@ export async function productRouter(app: FastifyInstance): Promise<void> {
 
       body.category_id = Number(body.category_id);
       body.company_id = Number(body.company_id);
-      body.base_price = Number(body.base_price);
 
       body.brand_id = body.brand_id ? Number(body.brand_id) : null;
 
@@ -163,8 +161,6 @@ export async function productRouter(app: FastifyInstance): Promise<void> {
       if (body.brand_id)
         body.brand_id = body.brand_id === "null" ? null : Number(body.brand_id);
 
-      if (body.base_price) body.base_price = Number(body.base_price);
-
       if (body.cgst_rate)
         body.cgst_rate = body.cgst_rate === "null" ? null : Number(body.cgst_rate);
       if (body.sgst_rate)
@@ -217,42 +213,42 @@ export async function productRouter(app: FastifyInstance): Promise<void> {
       });
     }
   );
-   app.post<{
-  Body: GetProductReport;
-}>(
-  "/reports",
-  {
-    schema: {
-      body: {
-        type: "object",
-        required: ["level"],
-        properties: {
-          level: {
-            type: "string",
-            enum: ["firm", "branch", "company"]
-          },
+  app.post<{
+    Body: GetProductReport;
+  }>(
+    "/reports",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["level"],
+          properties: {
+            level: {
+              type: "string",
+              enum: ["firm", "branch", "company"]
+            },
 
-          firm_id: { type: ["number", "null"] },
-          branch_id: { type: ["number", "null"] },
-          company_id: { type: ["number", "null"] },
+            firm_id: { type: ["number", "null"] },
+            branch_id: { type: ["number", "null"] },
+            company_id: { type: ["number", "null"] },
 
-          start_date: {
-            type: ["string", "null"],
-            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
-          },
+            start_date: {
+              type: ["string", "null"],
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+            },
 
-          end_date: {
-            type: ["string", "null"],
-            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+            end_date: {
+              type: ["string", "null"],
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+            }
           }
         }
       }
-    }
-  },
-  async (
-    request: FastifyRequest<{ Body: GetProductReport }>,
-    reply: FastifyReply
-  ) => {
+    },
+    async (
+      request: FastifyRequest<{ Body: GetProductReport }>,
+      reply: FastifyReply
+    ) => {
 
       const controller = new ProductController();
       const data = await controller.getProductReport(request.body);
@@ -261,7 +257,7 @@ export async function productRouter(app: FastifyInstance): Promise<void> {
         status: "Success",
         data
       });
-     
-  }
-);
+
+    }
+  );
 }
