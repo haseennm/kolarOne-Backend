@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import cors from '@fastify/cors'
 import { env } from './utils/env'
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
@@ -10,37 +11,50 @@ import { cns } from './utils/extra';
 const app = Fastify({
     logger: false,
 })
+
+// ADD CORS HERE
+app.register(cors, {
+    origin: '*', // or 'http://localhost:xxxxx'
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+})
+
 app.register(multipart, {
     limits: {
-        fileSize: 5 * 1024 * 1024, 
+        fileSize: 5 * 1024 * 1024,
     },
-
 });
 
 app.register(fastifyStatic, {
     root: path.join(__dirname, "../uploads"),
     prefix: "/uploads/",
 });
+
 app.addHook('preHandler', async (request, reply) => {
-  if (!request.isMultipart()) {
-    cns(request.url, request.body as object)
-  }
+    if (!request.isMultipart()) {
+        cns(request.url, request.body as object)
+    }
 })
+
 app.register(registerRoutes, { prefix: '/api' });
+
 registerErrorHandler(app);
 
 const start = async () => {
     try {
-        await app.listen({ 
+        await app.listen({
             port: Number(env.PORT),
             host: "0.0.0.0"
         })
 
-        console.log(`\x1b[44m Server running on http://localhost:${env.PORT}.. \x1b[0m`)
+        console.log(
+            `\x1b[44m Server running on http://localhost:${env.PORT}.. \x1b[0m`
+        )
 
     } catch (err) {
         console.log(err)
         process.exit(1)
     }
 }
+
 start()

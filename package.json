@@ -19,6 +19,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@fastify/cors": "^11.2.0",
     "@fastify/multipart": "^9.4.0",
     "@fastify/static": "^9.0.0",
     "bcrypt": "^6.0.0",
