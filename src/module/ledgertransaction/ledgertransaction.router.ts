@@ -163,7 +163,6 @@ export async function ledgerTransactionRouter(app: FastifyInstance) {
           limit
         }
       });
-
       return reply.code(200).send(data);
 
     }

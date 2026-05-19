@@ -10,7 +10,7 @@ export default class LedgerTransactionService {
 
     const {
       entity_id, amount, category_id, company_id, entity_type, reference_id,
-      remark, statusCode, transaction_date
+      remark, statusCode, transaction_date,transaction_time
     } = data;
 
 
@@ -63,9 +63,9 @@ export default class LedgerTransactionService {
     const queryText = `
   INSERT INTO ledger_transactions (
     entity_id, amount, category_id, company_id, entity_type,
-    reference_id, transaction_date, status, remarks
+    reference_id, transaction_date, status, remarks,transaction_time
   )
-  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
   RETURNING *;
 `;
 
@@ -78,7 +78,8 @@ export default class LedgerTransactionService {
       reference_id,
       transaction_date,
       statusCode,
-      JSON.stringify(remark)
+      JSON.stringify(remark),
+      transaction_time
     ];
     const { rows } = await executeInTransaction(client, queryText, values);
 
@@ -212,6 +213,7 @@ export default class LedgerTransactionService {
       transaction_date,
       statusCode,
       remark,
+      transaction_time
     } = data;
 
 
@@ -242,8 +244,9 @@ export default class LedgerTransactionService {
         WHEN jsonb_typeof(remarks) = 'array'
           THEN remarks || $7::jsonb
         ELSE jsonb_build_array(remarks) || $7::jsonb
-      END
-  WHERE id = $8
+      END,
+      transaction_time =$8
+  WHERE id = $9 
   RETURNING *;
 `;
     const status = statusCode === 99
@@ -258,6 +261,7 @@ export default class LedgerTransactionService {
       transaction_date ?? isLedgerTransactionExist.transaction_date,
       status,
       JSON.stringify(remark),
+      transaction_time,
       id
     ];
 
@@ -363,18 +367,21 @@ export default class LedgerTransactionService {
       params.push(end_date);
     }
 
-    const query = `
-    SELECT
-      CASE WHEN amount > 0 THEN 'income' ELSE 'expense' END AS type,
-      id,
-      transaction_date AS date,
-      amount,
-      reference_id AS invoice
-    FROM ledger_transactions
-    WHERE status != 0
-    ${condition}
-    ORDER BY transaction_date DESC
-  `;
+ const query = `
+  SELECT
+    CASE WHEN lt.amount > 0 THEN 'income' ELSE 'expense' END AS type,
+    lt.id,
+    lt.transaction_date AS date,
+    lt.amount,
+    lt.reference_id AS invoice,
+    lc.name AS ledger_category
+  FROM ledger_transactions lt
+  LEFT JOIN ledger_categories lc
+    ON lc.id = lt.category_id
+  WHERE lt.status != 0
+  ${condition}
+  ORDER BY lt.transaction_date DESC
+`;
 
     const { rows } = await client.query(query, params);
 

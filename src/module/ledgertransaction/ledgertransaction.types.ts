@@ -2,6 +2,7 @@ export interface CreateLedgerTransactionBody {
   category_id: number;
   amount: number;
   transaction_date: string;
+  transaction_time: string;
   reference_id: string;
   entity_type: string;
   entity_id: number;
@@ -51,6 +52,7 @@ export interface EditLedgerTransactionBody {
   entity_id: number;
   category_id?: number;
   amount?: number;
+  transaction_time?: string;
   transaction_date?: string;
   reference_id?: string;
   status?: number;

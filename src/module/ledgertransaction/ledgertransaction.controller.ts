@@ -1,6 +1,6 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../config/db";
-import {convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
+import { convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
 import { PaymentTransactionService } from "../paymentTransaction/paymenttransaction.services";
 import { GetReportSalePurchaseLedger } from "../sale/sale/sale.types";
 import LedgerTransactionService from "./ledgertransaction.service";
@@ -13,7 +13,12 @@ export default class LedgerTransactionController {
 
   async createTransaction(data: CreateLedgerTransactionBody) {
 
-    let { created_by, status, entity_type, amount, entity_id, company_id, ...rest } = data;
+    let { created_by, status, entity_type, amount, transaction_time = new Date().toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }), entity_id, company_id, ...rest } = data;
 
     const remark = {
       action: "Created",
@@ -31,7 +36,7 @@ export default class LedgerTransactionController {
         ...rest,
         remark,
         statusCode,
-        entity_type, amount, entity_id, company_id
+        entity_type, amount, entity_id, company_id, transaction_time
       }, client);
       const ref_id = Number(ledger_transaction.id)
 
