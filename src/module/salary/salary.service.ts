@@ -26,7 +26,6 @@ export default class SalaryService {
 
     const newRemarksJson = JSON.stringify([remark]);
 
-    // 🔍 Validate staff against entity
     for (const staffId of staff_ids) {
       const staff = await executeInTransaction(
         client,
@@ -77,7 +76,6 @@ export default class SalaryService {
       }
     }
 
-    // 🧠 Main Salary Calculation Query
     const upsertQuery = `
   INSERT INTO salary_generations (
     staff_id, salary_month, base_salary, total_days, 
@@ -224,21 +222,20 @@ export default class SalaryService {
   `;
 
     const params = [
-      salaryMonthStr,   // $1
-      entity_id,        // $2
-      entity_type,      // $3
-      newRemarksJson,   // $4
-      from_date,        // $5
-      to_date,          // $6
-      FULL_DAY_MINUTES, // $7
-      HALF_DAY_MINUTES, // $8
-      staff_ids,        // $9
-      PAID_LEAVE        // $10
+      salaryMonthStr,
+      entity_id,
+      entity_type,
+      newRemarksJson,
+      from_date,
+      to_date,
+      FULL_DAY_MINUTES,
+      HALF_DAY_MINUTES,
+      staff_ids,
+      PAID_LEAVE
     ];
 
     await executeInTransaction(client, upsertQuery, params);
 
-    // 📤 Fetch result
     const fetchQuery = `
     SELECT sg.*, s.full_name 
     FROM salary_generations sg
@@ -260,45 +257,41 @@ export default class SalaryService {
   }
   async confirmSalary(data: ConfirmSalaryParams, client: any) {
 
-  const { r_id, entity_id, entity_type, final_salary, remark, statusCode } = data;
+    const { r_id, entity_id, entity_type, final_salary, remark, statusCode } = data;
 
-  // ✅ Check salary record based on entity
-  const is_salary_exist = await executeInTransaction(
-    client,
-    `
+    const is_salary_exist = await executeInTransaction(
+      client,
+      `
     SELECT * FROM salary_generations
     WHERE id = $1
       AND entity_id = $2
       AND entity_type = $3
     `,
-    [r_id, entity_id, entity_type]
-  );
-
-  if (is_salary_exist.rowCount === 0) {
-    throw new AppError("Salary not found", 404);
-  }
-
-  const salary = is_salary_exist.rows[0];
-
-  // ❌ Already paid
-  if (salary.status === 5) {
-    throw new AppError(
-      "This record cannot be modified because it has already been paid.",
-      409
+      [r_id, entity_id, entity_type]
     );
-  }
 
-  // ✅ Keep old status if 99
-  const status =
-    statusCode === 99
-      ? salary.status
-      : statusCode;
+    if (is_salary_exist.rowCount === 0) {
+      throw new AppError("Salary not found", 404);
+    }
 
-  // ✅ Adjustment calculation
-  const adjustment =
-    (final_salary ?? salary.final_salary) - salary.gross_salary;
+    const salary = is_salary_exist.rows[0];
 
-  const updateQuery = `
+    if (salary.status === 5) {
+      throw new AppError(
+        "This record cannot be modified because it has already been paid.",
+        409
+      );
+    }
+
+    const status =
+      statusCode === 99
+        ? salary.status
+        : statusCode;
+
+    const adjustment =
+      (final_salary ?? salary.final_salary) - salary.gross_salary;
+
+    const updateQuery = `
     UPDATE salary_generations
     SET
       final_salary = $1,
@@ -316,22 +309,22 @@ export default class SalaryService {
     RETURNING *;
   `;
 
-  const values = [
-    final_salary ?? salary.final_salary,
-    status,
-    JSON.stringify(remark),
-    adjustment,
-    r_id,
-    entity_id,
-    entity_type
-  ];
+    const values = [
+      final_salary ?? salary.final_salary,
+      status,
+      JSON.stringify(remark),
+      adjustment,
+      r_id,
+      entity_id,
+      entity_type
+    ];
 
-  const { rows } = await executeInTransaction(client, updateQuery, values);
+    const { rows } = await executeInTransaction(client, updateQuery, values);
 
-  return {
-    data: rows[0]
-  };
-}
+    return {
+      data: rows[0]
+    };
+  }
   async getSalary(
     data: GetSalaryBody,
     client: PoolClient
@@ -352,7 +345,6 @@ export default class SalaryService {
 
     const params: any[] = [salary_month, entity_id, entity_type];
 
-    // Optional filter by staff_ids
     if (staff_ids && staff_ids.length > 0) {
       query += ` AND sg.staff_id = ANY($4)`;
       params.push(staff_ids);
