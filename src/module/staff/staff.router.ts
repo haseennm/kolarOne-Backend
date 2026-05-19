@@ -121,7 +121,6 @@ export async function staffRouter(app: FastifyInstance) {
       body.entity_id = Number(body.entity_id);
       body.company_id = Number(body.company_id);
       body.branch_id = body.branch_id ? Number(body.branch_id) : null;
-
       body.salary = body.salary ? Number(body.salary) : null;
       body.expected_salary = body.expected_salary
         ? Number(body.expected_salary)
@@ -135,10 +134,6 @@ export async function staffRouter(app: FastifyInstance) {
       body.image = imagePath;
       body.attachments = attachments.filter(Boolean);
 
-      // ================= DEBUG LOG =================
-      console.log("FINAL BODY:", body);
-
-      // ================= CONTROLLER =================
       const controller = new StaffController();
 
       const result = await controller.createStaff(body);
@@ -271,8 +266,9 @@ export async function staffRouter(app: FastifyInstance) {
       for await (const part of parts) {
         if (part.type === "file") {
           if (!part.filename) continue;
+          const safeFileName = path.basename(part.filename || "file");
 
-          const fileName = `${Date.now()}-${part.filename}`;
+          const fileName = `${Date.now()}-${safeFileName}`;
           const fullPath = path.join(uploadDir, fileName);
 
           await pipeline(part.file, fs.createWriteStream(fullPath));
@@ -359,7 +355,6 @@ export async function staffRouter(app: FastifyInstance) {
         body.attachments = attachments.filter(Boolean);
       }
 
-      console.log("EDIT BODY:", body);
 
       const controller = new StaffController();
 
