@@ -4,7 +4,7 @@ import LedgerTransactionService from "../ledgertransaction/ledgertransaction.ser
 import { FinancialReportQuery, FinancialReportRow, FinancialReportLevel } from "./financial-sales-purchase.service";
 
 export interface FinancialLedgerRow {
-  type: "ledger";
+  type: string;
   id: number;
   date: string;
   amount: number;
@@ -13,7 +13,7 @@ export interface FinancialLedgerRow {
 
 function asLedgerRow(row: any): FinancialLedgerRow {
   return {
-    type: "ledger",
+    type: `Ledger - ${row.ledger_category}`,
     id: Number(row.id),
     date: row.date ? new Date(row.date).toISOString() : new Date().toISOString(),
     amount: Number(row.amount ?? 0),
@@ -49,7 +49,6 @@ export default class FinancialLedgerService {
     };
 
     const raw = await service.getLedgerReport(client, queryParams as any);
-
     return raw.map(asLedgerRow);
   }
 }
