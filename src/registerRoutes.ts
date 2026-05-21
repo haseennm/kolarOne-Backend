@@ -3,6 +3,7 @@ import { FastifyInstance } from 'fastify'
 import { companyRoutes } from './module/company/company.router'
 import { branchRouter } from './module/branch/branch.router'
 import { firmRouter } from './module/firm/firm.router'
+import { recentActivityRouter } from './module/recent-activity/recent-activity.router'
 import { productCategoryRouter } from './module/productCategory/proCat.router'
 import { productRouter } from './module/product/product.router'
 import { brandRouter } from './module/brand/brand.router'
@@ -29,12 +30,14 @@ import { partyBalanceRouter } from './module/partyBalance/partyBalance.router'
 import { financialYearRouter } from './module/financialYear/financialYear.router'
 import { maintenanceRouter } from './module/maintenance/maintenance.router'
 import { companyBrandingRouter } from './module/companyBranding/companyBranding.router'
+import { todaySnapdealRouter } from './module/todaySnapdeal/todaySnapdeal.router'
 import reportRoutes from './module/reports/report.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
   app.register(branchRouter, { prefix: '/branch' })
   app.register(firmRouter, { prefix: '/firm' })
+  app.register(recentActivityRouter, { prefix: '/recent/activity' })
   app.register(productCategoryRouter, { prefix: '/product/category' })
   app.register(productRouter, { prefix: '/product' })
   app.register(brandRouter, { prefix: '/brand' })
@@ -57,6 +60,7 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(purchaseReturnRouter, { prefix: '/purchase/return' })
   app.register(saleRouter, { prefix: '/sale' })
   app.register(saleReturnRouter, { prefix: '/sale/return' })
+  app.register(todaySnapdealRouter, { prefix: '/today/snapdeals' })
   app.register(partyBalanceRouter, { prefix: 'balance' })
   app.register(financialYearRouter, { prefix: 'financial/year' })
   app.register(maintenanceRouter, { prefix: '/maintenance' })

@@ -16,7 +16,8 @@ const TABLES = [
     'payment_transactions',
     'party_balance',
 
-    'stock' 
+    'stock',
+    'ledger_transactions'
 ]
 
 export default class MaintenanceService {
