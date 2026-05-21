@@ -228,21 +228,34 @@ export class ReportService {
       }
     };
   }
-  private async getFirmWiseReport(
-    client: any,
-    firmIds: number[],
-    startDate?: string,
-    endDate?: string
-  ) {
+private async getFirmWiseReport(
+  client: any,
+  firmIds: number[],
+  startDate?: string,
+  endDate?: string
+) {
 
-    const firms = await executeInTransaction(client, `
-      SELECT id, firm_name FROM firm WHERE id = ANY($1)
-    `, [firmIds]);
+  const firms = await executeInTransaction(client, `
+    SELECT id, firm_name 
+    FROM firm 
+    WHERE id = ANY($1)
+  `, [firmIds]);
 
-    const result = [];
+  const result = [];
 
-    for (const f of firms.rows) {
-      const data = await this.getSummaryAndBreakdown(
+  for (const f of firms.rows) {
+
+    let data: any = {
+      total_sales: 0,
+      total_purchase: 0,
+      total_income: 0,
+      total_expense: 0,
+      profit: 0,
+      breakdown: []
+    };
+
+    try {
+      const reportData = await this.getSummaryAndBreakdown(
         client,
         [f.id],
         "firm",
@@ -251,15 +264,27 @@ export class ReportService {
         endDate
       );
 
-      result.push({
-        firm_id: f.id,
-        firm_name: f.firm_name,
-        ...data
-      });
+      // overwrite defaults only if data exists
+      if (reportData) {
+        data = {
+          ...data,
+          ...reportData
+        };
+      }
+
+    } catch (err) {
+      // keep default zero values
     }
 
-    return result;
+    result.push({
+      firm_id: f.id,
+      firm_name: f.firm_name,
+      ...data
+    });
   }
+
+  return result;
+}
   private async getBranchWiseReport(
     client: any,
     companyId: number,
@@ -268,29 +293,43 @@ export class ReportService {
   ) {
 
     const branches = await executeInTransaction(client, `
-      SELECT id, branch_name FROM branches WHERE company_id = $1
-    `, [companyId]);
+    SELECT id, branch_name 
+    FROM branches 
+    WHERE company_id = $1
+  `, [companyId]);
 
     const result = [];
 
     for (const b of branches.rows) {
 
       const firms = await executeInTransaction(client, `
-        SELECT id FROM firm WHERE branch_id = $1
-      `, [b.id]);
+      SELECT id 
+      FROM firm 
+      WHERE branch_id = $1
+    `, [b.id]);
 
       const firmIds = firms.rows.map((f: any) => f.id);
 
-      if (!firmIds.length) continue;
+      let data: any = {
+        total_sales: 0,
+        total_purchase: 0,
+        total_income: 0,
+        total_expense: 0,
+        profit: 0,
+        breakdown: []
+      };
 
-      const data = await this.getSummaryAndBreakdown(
-        client,
-        firmIds,
-        "branch",
-        { branch_id: b.id },
-        startDate,
-        endDate
-      );
+      // Only fetch summary if firms exist
+      if (firmIds.length) {
+        data = await this.getSummaryAndBreakdown(
+          client,
+          firmIds,
+          "branch",
+          { branch_id: b.id },
+          startDate,
+          endDate
+        );
+      }
 
       result.push({
         branch_id: b.id,
@@ -597,7 +636,7 @@ export class ReportService {
     }
 
     if (level === "company") {
-      query = `SELECT id, gstin FROM company WHERE id = ANY($1)`; 
+      query = `SELECT id, gstin FROM company WHERE id = ANY($1)`;
     }
 
     const res = await executeInTransaction(client, query, [ids]);
@@ -794,7 +833,7 @@ export class ReportService {
       }, {})
     );
 
-   
+
     const groupedB2C = Object.values(
       B2C.reduce((acc: any, row: any) => {
         const key = row.state_code || "UNKNOWN";
@@ -822,7 +861,7 @@ export class ReportService {
     );
 
     return {
-      gstin, 
+      gstin,
       B2B: groupedB2B,
       B2C: groupedB2C,
       credit_notes: creditNotes
