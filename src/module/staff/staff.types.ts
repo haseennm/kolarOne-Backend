@@ -53,6 +53,7 @@ export interface FetchStaffBody {
   search?: string;
   page: number;
   limit: number;
+  firm_staff?:boolean
 }
 
 export interface FetchStaffParams {

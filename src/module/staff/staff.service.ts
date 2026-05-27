@@ -221,101 +221,158 @@ export default class StaffService {
   }
 
 
-  async fetchStaff(data: FetchStaffParams) {
-    const { filters, offset } = data;
+ async fetchStaff(data: FetchStaffParams) {
+  const { filters, offset } = data;
 
-    let where: string[] = [];
-    let values: any[] = [];
+  let where: string[] = [];
+  let values: any[] = [];
+  let joins: string[] = [];
 
-    // Exclude deleted
-    where.push(`status != $${values.length + 1}`);
-    values.push(0);
+  // Exclude deleted
+  where.push(`s.status != $${values.length + 1}`);
+  values.push(0);
 
-    if (filters?.id) {
-      values.push(filters.id);
-      where.push(`id = $${values.length}`);
+  if (filters?.id) {
+    values.push(filters.id);
+    where.push(`s.id = $${values.length}`);
+  }
+
+  /**
+   * Entity handling
+   *
+   * B = Branch
+   * F = Firm
+   * C = Company
+   */
+  if (filters?.entity_type === "B" && filters?.entity_id) {
+
+    // Branch + firm staffs
+    if (filters?.firm_staff) {
+
+      joins.push(`
+        LEFT JOIN firm f
+          ON f.id = s.entity_id
+      `);
+
+      values.push(filters.entity_id);
+
+      where.push(`(
+        (
+          s.entity_type = 'B'
+          AND s.entity_id = $${values.length}
+        )
+        OR
+        (
+          s.entity_type = 'F'
+          AND f.branch_id = $${values.length}
+        )
+      )`);
+
+    } else {
+
+      // Only branch staffs
+      values.push(filters.entity_id);
+
+      where.push(`s.entity_type = 'B'`);
+      where.push(`s.entity_id = $${values.length}`);
     }
 
+  } else {
+
+    // Normal filtering for F and C
     if (filters?.entity_type) {
       values.push(filters.entity_type);
-      where.push(`entity_type = $${values.length}`);
+      where.push(`s.entity_type = $${values.length}`);
     }
 
     if (filters?.entity_id) {
       values.push(filters.entity_id);
-      where.push(`entity_id = $${values.length}`);
+      where.push(`s.entity_id = $${values.length}`);
     }
+  }
 
-    if (filters?.status !== undefined) {
-      values.push(filters.status);
-      where.push(`status = $${values.length}`);
-    }
+  if (filters?.status !== undefined) {
+    values.push(filters.status);
+    where.push(`s.status = $${values.length}`);
+  }
 
-    if (filters?.role && filters.role.length) {
-      values.push(filters.role);
-      where.push(`role && $${values.length}::smallint[]`);
-    }
+  if (filters?.role && filters.role.length) {
+    values.push(filters.role);
+    where.push(`s.role && $${values.length}::smallint[]`);
+  }
 
-    // Search
-    if (filters?.search) {
-      values.push(`%${filters.search}%`);
-      where.push(`(
-      email ILIKE $${values.length} OR
-      full_name ILIKE $${values.length} OR
-      phone_number ILIKE $${values.length} OR
-      address ILIKE $${values.length}
+  // Search
+  if (filters?.search) {
+    values.push(`%${filters.search}%`);
+
+    where.push(`(
+      s.email ILIKE $${values.length} OR
+      s.full_name ILIKE $${values.length} OR
+      s.phone_number ILIKE $${values.length} OR
+      s.address ILIKE $${values.length}
     )`);
-    }
+  }
 
-    // Company filter (mandatory)
-    values.push(filters.company_id);
-    where.push(`company_id = $${values.length}`);
+  // Company filter
+  values.push(filters.company_id);
+  where.push(`s.company_id = $${values.length}`);
 
-    const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const joinClause = joins.join(" ");
 
-    const staffQuery = `
- SELECT 
-  s.*,
-  (
-    SELECT json_agg(
-      json_build_object(
-        'id', r.id,
-        'role', r.role
-      )
-    )
-    FROM role r
-    WHERE r.id = ANY(s.role)
-  ) as role_details
-FROM staff s
-${whereClause}
-ORDER BY s.id DESC
-LIMIT $${values.length + 1}
-OFFSET $${values.length + 2}
+  const whereClause = where.length
+    ? `WHERE ${where.join(" AND ")}`
+    : "";
+
+  const staffQuery = `
+    SELECT 
+      s.*,
+      (
+        SELECT json_agg(
+          json_build_object(
+            'id', r.id,
+            'role', r.role
+          )
+        )
+        FROM role r
+        WHERE r.id = ANY(s.role)
+      ) as role_details
+    FROM staff s
+    ${joinClause}
+    ${whereClause}
+    ORDER BY s.id DESC
+    LIMIT $${values.length + 1}
+    OFFSET $${values.length + 2}
   `;
 
-    const countQuery = `
+  const countQuery = `
     SELECT COUNT(*)
-    FROM staff
+    FROM staff s
+    ${joinClause}
     ${whereClause}
   `;
 
-    const staff = await query<FetchDbStaff>(
-      staffQuery,
-      [...values, filters.limit, offset]
-    );
+  const staff = await query<FetchDbStaff>(
+    staffQuery,
+    [...values, filters.limit, offset]
+  );
 
-    const total = await query<StaffCountResult>(countQuery, values);
+  const total = await query<StaffCountResult>(
+    countQuery,
+    values
+  );
 
-    return {
-      staff,
-      pagination: {
-        page: filters.page,
-        limit: filters.limit,
-        total: Number(total[0].count),
-        totalPages: Math.ceil(Number(total[0].count) / filters.limit),
-      },
-    };
-  }
+  return {
+    staff,
+    pagination: {
+      page: filters.page,
+      limit: filters.limit,
+      total: Number(total[0].count),
+      totalPages: Math.ceil(
+        Number(total[0].count) / filters.limit
+      ),
+    },
+  };
+}
 
   async updateStaff(data: EditStaffParams, client: any) {
     const {

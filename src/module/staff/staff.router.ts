@@ -191,6 +191,10 @@ export async function staffRouter(app: FastifyInstance) {
               type: "number",
               minimum: 1
             },
+            firm_staff: {
+              type: "boolean",
+              default:false
+            },
 
             limit: {
               type: "number",
@@ -238,7 +242,6 @@ export async function staffRouter(app: FastifyInstance) {
           limit
         }
       });
-
       return reply.code(200).send(data);
 
     }
