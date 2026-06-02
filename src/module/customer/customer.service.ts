@@ -156,6 +156,10 @@ export default class CustomerService {
       values.push(filters.customer_type);
       where.push(`customer_type = $${values.length}`);
     }
+    if (filters?.status) {
+      values.push(filters.status);
+      where.push(`status = $${values.length}`);
+    }
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 

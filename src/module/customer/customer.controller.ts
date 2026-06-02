@@ -3,6 +3,7 @@ import { getStatusCode, getStatusText, isValidDateFormat } from "../../utils/ext
 import CustomerService from "./customer.service";
 import {
   CreateCustomerBody,
+  CustomerRemark,
   DeleteCustomerBody,
   EditCustomerBody,
   FetchCustomerParams,
@@ -11,28 +12,43 @@ import {
 
 export default class CustomerController {
 
-  async fetchCustomer(data: FetchCustomerParams) {
+async fetchCustomer(data: FetchCustomerParams) {
+  const {
+    filters: { status, ...filters },
+    offset,
+  } = data;
 
-    const service = new CustomerService();
+const statusCode =
+  typeof status === "string"
+    ? getStatusCode(status)
+    : status;
 
-    const customers_with_code = await service.fetchCustomer(data);
+  const service = new CustomerService();
 
-    const customers = customers_with_code.customers.map((row) => ({
-      ...row,
-      status: getStatusText(row.status),
-    }));
+  const customers_with_code = await service.fetchCustomer({
+    offset,
+    filters: {
+      ...filters,
+      status: statusCode,
+    },
+  });
 
-    return {
-      pagination: {
-        page: customers_with_code.page,
-        limit: customers_with_code.limit,
-        total: customers_with_code.total,
-      },
-      data: {
-        customers,
-      },
-    };
-  }
+  const customers = customers_with_code.customers.map((row) => ({
+    ...row,
+    status: getStatusText(row.status),
+  }));
+
+  return {
+    pagination: {
+      page: customers_with_code.page,
+      limit: customers_with_code.limit,
+      total: customers_with_code.total,
+    },
+    data: {
+      customers,
+    },
+  };
+}
 
   async createCustomer(data: CreateCustomerBody) {
 
@@ -59,14 +75,25 @@ export default class CustomerController {
 
   async editCustomer(data: EditCustomerBody) {
 
-    const { updated_by, status, ...rest } = data;
+    const { updated_by, status, blacklist_reason, ...rest } = data;
 
-    const remark = {
+    let remark: CustomerRemark = {
       action: "Updated",
       updated_by,
       updated_at: Date.now(),
     };
+    if (status === "blacklist") {
+      if (!blacklist_reason) {
+        throw new AppError("Blacklist reason is require and must be string", 400)
+      }
+      remark = {
+        action: "added to blacklist",
+        reason: blacklist_reason,
+        updated_by,
+        updated_at: Date.now(),
+      };
 
+    }
     let statusCode;
 
     if (typeof status === "string") {

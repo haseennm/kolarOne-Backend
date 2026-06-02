@@ -42,7 +42,7 @@ export interface FetchCustomerBody {
   company_id?: number;
   search?: string | null;
   customer_type?: "B2B" | "B2C" | "both";
-  status?: number;
+  status?: string | number;
 }
 
 export interface FetchCustomerParams {
@@ -82,6 +82,7 @@ export interface EditCustomerBody {
   gstin?: string | null;
   notes?: string[];
   status?: string | null;
+  blacklist_reason?:string;
   updated_by: string;
 }
 
@@ -110,3 +111,10 @@ export interface GetCustomerReport {
   start_date?: string;
   end_date?: string;
 }
+
+export interface CustomerRemark  {
+  action: string;
+  updated_by: string;
+  updated_at: number;
+  reason?: string;
+};

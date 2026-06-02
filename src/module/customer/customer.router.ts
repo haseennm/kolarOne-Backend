@@ -115,7 +115,10 @@ export async function customerRouter(app: FastifyInstance): Promise<void> {
             company_id: { type: "number" },
             customer_type: { type: "string" },
             search: { type: ["string", "null"] },
-            status: { type: "number" }
+            status: {
+              type: "string",
+              enum: ["Active", "Inactive", "Blacklist"]
+            },
           },
         },
       },
@@ -147,6 +150,78 @@ export async function customerRouter(app: FastifyInstance): Promise<void> {
 
   app.post<{ Body: EditCustomerBody }>(
     "/edit",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: [
+            "company_id",
+            "id",
+            "updated_by"
+          ],
+          properties: {
+            company_id: { type: "number" },
+            customer_type: {
+              type: "string",
+              enum: ["B2B", "B2C", "both"]
+            },
+            customer_name: { type: "string", minLength: 2 },
+            gender: {
+              type: ["string", "null"],
+              enum: ["MALE", "FEMALE", "OTHER", null]
+            },
+            email: {
+              type: ["string", "null"],
+              format: "email"
+            },
+            phone_number: {
+              type: ["string"],
+              minLength: 10,
+              maxLength: 15
+            },
+            alternate_phone: {
+              type: ["string", "null"]
+            },
+            billing_address: { type: ["string", "null"] },
+            billing_district: { type: ["string", "null"] },
+            billing_state: { type: ["string", "null"] },
+            billing_pin: {
+              type: ["number", "null"],
+              minimum: 100000,
+              maximum: 999999
+            },
+            shipping_address: { type: ["string", "null"] },
+            shipping_district: { type: ["string", "null"] },
+            shipping_state: { type: ["string", "null"] },
+            shipping_pin: {
+              type: ["number", "null"],
+              minimum: 100000,
+              maximum: 999999
+            },
+            state_code: {
+              type: ["string", "null"],
+              minLength: 2,
+              maxLength: 2
+            },
+            gstin: {
+              type: ["string", "null"],
+              minLength: 15,
+              maxLength: 15
+            },
+            notes: {
+              type: ["array", "null"],
+              items: { type: "string" }
+            },
+            status: {
+              type: "string",
+              enum: ["Active", "Inactive", "blacklist"]
+            },
+            updated_by: { type: "string" },
+            blacklist_reason: { type: "string" }
+          }
+        }
+      }
+    },
     async (
       request: FastifyRequest<{ Body: EditCustomerBody }>,
       reply: FastifyReply
@@ -198,36 +273,36 @@ export async function customerRouter(app: FastifyInstance): Promise<void> {
     }
   );
   app.post<{ Body: GetCustomerReport }>(
-  "/reports",
-  {
-    schema: {
-      body: {
-        type: "object",
-        required: ["level"],
-        properties: {
-          level: {
-            type: "string",
-            enum: ["firm", "branch", "company"]
-          },
-          firm_id: { type: ["number", "null"] },
-          branch_id: { type: ["number", "null"] },
-          company_id: { type: ["number", "null"] },
-          start_date: { type: ["string", "null"] },
-          end_date: { type: ["string", "null"] }
+    "/reports",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["level"],
+          properties: {
+            level: {
+              type: "string",
+              enum: ["firm", "branch", "company"]
+            },
+            firm_id: { type: ["number", "null"] },
+            branch_id: { type: ["number", "null"] },
+            company_id: { type: ["number", "null"] },
+            start_date: { type: ["string", "null"] },
+            end_date: { type: ["string", "null"] }
+          }
         }
       }
+    },
+    async (request, reply) => {
+
+      const controller = new CustomerController();
+
+      const data = await controller.getCustomerReport(request.body);
+
+      return reply.send({
+        status: "Success",
+        data
+      });
     }
-  },
-  async (request, reply) => {
-
-    const controller = new CustomerController();
-
-    const data = await controller.getCustomerReport(request.body);
-
-    return reply.send({
-      status: "Success",
-      data
-    });
-  }
-);
+  );
 }
