@@ -32,6 +32,9 @@ import { maintenanceRouter } from './module/maintenance/maintenance.router'
 import { companyBrandingRouter } from './module/companyBranding/companyBranding.router'
 import { todaySnapdealRouter } from './module/todaySnapdeal/todaySnapdeal.router'
 import reportRoutes from './module/reports/report.router'
+import { voiceAssistantRouter } from './module/voice-assistance/voice.assistance.router'
+import { stockRentalRouter } from './module/stockRent/stockRent.router'
+import { rentRouter } from './module/rent/rent.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -66,4 +69,7 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(maintenanceRouter, { prefix: '/maintenance' })
   app.register(companyBrandingRouter, { prefix: '/company/branding' })
   app.register(reportRoutes, { prefix: '/reports' })
+  app.register(voiceAssistantRouter, { prefix: '/voice' })
+  app.register(stockRentalRouter, { prefix: '/rent/stock' })
+  app.register(rentRouter, { prefix: '/rent' })
 }
