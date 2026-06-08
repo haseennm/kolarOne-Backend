@@ -1432,14 +1432,16 @@ export class RentService {
       SET
         returned_qty =
           returned_qty + $1,
-        remarks = $2
-      WHERE id = $3
+        remarks = $2,
+        amount = $3
+      WHERE id = $4
       `,
         [
           item.return_qty,
           JSON.stringify(
             itemRemarks
           ),
+          item.amount,
           item.bill_item_id
         ]
       );
