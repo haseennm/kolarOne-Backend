@@ -80,6 +80,7 @@ export default class FinancialReportService {
 
         const ledgerTransformed: UnifiedFinancialReportRow[] = ledgerRows.map((ledgerRow) => ({
           ...ledgerRow,
+          type: (ledgerRow.type as UnifiedFinancialReportRow["type"]),
         }));
 
         data.push(...ledgerTransformed);
