@@ -35,6 +35,7 @@ import reportRoutes from './module/reports/report.router'
 import { voiceAssistantRouter } from './module/voice-assistance/voice.assistance.router'
 import { stockRentalRouter } from './module/stockRent/stockRent.router'
 import { rentRouter } from './module/rent/rent.router'
+import { rentLostRouter } from './module/rent loss/rentLoss.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -72,4 +73,5 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(voiceAssistantRouter, { prefix: '/voice' })
   app.register(stockRentalRouter, { prefix: '/rent/stock' })
   app.register(rentRouter, { prefix: '/rent' })
+  app.register(rentLostRouter, { prefix: '/rent/loss' })
 }

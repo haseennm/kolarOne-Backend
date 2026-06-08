@@ -36,7 +36,17 @@ export interface ReturnRentParams {
 
   remarks?: any[];
 }
-
+export interface CreateRentPaymentParams {
+  branch_id: number;
+  amount: number;
+  payment_method_id: number;
+  row_type: "advance" | "loss";
+  row_id: number;
+  cash_flow: "in" | "out";
+  note?: string | null;
+  remarks?: any;
+  status?: number;
+}
 export interface ReturnRentItem {
   bill_item_id: number;
 

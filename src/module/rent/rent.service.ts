@@ -1,5 +1,5 @@
 import { PoolClient } from "pg";
-import { CreateAdvanceParams, CreateRentItem, CreateRentParams, FetchAdvanceLedgerParams, FetchRentParams, PayBillParams, ReturnAdvanceParams, ReturnRentParams } from "./rent.types";
+import { CreateAdvanceParams, CreateRentItem, CreateRentParams, CreateRentPaymentParams, FetchAdvanceLedgerParams, FetchRentParams, PayBillParams, ReturnAdvanceParams, ReturnRentParams } from "./rent.types";
 import { executeInTransaction, pool } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord, getStatusCode } from "../../utils/extra";
@@ -258,6 +258,82 @@ export class RentService {
 
     return getStatusCode("Active");
   }
+  private async createRentPayment(
+    params: CreateRentPaymentParams,
+    client: PoolClient
+  ) {
+    const {
+      branch_id,
+      amount,
+      payment_method_id,
+      row_type,
+      row_id,
+      cash_flow,
+      note = null,
+      remarks = [],
+      status = getStatusCode("Active")
+    } = params;
+
+    const prefix =
+      cash_flow === "in"
+        ? "REC"
+        : "VOU";
+
+    const sequenceName =
+      cash_flow === "in"
+        ? "receipt_seq"
+        : "voucher_seq";
+
+    const seqResult = await executeInTransaction(
+      client,
+      `
+    SELECT nextval('${sequenceName}') AS seq
+    `
+    );
+
+    const seq = Number(seqResult.rows[0].seq);
+
+    const year = new Date().getFullYear();
+
+    const ref_no =
+      `${prefix}-${branch_id}-${year}-${String(seq).padStart(4, "0")}`;
+
+    const result = await executeInTransaction(
+      client,
+      `
+    INSERT INTO rent_payments (
+      ref_no,
+      branch_id,
+      amount,
+      payment_method_id,
+      row_type,
+      row_id,
+      cash_flow,
+      note,
+      remarks,
+      status
+    )
+    VALUES (
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
+    )
+    RETURNING *
+    `,
+      [
+        ref_no,
+        branch_id,
+        amount,
+        payment_method_id,
+        row_type,
+        row_id,
+        cash_flow,
+        note,
+        JSON.stringify(remarks),
+        status
+      ]
+    );
+
+    return result.rows[0];
+  }
   private async processPayment(
     bill_id: number,
     amount: number,
@@ -312,43 +388,25 @@ export class RentService {
 
     // bill payment
     if (billAmount > 0) {
-      await executeInTransaction(
-        client,
-        `
-      INSERT INTO rent_payments (
-        branch_id,
-        amount,
-        payment_method_id,
-        row_type,
-        row_id,
-        cash_flow,
-        note,
-        remarks,
-        status
-      )
-      VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9
-      )
-      `,
-        [
+      await this.createRentPayment(
+        {
           branch_id,
-          billAmount,
+          amount,
           payment_method_id,
-          "bill",
-          bill_id,
-          "in",
-          note || null,
-          JSON.stringify([
+          row_type: "loss",
+          row_id: bill_id,
+          cash_flow: "in",
+          note: null,
+          remarks: [
             {
               action: "bill_payment",
               amount: billAmount,
               at: new Date().toISOString()
             }
-          ]),
-          getStatusCode("Active")
-        ]
+          ]
+        },
+        client
       );
-
       const updatedRemarks = this.appendRemark(
         bill.remarks,
         "payment",
@@ -413,41 +471,24 @@ export class RentService {
       const ledgerId =
         ledgerResult.rows[0].id;
 
-      await executeInTransaction(
-        client,
-        `
-      INSERT INTO rent_payments (
-        branch_id,
-        amount,
-        payment_method_id,
-        row_type,
-        row_id,
-        cash_flow,
-        note,
-        remarks,
-        status
-      )
-      VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9
-      )
-      `,
-        [
+      await this.createRentPayment(
+        {
           branch_id,
-          advanceAmount,
+          amount,
           payment_method_id,
-          "advance",
-          ledgerId,
-          "in",
-          note || null,
-          JSON.stringify([
+          row_type: "loss",
+          row_id: ledgerId,
+          cash_flow: "in",
+          note: null,
+          remarks: [
             {
               action: "advance_payment",
               amount: advanceAmount,
               at: new Date().toISOString()
             }
-          ]),
-          getStatusCode("Active")
-        ]
+          ]
+        },
+        client
       );
     }
 
@@ -590,41 +631,24 @@ export class RentService {
 
     const ledger = ledgerResult.rows[0];
 
-    await executeInTransaction(
-      client,
-      `
-    INSERT INTO rent_payments (
-      branch_id,
-      amount,
-      payment_method_id,
-      row_type,
-      row_id,
-      cash_flow,
-      note,
-      remarks,
-      status
-    )
-    VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9
-    )
-    `,
-      [
+    await this.createRentPayment(
+      {
         branch_id,
         amount,
         payment_method_id,
-        "advance",
-        ledger.id,
-        "in",
-        note || null,
-        JSON.stringify([
+        row_type: "loss",
+        row_id: ledger.id,
+        cash_flow: "in",
+        note: null,
+        remarks: [
           {
             action: "advance_payment",
             amount,
             at: new Date().toISOString()
           }
-        ]),
-        getStatusCode("Active")
-      ]
+        ]
+      },
+      client
     );
 
     return ledger;
@@ -711,41 +735,24 @@ export class RentService {
       ]
     );
 
-    await executeInTransaction(
-      client,
-      `
-    INSERT INTO rent_payments (
-      branch_id,
-      amount,
-      payment_method_id,
-      row_type,
-      row_id,
-      cash_flow,
-      note,
-      remarks,
-      status
-    )
-    VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9
-    )
-    `,
-      [
-        ledger.branch_id,
+    await this.createRentPayment(
+      {
+        branch_id,
         amount,
         payment_method_id,
-        "advance",
-        ledger_id,
-        "out",
-        note || null,
-        JSON.stringify([
+        row_type: "loss",
+        row_id: ledger_id,
+        cash_flow: "in",
+        note: null,
+        remarks: [
           {
             action: "advance_refund",
             amount,
             at: new Date().toISOString()
           }
-        ]),
-        getStatusCode("Active")
-      ]
+        ]
+      },
+      client
     );
 
     return {
@@ -991,111 +998,111 @@ export class RentService {
   }
 
 
- async payBill(
-  params: PayBillParams,
-  client: PoolClient
-) {
-  const {
-    bill_id,
-    amount = 0,
-    payment_method_id,
-    note,
-    company_id,
-    advance_deductions = [],
-    branch_id
-  } = params;
+  async payBill(
+    params: PayBillParams,
+    client: PoolClient
+  ) {
+    const {
+      bill_id,
+      amount = 0,
+      payment_method_id,
+      note,
+      company_id,
+      advance_deductions = [],
+      branch_id
+    } = params;
 
-  const billResult = await executeInTransaction(
-    client,
-    `
+    const billResult = await executeInTransaction(
+      client,
+      `
     SELECT *
     FROM rent_bills
     WHERE id = $1
     AND branch_id = $2
     AND status != $3
     `,
-    [
-      bill_id,
-      branch_id,
-      getStatusCode("Deleted")
-    ]
-  );
-
-  const bill = billResult.rows[0];
-
-  if (!bill) {
-    throw new AppError(
-      "Rent bill not found",
-      404
-    );
-  }
-
-  const customer = await getRecord(
-    bill.customer_id,
-    "customers",
-    "company_id",
-    company_id,
-    client
-  );
-
-  if (!customer) {
-    throw new AppError(
-      "Customer not found",
-      404
-    );
-  }
-
-  if (
-    bill.status ===
-    getStatusCode("Completed")
-  ) {
-    throw new AppError(
-      "Bill already completed",
-      400
-    );
-  }
-
-  if (
-    amount > 0 &&
-    !payment_method_id
-  ) {
-    throw new AppError(
-      "Payment method required",
-      400
-    );
-  }
-
-  // ==========================
-  // Apply Advance Ledgers
-  // ==========================
-
-  let advanceUsed = 0;
-
-  for (const advance of advance_deductions) {
-    const ledger =
-      await this.validateAdvanceBalance(
-        advance.ledger_id,
-        advance.amount,
+      [
+        bill_id,
         branch_id,
-        client
+        getStatusCode("Deleted")
+      ]
+    );
+
+    const bill = billResult.rows[0];
+
+    if (!bill) {
+      throw new AppError(
+        "Rent bill not found",
+        404
       );
+    }
+
+    const customer = await getRecord(
+      bill.customer_id,
+      "customers",
+      "company_id",
+      company_id,
+      client
+    );
+
+    if (!customer) {
+      throw new AppError(
+        "Customer not found",
+        404
+      );
+    }
 
     if (
-      ledger.customer_id !==
-      bill.customer_id
+      bill.status ===
+      getStatusCode("Completed")
     ) {
       throw new AppError(
-        "Advance belongs to another customer",
+        "Bill already completed",
         400
       );
     }
 
-    advanceUsed += Number(
-      advance.amount
-    );
+    if (
+      amount > 0 &&
+      !payment_method_id
+    ) {
+      throw new AppError(
+        "Payment method required",
+        400
+      );
+    }
 
-    const ledgerRemarks =
-       this.appendRemark(
+    // ==========================
+    // Apply Advance Ledgers
+    // ==========================
+
+    let advanceUsed = 0;
+
+    for (const advance of advance_deductions) {
+      const ledger =
+        await this.validateAdvanceBalance(
+          advance.ledger_id,
+          advance.amount,
+          branch_id,
+          client
+        );
+
+      if (
+        ledger.customer_id !==
+        bill.customer_id
+      ) {
+        throw new AppError(
+          "Advance belongs to another customer",
+          400
+        );
+      }
+
+      advanceUsed += Number(
+        advance.amount
+      );
+
+      const ledgerRemarks =
+        this.appendRemark(
           ledger.remarks,
           "advance_used",
           {
@@ -1105,9 +1112,9 @@ export class RentService {
         );
 
 
-    await executeInTransaction(
-      client,
-      `
+      await executeInTransaction(
+        client,
+        `
       UPDATE rent_customer_ledger
       SET
         remaining_amount =
@@ -1115,194 +1122,173 @@ export class RentService {
         remarks = $2
       WHERE id = $3
       `,
-      [
-        advance.amount,
-        JSON.stringify(
-          ledgerRemarks
-        ),
-        advance.ledger_id
-      ]
-    );
+        [
+          advance.amount,
+          JSON.stringify(
+            ledgerRemarks
+          ),
+          advance.ledger_id
+        ]
+      );
 
-    await executeInTransaction(
-      client,
-      `
-      INSERT INTO rent_payments (
-        branch_id,
+     await this.createRentPayment(
+            {
+              branch_id,
+              amount,
+              payment_method_id,
+              row_type: "loss",
+              row_id:bill_id,
+              cash_flow: "in",
+              note: null,
+              remarks: [
+                {
+                  action: "Bill amount paid",
+                  at: new Date().toISOString()
+                }
+              ]
+            },
+            client
+          );
+    }
+
+    // ==========================
+    // Bill Balance
+    // ==========================
+
+    const balance =
+      Number(bill.total_amount) -
+      Number(bill.total_paid);
+
+    let remainingBalance =
+      balance - advanceUsed;
+
+    if (remainingBalance < 0) {
+      remainingBalance = 0;
+    }
+
+    // ==========================
+    // Cash Payment
+    // ==========================
+
+    let billPayment = 0;
+    let extraAdvance = 0;
+
+    if (amount > 0) {
+      billPayment = Math.min(
         amount,
-        payment_method_id,
-        row_type,
-        row_id,
-        cash_flow,
-        note,
-        status
-      )
-      VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8
-      )
-      `,
-      [
-        branch_id,
-        advance.amount,
-        ledger.payment_method_id,
-        "bill",
-        bill_id,
-        "in",
-        "Advance Applied",
-        getStatusCode("Active")
-      ]
-    );
-  }
+        remainingBalance
+      );
 
-  // ==========================
-  // Bill Balance
-  // ==========================
+      extraAdvance =
+        amount - billPayment;
+    }
 
-  const balance =
-    Number(bill.total_amount) -
-    Number(bill.total_paid);
+    // ==========================
+    // Update Bill Paid
+    // ==========================
 
-  let remainingBalance =
-    balance - advanceUsed;
+    const totalBillPayment =
+      advanceUsed + billPayment;
 
-  if (remainingBalance < 0) {
-    remainingBalance = 0;
-  }
-
-  // ==========================
-  // Cash Payment
-  // ==========================
-
-  let billPayment = 0;
-  let extraAdvance = 0;
-
-  if (amount > 0) {
-    billPayment = Math.min(
-      amount,
-      remainingBalance
-    );
-
-    extraAdvance =
-      amount - billPayment;
-  }
-
-  // ==========================
-  // Update Bill Paid
-  // ==========================
-
-  const totalBillPayment =
-    advanceUsed + billPayment;
-
-  if (totalBillPayment > 0) {
-    await executeInTransaction(
-      client,
-      `
+    if (totalBillPayment > 0) {
+      await executeInTransaction(
+        client,
+        `
       UPDATE rent_bills
       SET
         total_paid =
           total_paid + $1
       WHERE id = $2
       `,
-      [
-        totalBillPayment,
-        bill_id
-      ]
-    );
-  }
+        [
+          totalBillPayment,
+          bill_id
+        ]
+      );
+    }
 
-  // ==========================
-  // Bill Payment Entry
-  // ==========================
+    // ==========================
+    // Bill Payment Entry
+    // ==========================
 
-  if (billPayment > 0) {
-    await executeInTransaction(
-      client,
-      `
-      INSERT INTO rent_payments (
-        branch_id,
-        amount,
-        payment_method_id,
-        row_type,
-        row_id,
-        cash_flow,
-        note,
-        status
-      )
-      VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8
-      )
-      `,
-      [
-        branch_id,
-        billPayment,
-        payment_method_id,
-        "bill",
-        bill_id,
-        "in",
-        note || null,
-        getStatusCode("Active")
-      ]
-    );
-  }
+    if (billPayment > 0) {
+     await this.createRentPayment(
+            {
+              branch_id,
+              amount,
+              payment_method_id,
+              row_type: "loss",
+              row_id: bill_id,
+              cash_flow: "in",
+              note: null,
+              remarks: [
+                {
+                  at: new Date().toISOString()
+                }
+              ]
+            },
+            client
+          );
+    }
 
-  // ==========================
-  // Extra Amount -> Advance
-  // ==========================
+    // ==========================
+    // Extra Amount -> Advance
+    // ==========================
 
-  if (extraAdvance > 0) {
-    await this.createAdvance(
-      {
-        customer_id:
-          bill.customer_id,
-        branch_id,
-        amount: extraAdvance,
-        payment_method_id,
-        note:
-          "Auto created from bill overpayment",
+    if (extraAdvance > 0) {
+      await this.createAdvance(
+        {
+          customer_id:
+            bill.customer_id,
+          branch_id,
+          amount: extraAdvance,
+          payment_method_id,
+          note:
+            "Auto created from bill overpayment",
           company_id,
-      },
-      client
-    );
-  }
+        },
+        client
+      );
+    }
 
-  // ==========================
-  // Refresh Bill
-  // ==========================
+    // ==========================
+    // Refresh Bill
+    // ==========================
 
-  const updatedBillResult =
-    await executeInTransaction(
-      client,
-      `
+    const updatedBillResult =
+      await executeInTransaction(
+        client,
+        `
       SELECT *
       FROM rent_bills
       WHERE id = $1
       `,
-      [bill_id]
-    );
+        [bill_id]
+      );
 
-  const updatedBill =
-    updatedBillResult.rows[0];
+    const updatedBill =
+      updatedBillResult.rows[0];
 
-  const allReturned =
-    await this.checkAllItemsReturned(
-      bill_id,
-      client
-    );
+    const allReturned =
+      await this.checkAllItemsReturned(
+        bill_id,
+        client
+      );
 
-  const status =
-    this.getRentBillStatus(
-      allReturned,
-      Number(
-        updatedBill.total_paid
-      ),
-      Number(
-        updatedBill.total_amount
-      )
-    );
+    const status =
+      this.getRentBillStatus(
+        allReturned,
+        Number(
+          updatedBill.total_paid
+        ),
+        Number(
+          updatedBill.total_amount
+        )
+      );
 
-  await executeInTransaction(
-    client,
-    `
+    await executeInTransaction(
+      client,
+      `
     UPDATE rent_bills
     SET
       status = $1,
@@ -1314,18 +1300,18 @@ export class RentService {
         END
     WHERE id = $3
     `,
-    [
-      status,
-      getStatusCode("Completed"),
-      bill_id
-    ]
-  );
+      [
+        status,
+        getStatusCode("Completed"),
+        bill_id
+      ]
+    );
 
-  return {
-    message:
-      "Payment processed successfully"
-  };
-}
+    return {
+      message:
+        "Payment processed successfully"
+    };
+  }
 
   async returnRent(
     params: ReturnRentParams,

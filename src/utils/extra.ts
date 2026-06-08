@@ -28,7 +28,10 @@ export const STATUS_MAP = {
   11: 'Partial',
   12: 'Good',
   13: 'Damaged',
-  14: 'Advance'
+  14: 'Advance',
+  15: 'Miss',
+  16: 'Overdue',
+  17: 'Blacklist'
 } as const
 export const STATUS_REVERSE_MAP = Object.fromEntries(
   Object.entries(STATUS_MAP).map(([key, value]) => [
@@ -209,7 +212,7 @@ export const isValidDay = async (
   client: PoolClient,
   today: string,
   entity_id: number,
-  entity_type:string
+  entity_type: string
 ): Promise<boolean> => {
 
   const result = await executeInTransaction(
@@ -223,7 +226,7 @@ export const isValidDay = async (
       AND entity_type = $3
     LIMIT 1
     `,
-    [entity_id, today,entity_type]
+    [entity_id, today, entity_type]
   );
 
   if (result.rows.length > 0) {

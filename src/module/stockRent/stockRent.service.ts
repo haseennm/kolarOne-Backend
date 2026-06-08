@@ -262,8 +262,18 @@ OFFSET $${values.length + 2}
 
     const total = await query<CountResult>(countQuery, values);
 
+    const mappedRentStock = rent_stock.map((row: any) => ({
+      ...row,
+      available_rate_types: [
+        ...(Number(row.hourly_rate ?? 0) > 0 ? ["hour"] : []),
+        ...(Number(row.daily_rate ?? 0) > 0 ? ["day"] : []),
+        ...(Number(row.weekly_rate ?? 0) > 0 ? ["week"] : []),
+        ...(Number(row.monthly_rate ?? 0) > 0 ? ["month"] : []),
+      ],
+    }));
+
     return {
-      rent_stock,
+      rent_stock: mappedRentStock,
       page,
       limit,
       total: Number(total[0].count),
