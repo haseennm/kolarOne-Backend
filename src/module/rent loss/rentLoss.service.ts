@@ -394,15 +394,18 @@ export class RentLossService {
     }
 
     if (billPayment > 0) {
-      await executeInTransaction(
-        client,
-        `
-        INSERT INTO rent_payments (
-          branch_id, amount, payment_method_id, row_type, row_id, cash_flow, note, status
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        `,
-        [branch_id, billPayment, payment_method_id, "loss", lost_row_id, "in", note || null, getStatusCode("Paid")]
+        await this.createRentPayment(
+        {
+          branch_id,
+          amount:billPayment,
+          payment_method_id,
+          row_type: "loss",
+          row_id: lost_row_id,
+          cash_flow: "in",
+          note: note || null,
+          remarks: [{ action: "lost payment created after record", at: new Date().toISOString() }]
+        },
+        client
       );
     }
 
