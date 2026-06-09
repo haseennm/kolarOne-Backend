@@ -589,4 +589,120 @@ export class ReportService {
       }));
     });
   }
+  async getRentDashboard(data: {
+    company_id: number;
+    branch_id: number;
+  }) {
+    const { company_id, branch_id } = data;
+
+    return transaction(async (client) => {
+
+      let queryArgs: any[] = [];
+      let billCondition = "";
+      let customerCondition = "";
+      let stockCondition = "";
+
+      queryArgs.push(branch_id);
+
+      billCondition = `rb.branch_id = $${queryArgs.length}`;
+      stockCondition = `rs.branch_id = $${queryArgs.length}`;
+      queryArgs.push(company_id);
+
+      const companyParam = queryArgs.length;
+
+      customerCondition = `c.company_id = $${companyParam}`;
+
+      const activeStatus = getStatusCode("Active");       // 1
+      const blacklistStatus = getStatusCode("blacklist"); // 17
+
+      const query = `
+      SELECT
+        (
+          SELECT COUNT(*)
+          FROM rent_bills rb
+          WHERE ${billCondition}
+          AND rb.status = ${activeStatus} AND DATE(rb.start_date) = CURRENT_DATE
+        ) AS today_active_rent_bills,
+
+        (
+          SELECT COUNT(*)
+          FROM rent_bills rb
+          WHERE ${billCondition}
+          AND DATE(rb.actual_close_date) = CURRENT_DATE
+        ) AS today_closed_rent_bills,
+
+        (
+          SELECT COUNT(*)
+          FROM rent_bills rb
+          WHERE ${billCondition}
+          AND rb.actual_close_date IS NULL
+          AND rb.expected_return_date < CURRENT_DATE
+        ) AS overdue_rent_bills,
+
+        (
+          SELECT COALESCE(SUM(rbi.quantity_taken),0)
+          FROM rent_bill_items rbi
+          JOIN rent_bills rb ON rb.id = rbi.bill_id
+          WHERE ${billCondition}
+          AND rbi.status != 0
+          AND DATE(rb.start_date) = CURRENT_DATE
+        ) AS today_total_rent_items,
+        (
+          SELECT COALESCE(
+            SUM((remark->>'qty')::numeric),
+            0
+          )
+          FROM rent_bill_items rbi
+          CROSS JOIN LATERAL jsonb_array_elements(rbi.remarks) remark
+          JOIN rent_bills rb ON rb.id = rbi.bill_id
+          WHERE ${billCondition}
+          AND remark->>'action' = 'returned'
+          AND DATE((remark->>'at')::timestamp) = CURRENT_DATE
+        ) AS today_return_items_qty,
+        (
+          SELECT COALESCE(SUM(rp.amount),0)
+          FROM rent_payments rp
+          WHERE rp.branch_id = $1
+          AND DATE(rp.created_at) = CURRENT_DATE
+        ) AS today_revenue,
+
+        (
+        SELECT COALESCE(SUM(rp.amount),0)
+        FROM rent_payments rp
+        WHERE rp.branch_id = $1
+        AND DATE_TRUNC('month', rp.created_at)
+            = DATE_TRUNC('month', CURRENT_DATE)
+       ) AS month_revenue,
+
+        (
+          SELECT COUNT(*)
+          FROM customers c
+          WHERE ${customerCondition}
+          AND c.status = ${activeStatus}
+        ) AS active_customers,
+
+        (
+          SELECT COUNT(*)
+          FROM customers c
+          WHERE ${customerCondition}
+          AND c.status = ${blacklistStatus}
+        ) AS blacklist_customers,
+
+        (
+          SELECT COALESCE(SUM(rs.available_units),0)
+          FROM rental_stocks rs
+          WHERE ${stockCondition}
+          AND rs.status != 0
+        ) AS total_available_quantity
+    `;
+
+      const result = await executeInTransaction(
+        client,
+        query,
+        queryArgs
+      );
+
+      return result.rows[0];
+    });
+  }
 }
