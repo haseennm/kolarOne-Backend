@@ -1,5 +1,5 @@
 import { PoolClient } from "pg";
-import { CreateAdvanceBody, CreateRentItem, CreateRentParams, CreateRentPaymentParams, ReturnRentParams,ReturnAdvanceBody, PayBillBody, FetchRentParams, FetchAdvanceLedgerParams } from "./rent.types";
+import { CreateAdvanceBody, CreateRentItem, CreateRentParams, CreateRentPaymentParams, ReturnRentParams, ReturnAdvanceBody, PayBillBody, FetchRentParams, FetchAdvanceLedgerParams } from "./rent.types";
 import { executeInTransaction, pool } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord, getStatusCode } from "../../utils/extra";
@@ -655,90 +655,90 @@ export class RentService {
   }
 
   async returnAdvance(
-  params: ReturnAdvanceBody,
-  client: PoolClient
-) {
-  const {
-    customer_id,
-    amount,
-    payment_method_id,
-    note,
-    company_id,
-    branch_id
-  } = params;
+    params: ReturnAdvanceBody,
+    client: PoolClient
+  ) {
+    const {
+      customer_id,
+      amount,
+      payment_method_id,
+      note,
+      company_id,
+      branch_id
+    } = params;
 
-  if (amount <= 0) {
-    throw new AppError("Amount must be greater than zero", 400);
-  }
+    if (amount <= 0) {
+      throw new AppError("Amount must be greater than zero", 400);
+    }
 
-  // 1. Validate Customer
-  const customer = await getRecord(
-    customer_id,
-    "customers",
-    "company_id",
-    company_id,
-    client
-  );
-
-  if (!customer) {
-    throw new AppError("Customer not found", 404);
-  }
-
-  // 2. Validate Payment Method
-  const paymentMethod = await getRecord(
-    payment_method_id,
-    "payment_methods",
-    "company_id",
-    company_id,
-    client
-  );
-
-  if (!paymentMethod) {
-    throw new AppError("Payment method not found", 404);
-  }
-
-  // 3. Fetch all active ledgers for this customer with a remaining balance (FIFO)
-  const activeLedgersResult = await client.query(
-    `SELECT * FROM rent_customer_ledger 
-     WHERE customer_id = $1 AND branch_id = $2 AND remaining_amount > 0
-     ORDER BY remaining_amount ASC `,
-    [customer_id, branch_id]
-  );
-
-  const activeLedgers = activeLedgersResult.rows;
-  
-  // Calculate total available balance across all entries
-  const totalAvailableBalance = activeLedgers.reduce((sum, ledger) => sum + Number(ledger.remaining_amount), 0);
-  
-  if (amount > totalAvailableBalance) {
-    throw new AppError(`Insufficient remaining balance. Available: ${totalAvailableBalance}`, 400);
-  }
-
-  let amountToRefund = amount;
-  const updatedLedgers = [];
-
-  // 4. Loop through ledgers and deduct amounts sequentially
-  for (const ledger of activeLedgers) {
-    if (amountToRefund <= 0) break;
-
-    const currentLedgerBalance = Number(ledger.remaining_amount);
-    // Determine how much to take from this specific ledger entry
-    const deduction = Math.min(amountToRefund, currentLedgerBalance);
-
-    const updatedRemarks = this.appendRemark(
-      ledger.remarks,
-      "advance_refund",
-      {
-        amount: deduction,
-        payment_method_id,
-        note: note || `Knocked down via multi-ledger refund.`
-      }
+    // 1. Validate Customer
+    const customer = await getRecord(
+      customer_id,
+      "customers",
+      "company_id",
+      company_id,
+      client
     );
 
-    // Update the individual ledger entry
-    const updatedLedgerRow = await executeInTransaction(
-      client,
-      `
+    if (!customer) {
+      throw new AppError("Customer not found", 404);
+    }
+
+    // 2. Validate Payment Method
+    const paymentMethod = await getRecord(
+      payment_method_id,
+      "payment_methods",
+      "company_id",
+      company_id,
+      client
+    );
+
+    if (!paymentMethod) {
+      throw new AppError("Payment method not found", 404);
+    }
+
+    // 3. Fetch all active ledgers for this customer with a remaining balance (FIFO)
+    const activeLedgersResult = await client.query(
+      `SELECT * FROM rent_customer_ledger 
+     WHERE customer_id = $1 AND branch_id = $2 AND remaining_amount > 0
+     ORDER BY remaining_amount ASC `,
+      [customer_id, branch_id]
+    );
+
+    const activeLedgers = activeLedgersResult.rows;
+
+    // Calculate total available balance across all entries
+    const totalAvailableBalance = activeLedgers.reduce((sum, ledger) => sum + Number(ledger.remaining_amount), 0);
+
+    if (amount > totalAvailableBalance) {
+      throw new AppError(`Insufficient remaining balance. Available: ${totalAvailableBalance}`, 400);
+    }
+
+    let amountToRefund = amount;
+    const updatedLedgers = [];
+
+    // 4. Loop through ledgers and deduct amounts sequentially
+    for (const ledger of activeLedgers) {
+      if (amountToRefund <= 0) break;
+
+      const currentLedgerBalance = Number(ledger.remaining_amount);
+      // Determine how much to take from this specific ledger entry
+      const deduction = Math.min(amountToRefund, currentLedgerBalance);
+
+      const updatedRemarks = this.appendRemark(
+        ledger.remarks,
+        "advance_refund",
+        {
+          amount: deduction,
+          payment_method_id,
+          note: note || `Knocked down via multi-ledger refund.`
+        }
+      );
+
+      // Update the individual ledger entry
+      const updatedLedgerRow = await executeInTransaction(
+        client,
+        `
       UPDATE rent_customer_ledger
       SET
         remaining_amount = remaining_amount - $1,
@@ -746,44 +746,44 @@ export class RentService {
       WHERE id = $3
       RETURNING *
       `,
-      [
-        deduction,
-        JSON.stringify(updatedRemarks),
-        ledger.id
-      ]
-    );
-
-    // Track the payment record link for accountability
-    await this.createRentPayment(
-      {
-        branch_id,
-        amount: deduction,
-        payment_method_id,
-        row_type: "loss",
-        row_id: ledger.id,
-        cash_flow: "in", // Keep your architecture rule; typically refunds are cash-out, but keeping your original config
-        note: note || null,
-        remarks: [
-          {
-            action: "advance_refund",
-            amount: deduction,
-            at: new Date().toISOString()
-          }
+        [
+          deduction,
+          JSON.stringify(updatedRemarks),
+          ledger.id
         ]
-      },
-      client
-    );
+      );
 
-    updatedLedgers.push(updatedLedgerRow.rows[0]);
-    amountToRefund -= deduction; // Reduce the remaining amount left to clear
+      // Track the payment record link for accountability
+      await this.createRentPayment(
+        {
+          branch_id,
+          amount: deduction,
+          payment_method_id,
+          row_type: "loss",
+          row_id: ledger.id,
+          cash_flow: "in", // Keep your architecture rule; typically refunds are cash-out, but keeping your original config
+          note: note || null,
+          remarks: [
+            {
+              action: "advance_refund",
+              amount: deduction,
+              at: new Date().toISOString()
+            }
+          ]
+        },
+        client
+      );
+
+      updatedLedgers.push(updatedLedgerRow.rows[0]);
+      amountToRefund -= deduction; // Reduce the remaining amount left to clear
+    }
+
+    return {
+      message: "Advance balances refunded and processed successfully",
+      affected_ledgers_count: updatedLedgers.length,
+      data: updatedLedgers
+    };
   }
-
-  return {
-    message: "Advance balances refunded and processed successfully",
-    affected_ledgers_count: updatedLedgers.length,
-    data: updatedLedgers
-  };
-}
 
   async createRent(
     params: CreateRentParams,
@@ -1155,24 +1155,24 @@ export class RentService {
         ]
       );
 
-     await this.createRentPayment(
+      await this.createRentPayment(
+        {
+          branch_id,
+          amount,
+          payment_method_id,
+          row_type: "loss",
+          row_id: bill_id,
+          cash_flow: "in",
+          note: null,
+          remarks: [
             {
-              branch_id,
-              amount,
-              payment_method_id,
-              row_type: "loss",
-              row_id:bill_id,
-              cash_flow: "in",
-              note: null,
-              remarks: [
-                {
-                  action: "Bill amount paid",
-                  at: new Date().toISOString()
-                }
-              ]
-            },
-            client
-          );
+              action: "Bill amount paid",
+              at: new Date().toISOString()
+            }
+          ]
+        },
+        client
+      );
     }
 
     // ==========================
@@ -1236,23 +1236,23 @@ export class RentService {
     // ==========================
 
     if (billPayment > 0) {
-     await this.createRentPayment(
+      await this.createRentPayment(
+        {
+          branch_id,
+          amount,
+          payment_method_id,
+          row_type: "loss",
+          row_id: bill_id,
+          cash_flow: "in",
+          note: null,
+          remarks: [
             {
-              branch_id,
-              amount,
-              payment_method_id,
-              row_type: "loss",
-              row_id: bill_id,
-              cash_flow: "in",
-              note: null,
-              remarks: [
-                {
-                  at: new Date().toISOString()
-                }
-              ]
-            },
-            client
-          );
+              at: new Date().toISOString()
+            }
+          ]
+        },
+        client
+      );
     }
 
     // ==========================
@@ -1311,8 +1311,8 @@ export class RentService {
       );
 
     await executeInTransaction(
-  client,
-  `
+      client,
+      `
   UPDATE rent_bills
   SET
     status = $1::int, -- Cast to integer here
@@ -1324,12 +1324,12 @@ export class RentService {
       END
   WHERE id = $3
   `,
-  [
-    status,
-    getStatusCode("Completed"),
-    bill_id
-  ]
-);
+      [
+        status,
+        getStatusCode("Completed"),
+        bill_id
+      ]
+    );
 
     return {
       message:
@@ -1458,7 +1458,8 @@ export class RentService {
           returned_qty + $1,
         remarks = $2,
         amount = $3
-      WHERE id = $4
+        status= $4
+      WHERE id = $5 AND bill_id = $6
       `,
         [
           item.return_qty,
@@ -1466,7 +1467,9 @@ export class RentService {
             itemRemarks
           ),
           item.amount,
-          item.bill_item_id
+          Number(remainingQty) + Number(item.return_qty) === billItem.quantity_taken ? getStatusCode("Returned") : billItem.status,
+          item.bill_item_id,
+          bill_id
         ]
       );
 

@@ -31,7 +31,8 @@ export const STATUS_MAP = {
   14: 'Advance',
   15: 'Miss',
   16: 'Overdue',
-  17: 'Blacklist'
+  17: 'Blacklist',
+  18: 'Returned',
 } as const
 export const STATUS_REVERSE_MAP = Object.fromEntries(
   Object.entries(STATUS_MAP).map(([key, value]) => [
