@@ -165,3 +165,12 @@ export const sharedSchemaBody = {
       level: { type: "string", enum: ["company", "branch"] }
     }
   };
+  export type DashboardBody = {
+  company_id: number;
+  branch_id: number;
+};
+  export type DailyCashFlowBody = {
+    branch_id: number;
+    month: number;
+    year: number;
+};

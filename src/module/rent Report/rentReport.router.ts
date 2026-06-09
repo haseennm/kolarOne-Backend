@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ReportController } from "./rentReport.controller";
-import { DashboardBody, RentReportInput, sharedSchemaBody } from "./rentReport.types";
+import { DailyCashFlowBody, DashboardBody, RentReportInput, sharedSchemaBody } from "./rentReport.types";
 
 export async function rentReportRouter(app: FastifyInstance): Promise<void> {
   const controller = new ReportController();
@@ -92,26 +92,50 @@ export async function rentReportRouter(app: FastifyInstance): Promise<void> {
     return reply.code(200).send({ status: "Success", data });
   });
   app.post<{ Body: DashboardBody }>(
-  "/dashboard",
-  {
-    schema: {
-      body: {
-        type: "object",
-        required: ["branch_id", "company_id"],
-        properties: {
-          company_id: { type: "number" },
-          branch_id: { type: "number" }
+    "/dashboard",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["branch_id", "company_id"],
+          properties: {
+            company_id: { type: "number" },
+            branch_id: { type: "number" }
+          }
         }
       }
-    }
-  },
-  async (req, reply) => {
-    const data = await controller.getDashbordReport(req.body);
+    },
+    async (req, reply) => {
+      const data = await controller.getDashbordReport(req.body);
 
-    return reply.code(200).send({
-      status: "Success",
-      data
-    });
-  }
-);
+      return reply.code(200).send({
+        status: "Success",
+        data
+      });
+    }
+  );
+  app.post<{ Body: DailyCashFlowBody }>(
+    "/cashflow",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["branch_id", "year", "month"],
+          properties: {
+            month: { type: "number" },
+            year: { type: "number" },
+            branch_id: { type: "number" }
+          }
+        }
+      }
+    },
+    async (req, reply) => {
+      const data = await controller.getDailyCashFlow(req.body);
+
+      return reply.code(200).send({
+        status: "Success",
+        data
+      });
+    }
+  );
 }

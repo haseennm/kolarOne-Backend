@@ -1457,7 +1457,7 @@ export class RentService {
         returned_qty =
           returned_qty + $1,
         remarks = $2,
-        amount = $3
+        amount = $3,
         status= $4
       WHERE id = $5 AND bill_id = $6
       `,

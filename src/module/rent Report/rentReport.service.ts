@@ -705,4 +705,59 @@ export class ReportService {
       return result.rows[0];
     });
   }
+  async getDailyCashFlow(data: {
+    branch_id: number;
+    month: number;
+    year: number;
+  }) {
+    const { branch_id, month, year } = data;
+    return transaction(async (client) => {
+
+     const result= await executeInTransaction(client,
+        `
+    WITH daily_transactions AS (
+      SELECT
+        DATE(created_at) AS transaction_date,
+
+        SUM(
+          CASE
+            WHEN cash_flow='in'
+            THEN amount
+            ELSE 0
+          END
+        ) AS income,
+
+        SUM(
+          CASE
+            WHEN cash_flow='out'
+            THEN amount
+            ELSE 0
+          END
+        ) AS expense
+
+      FROM rent_payments
+
+      WHERE branch_id = $1
+      AND EXTRACT(MONTH FROM created_at) = $2
+      AND EXTRACT(YEAR FROM created_at) = $3
+      AND status != 0
+
+      GROUP BY DATE(created_at)
+    )
+
+    SELECT
+      transaction_date AS date,
+      COALESCE(income,0) AS income,
+      COALESCE(expense,0) AS expense,
+      COALESCE(income,0) - COALESCE(expense,0) AS balance
+
+    FROM daily_transactions
+
+    ORDER BY transaction_date
+    `,
+        [branch_id, month, year]
+      );
+      return result.rows
+    })
+  }
 }

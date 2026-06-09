@@ -73,4 +73,11 @@ export class ReportController {
   }) {
     return await this.service.getRentDashboard(body);
   }
+  async getDailyCashFlow(body: {
+    branch_id: number;
+    month: number;
+    year: number;
+  }) {
+    return await this.service.getDailyCashFlow(body);
+  }
 }
