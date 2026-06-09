@@ -2,18 +2,18 @@
 import { transaction } from "../../config/db";
 import { getStatusCode, getStatusText } from "../../utils/extra";
 import { RentService } from "./rent.service";
-import { CreateAdvanceBody, CreateRentBody, FetchAdvanceLedgerQuery, FetchRentQuery, PayBillBody, ReturnAdvanceBody, ReturnRentBody, } from "./rent.types";
+import { CreateAdvanceBody, CreateRentParams,  FetchRentQuery, PayBillBody, ReturnAdvanceBody, ReturnRentParams} from "./rent.types";
 
 export class RentController {
   private rentService = new RentService();
 
-  async createRent(body: CreateRentBody) {
+  async createRent(body: CreateRentParams) {
     return transaction(async (client) => {
       return this.rentService.createRent(body, client);
     })
   }
 
-  async returnRent(body: ReturnRentBody) {
+  async returnRent(body: ReturnRentParams) {
     return transaction(async (client) => {
       return this.rentService.returnRent(body, client);
     })
@@ -74,7 +74,7 @@ export class RentController {
     };
   }
   async fetchAdvanceLedger(
-    data: FetchAdvanceLedgerQuery
+    data: FetchRentQuery
   ) {
     const res = await this.rentService.fetchAdvanceLedger(
       data

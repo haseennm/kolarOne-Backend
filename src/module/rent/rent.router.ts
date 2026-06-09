@@ -6,19 +6,18 @@ import {
   payBillSchema,
   createRentSchema,
   PayBillBody,
-  CreateRentBody,
-  ReturnRentBody,
+  CreateRentParams,
+  ReturnRentParams,
   returnRentSchema,
   CreateAdvanceBody,
   ReturnAdvanceBody,
   FetchRentQuery,
-  FetchAdvanceLedgerQuery,
   fetchRentSchema,
 } from "./rent.types";
 import { RentController } from "./rent.controller";
 
 export async function rentRouter(app: FastifyInstance): Promise<void> {
-  app.post<{ Body: CreateRentBody }>(
+  app.post<{ Body: CreateRentParams }>(
     "/add",
     {
       schema: {
@@ -45,7 +44,7 @@ export async function rentRouter(app: FastifyInstance): Promise<void> {
       });
     }
   );
-  app.post<{ Body: ReturnRentBody }>(
+  app.post<{ Body: ReturnRentParams }>(
     "/return",
     {
       schema: {
@@ -194,7 +193,7 @@ export async function rentRouter(app: FastifyInstance): Promise<void> {
     }
   );
   app.post<{
-    Body: FetchAdvanceLedgerQuery;
+    Body:FetchRentQuery ;
   }>(
     "/advance/fetch",
     async (
