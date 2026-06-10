@@ -237,13 +237,55 @@ RETURNING *;
 
   async deleteProductCat(data: DeleteProductCatParams) {
     const { r_id, remark, company_id, sub_cat_remark } = data;
+
     const result = transaction(async (client) => {
+      // 1. Verify the target product category exists
       const isProduct_cat_exist = await getRecord(r_id, "product_categories", "company_id", company_id, client);
 
       if (!isProduct_cat_exist) {
         throw new AppError("product category not found or deleted", 404);
       }
 
+      // 2. Validate Stock for all cascading products (Direct products + Subcategory products)
+      const stock_check_query = `
+  SELECT 
+    s.product_id,
+    s.available_quantity,
+    s.batch_number,
+    p.name AS product_name
+  FROM stock s
+  JOIN products p ON s.product_id = p.id
+  WHERE (
+    p.category_id = $1
+    OR p.category_id IN (
+      SELECT id
+      FROM product_categories
+      WHERE parent_id = $1
+      AND company_id = $2
+    )
+  )
+  AND p.company_id = $2
+  AND s.available_quantity > 0
+  AND s.status = $3
+  LIMIT 1;
+`;
+
+      const stockCheckResult = await executeInTransaction(
+        client,
+        stock_check_query,
+        [r_id, company_id, getStatusCode("Good")]
+      );
+
+      if ((stockCheckResult.rowCount ?? 0) > 0) {
+        const stock = stockCheckResult.rows[0];
+
+        throw new AppError(
+          `Cannot delete category. Product "${stock.product_name}" still has active stock in batch "${stock.batch_number}" with quantity ${stock.available_quantity}.`,
+          400
+        );
+      }
+
+      // 3. Delete products directly under the main category
       const delete_product_query_text = `
       UPDATE products
       SET
@@ -258,18 +300,20 @@ RETURNING *;
       RETURNING *;
     `;
 
-      const delete_product_values = [
-        getStatusCode("Deleted"),
-        JSON.stringify(sub_cat_remark),
-        r_id,
-        company_id
-      ];
-      const deletedProducts = await executeInTransaction(
-        client,
-        delete_product_query_text,
-        delete_product_values
-      );
-      const delete_sub_query_text = `
+    const delete_product_values = [
+      getStatusCode("Deleted"),
+      JSON.stringify(sub_cat_remark),
+      r_id,
+      company_id
+    ];
+    const deletedProducts = await executeInTransaction(
+      client,
+      delete_product_query_text,
+      delete_product_values
+    );
+
+    // 4. Delete subcategories
+    const delete_sub_query_text = `
       UPDATE product_categories
       SET
         status = $1,
@@ -283,50 +327,54 @@ RETURNING *;
       RETURNING *;
     `;
 
-      const delete_sub_values = [
-        getStatusCode("Deleted"),
-        JSON.stringify(sub_cat_remark),
-        r_id,
-        company_id
-      ];
-      const deletedSubCategories = await executeInTransaction(
-        client,
-        delete_sub_query_text,
-        delete_sub_values
-      );
-      const delete_sub_products_query = `
-          UPDATE products
-          SET
-            status = $1,
-            remarks =
-              CASE
-                WHEN jsonb_typeof(remarks) = 'array'
-                  THEN remarks || $2::jsonb
-                ELSE jsonb_build_array(remarks) || $2::jsonb
-              END
-          WHERE category_id IN (
-            SELECT id
-            FROM product_categories
-            WHERE parent_id = $3
-              AND company_id = $4
-          )
+    const delete_sub_values = [
+      getStatusCode("Deleted"),
+      JSON.stringify(sub_cat_remark),
+      r_id,
+      company_id
+    ];
+    const deletedSubCategories = await executeInTransaction(
+      client,
+      delete_sub_query_text,
+      delete_sub_values
+    );
+
+    // 5. Delete products belonging to subcategories
+    const delete_sub_products_query = `
+      UPDATE products
+      SET
+        status = $1,
+        remarks =
+          CASE
+            WHEN jsonb_typeof(remarks) = 'array'
+              THEN remarks || $2::jsonb
+            ELSE jsonb_build_array(remarks) || $2::jsonb
+          END
+      WHERE category_id IN (
+        SELECT id
+        FROM product_categories
+        WHERE parent_id = $3
           AND company_id = $4
-          RETURNING *;
-        `;
+      )
+      AND company_id = $4
+      RETURNING *;
+    `;
 
-      const delete_sub_products_values = [
-        getStatusCode("Deleted"),
-        JSON.stringify(sub_cat_remark),
-        r_id,
-        company_id
-      ];
+    const delete_sub_products_values = [
+      getStatusCode("Deleted"),
+      JSON.stringify(sub_cat_remark),
+      r_id,
+      company_id
+    ];
 
-      const deletedSubProducts = await executeInTransaction(
-        client,
-        delete_sub_products_query,
-        delete_sub_products_values
-      );
-      const queryText = `
+    const deletedSubProducts = await executeInTransaction(
+      client,
+      delete_sub_products_query,
+      delete_sub_products_values
+    );
+
+    // 6. Delete the main category itself
+    const queryText = `
       UPDATE product_categories
       SET
         status = $1,
@@ -340,22 +388,23 @@ RETURNING *;
       RETURNING *;
     `;
 
-      const values = [
-        0,
-        JSON.stringify(remark),
-        r_id,
-      ];
+    const values = [
+      0, // Assumed status code for main deleted item
+      JSON.stringify(remark),
+      r_id,
+    ];
 
-      await executeInTransaction(client, queryText, values);
+    await executeInTransaction(client, queryText, values);
 
-      return `
-        Product Category ${isProduct_cat_exist.name} deleted successfully.
-        Deleted products: ${deletedProducts.rowCount}
-        Deleted subcategory products: ${deletedSubProducts.rowCount}
-        Deleted subcategories: ${deletedSubCategories.rowCount}
-        `;
-    })
-    return result
+    return `
+      Product Category ${isProduct_cat_exist.name} deleted successfully.
+      Deleted products: ${deletedProducts.rowCount}
+      Deleted subcategory products: ${deletedSubProducts.rowCount}
+      Deleted subcategories: ${deletedSubCategories.rowCount}
+    `;
+  });
+
+    return result;
   }
 
 }

@@ -39,7 +39,7 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
         }
 
         else {
-          const cleanKey = part.fieldname.trim(); 
+          const cleanKey = part.fieldname.trim();
           body[cleanKey] = part.value;
         }
       }
@@ -118,7 +118,7 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
 
       const controller = new ProCatController();
 
-      const firms = await controller.fetchProCat({
+      const product_category = await controller.fetchProCat({
         offset,
         filters: {
           ...filters,
@@ -127,8 +127,8 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
         },
       });
 
-      return reply.code(200).send(firms);
-     
+      return reply.code(200).send(product_category);
+
     }
   );
 
@@ -185,11 +185,11 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
       }
 
       const controller = new ProCatController();
-      const firm = await controller.editProductCat(body);
+      const edited_product_cat = await controller.editProductCat(body);
 
       return reply.code(200).send({
         status: "Success",
-        message: firm
+        message: edited_product_cat
       });
 
     } catch (err: any) {
@@ -220,8 +220,11 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
     async (request, reply) => {
       cns(request.url, request.body);
       const controller = new ProCatController();
-      const firm = await controller.deleteProductCat(request.body);
-      return reply.code(201).send(firm);
+      const deleted_product_cat = await controller.deleteProductCat(request.body);
+      return reply.code(201).send({
+        status: "Success",
+        message: deleted_product_cat
+      });
     }
   );
 }

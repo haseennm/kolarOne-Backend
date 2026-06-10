@@ -104,7 +104,12 @@ export default class SaleService {
       amount: p.amount,
       reference: p.reference ?? null
     }));
+    const refResult = await executeInTransaction(
+      client,
+      `SELECT CONCAT('SL-', nextval('sale_ref_seq')) AS ref`
+    );
 
+    const ref_no = refResult.rows[0].ref;
     const query = `
     INSERT INTO sales (
       customer_id,
@@ -122,10 +127,11 @@ export default class SaleService {
       status,
       remarks,
       firm_id,
-      paid
+      paid,
+      ref_no
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
     )
     RETURNING *;
   `;
@@ -146,7 +152,8 @@ export default class SaleService {
       statusCode,
       JSON.stringify(remark ?? {}),
       firm_id,
-      paid
+      paid,
+      ref_no
     ];
 
     const { rows } = await executeInTransaction(client, query, values);

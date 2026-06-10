@@ -4,7 +4,6 @@ export interface CreateProductBody {
   name: string;
   short_name: string | null;
   description: string | null;
-  sku: string | null;
   barcode: string | null;
   hsn_sac_code: string | null;
   unit: string | null;
@@ -77,7 +76,6 @@ export interface EditProductBody {
   name?: string;
   short_name?: string | null;
   description?: string | null;
-  sku?: string | null;
   barcode?: string | null;
   hsn_sac_code?: string | null;
   unit?: string | null;

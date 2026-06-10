@@ -76,6 +76,12 @@ export default class PurchaseService {
     if ((is_bill_exist.rowCount ?? 0) > 0) {
       throw new AppError("purchase bill already exist", 400);
     }
+     const refResult = await executeInTransaction(
+      client,
+      `SELECT CONCAT('PB-', nextval('sale_ref_seq')) AS ref`
+    );
+
+    const ref_no = refResult.rows[0].ref;
     const purchaseQuery = `
     INSERT INTO purchases (
       vendor_id,
@@ -94,11 +100,12 @@ export default class PurchaseService {
       remarks,
       payment_method_id,
       transaction_reference,
-      firm_id
+      firm_id,
+      ref_no
     )
     VALUES (
       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-      $11,$12,$13,$14,$15,$16,$17
+      $11,$12,$13,$14,$15,$16,$17,$18
     )
     RETURNING *;
   `;
@@ -120,7 +127,8 @@ export default class PurchaseService {
       JSON.stringify(remark) ?? {},
       payment_method_id ?? null,
       transaction_reference ?? null,
-      firm_id
+      firm_id,
+      ref_no
     ];
 
     const { rows } = await executeInTransaction(client, purchaseQuery, values);

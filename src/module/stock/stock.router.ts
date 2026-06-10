@@ -208,10 +208,14 @@ export async function stockRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["firm_id", "r_id", "selling_price"],
+          required: ["firm_id", "r_id", "mrp_price","retail_price","wholesale_price","branch_price","special_retail_price"],
           properties: {
             r_id: { type: "number" },
             selling_price: { type: "number" },
+            special_retail_price: { type: "number" },
+            branch_price: { type: "number" },
+            wholesale_price: { type: "number" },
+            retail_price: { type: "number" },
             firm_id: { type: "number" },
           }
         }

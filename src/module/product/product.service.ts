@@ -21,7 +21,6 @@ export default class ProductService {
       name,
       short_name,
       description,
-      sku,
       barcode,
       hsn_sac_code,
       unit,
@@ -65,6 +64,12 @@ export default class ProductService {
         if (!brandExist)
           throw new AppError("brand not found", 404);
       }
+      const skuResult = await executeInTransaction(
+        client,
+        `SELECT CONCAT('SKU-', nextval('product_sku_seq')) AS sku`
+      );
+
+      const sku = skuResult.rows[0].sku;
 
       const queryText = `
         INSERT INTO products (
@@ -339,7 +344,7 @@ export default class ProductService {
         rest.name ?? existing.name,
         rest.short_name ?? existing.short_name,
         rest.description ?? existing.description,
-        rest.sku ?? existing.sku,
+        existing.sku,
         rest.barcode ?? existing.barcode,
         rest.hsn_sac_code ?? existing.hsn_sac_code,
         rest.unit ?? existing.unit,
