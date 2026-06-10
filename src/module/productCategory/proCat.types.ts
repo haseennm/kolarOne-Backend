@@ -78,6 +78,7 @@ export interface DeleteProductCatParams
   extends Omit<DeleteProductCatBody, "deleted_by"> {
   remark: object;
   company_id: number;
+  sub_cat_remark:object
 }
 
 export interface ProductCatLoginBody {

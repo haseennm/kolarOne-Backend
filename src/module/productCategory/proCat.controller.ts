@@ -88,12 +88,17 @@ export default class ProCatController {
       deleted_by,
       updated_at: Date.now(),
     };
-
+    const sub_cat_remark = {
+      action: "Deleted Due to delete parent category",
+      deleted_by,
+      deleted_at: Date.now(),
+    };
     const service = new ProductCatService();
 
     const product_category = await service.deleteProductCat({
       ...rest,
       remark,
+      sub_cat_remark
     });
 
     return product_category;

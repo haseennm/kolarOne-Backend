@@ -1,6 +1,6 @@
 import { Result } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
-import { cns, getRecord } from "../../utils/extra";
+import { cns, getRecord, getStatusCode } from "../../utils/extra";
 import {
   CountResult,
   CreateProductCatParams,
@@ -236,7 +236,7 @@ RETURNING *;
   }
 
   async deleteProductCat(data: DeleteProductCatParams) {
-    const { r_id, remark, company_id } = data;
+    const { r_id, remark, company_id, sub_cat_remark } = data;
     const result = transaction(async (client) => {
       const isProduct_cat_exist = await getRecord(r_id, "product_categories", "company_id", company_id, client);
 
@@ -244,6 +244,88 @@ RETURNING *;
         throw new AppError("product category not found or deleted", 404);
       }
 
+      const delete_product_query_text = `
+      UPDATE products
+      SET
+        status = $1,
+        remarks =
+          CASE
+            WHEN jsonb_typeof(remarks) = 'array'
+              THEN remarks || $2::jsonb
+            ELSE jsonb_build_array(remarks) || $2::jsonb
+          END
+      WHERE category_id =$3 AND company_id =$4
+      RETURNING *;
+    `;
+
+      const delete_product_values = [
+        getStatusCode("Deleted"),
+        JSON.stringify(sub_cat_remark),
+        r_id,
+        company_id
+      ];
+      const deletedProducts = await executeInTransaction(
+        client,
+        delete_product_query_text,
+        delete_product_values
+      );
+      const delete_sub_query_text = `
+      UPDATE product_categories
+      SET
+        status = $1,
+        remarks =
+          CASE
+            WHEN jsonb_typeof(remarks) = 'array'
+              THEN remarks || $2::jsonb
+            ELSE jsonb_build_array(remarks) || $2::jsonb
+          END
+      WHERE parent_id =$3 AND company_id =$4
+      RETURNING *;
+    `;
+
+      const delete_sub_values = [
+        getStatusCode("Deleted"),
+        JSON.stringify(sub_cat_remark),
+        r_id,
+        company_id
+      ];
+      const deletedSubCategories = await executeInTransaction(
+        client,
+        delete_sub_query_text,
+        delete_sub_values
+      );
+      const delete_sub_products_query = `
+          UPDATE products
+          SET
+            status = $1,
+            remarks =
+              CASE
+                WHEN jsonb_typeof(remarks) = 'array'
+                  THEN remarks || $2::jsonb
+                ELSE jsonb_build_array(remarks) || $2::jsonb
+              END
+          WHERE category_id IN (
+            SELECT id
+            FROM product_categories
+            WHERE parent_id = $3
+              AND company_id = $4
+          )
+          AND company_id = $4
+          RETURNING *;
+        `;
+
+      const delete_sub_products_values = [
+        getStatusCode("Deleted"),
+        JSON.stringify(sub_cat_remark),
+        r_id,
+        company_id
+      ];
+
+      const deletedSubProducts = await executeInTransaction(
+        client,
+        delete_sub_products_query,
+        delete_sub_products_values
+      );
       const queryText = `
       UPDATE product_categories
       SET
@@ -266,7 +348,12 @@ RETURNING *;
 
       await executeInTransaction(client, queryText, values);
 
-      return `Firm ${isProduct_cat_exist.name} Deleted Successfully`;
+      return `
+        Product Category ${isProduct_cat_exist.name} deleted successfully.
+        Deleted products: ${deletedProducts.rowCount}
+        Deleted subcategory products: ${deletedSubProducts.rowCount}
+        Deleted subcategories: ${deletedSubCategories.rowCount}
+        `;
     })
     return result
   }
