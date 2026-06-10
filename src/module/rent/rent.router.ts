@@ -13,6 +13,8 @@ import {
   ReturnAdvanceBody,
   FetchRentQuery,
   fetchRentSchema,
+  returnBillAmountSchema,
+  ReturnBillAmountBody,
 } from "./rent.types";
 import { RentController } from "./rent.controller";
 
@@ -135,6 +137,31 @@ export async function rentRouter(app: FastifyInstance): Promise<void> {
 
       const data =
         await controller.returnAdvance(
+          request.body
+        );
+
+      return reply.send({
+        status: "Success",
+        message: data
+      });
+    }
+  );
+  app.post<{ Body: ReturnBillAmountBody }>(
+    "/bill/amount/refund",
+    {
+      schema: {
+        body: returnBillAmountSchema
+      }
+    },
+    async (
+      request,
+      reply
+    ) => {
+      const controller =
+        new RentController();
+
+      const data =
+        await controller.refundBill(
           request.body
         );
 

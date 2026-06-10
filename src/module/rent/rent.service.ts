@@ -1,5 +1,5 @@
 import { PoolClient } from "pg";
-import { CreateAdvanceBody, CreateRentItem, CreateRentParams, CreateRentPaymentParams, ReturnRentParams, ReturnAdvanceBody, PayBillBody, FetchRentParams, FetchAdvanceLedgerParams } from "./rent.types";
+import { CreateAdvanceBody, CreateRentItem, CreateRentParams, CreateRentPaymentParams, ReturnRentParams, ReturnAdvanceBody, PayBillBody, FetchRentParams, FetchAdvanceLedgerParams, ReturnBillAmountBody } from "./rent.types";
 import { executeInTransaction, pool } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord, getStatusCode } from "../../utils/extra";
@@ -782,6 +782,108 @@ export class RentService {
       message: "Advance balances refunded and processed successfully",
       affected_ledgers_count: updatedLedgers.length,
       data: updatedLedgers
+    };
+  }
+  async refundBillAmount(
+    params: ReturnBillAmountBody,
+    client: PoolClient
+  ) {
+    const {
+      bill_id,
+      amount,
+      payment_method_id,
+      note,
+      company_id,
+      branch_id
+    } = params;
+
+    if (amount <= 0) {
+      throw new AppError("Amount must be greater than zero", 400);
+    }
+
+    // 1. Validate Customer
+    const rent_bill = await getRecord(
+      bill_id,
+      "rent_bills",
+      "branch_id",
+      branch_id,
+      client
+    );
+
+    if (!rent_bill) {
+      throw new AppError("Rent bill not found", 404);
+    }
+    if (amount > rent_bill.paid_amount) {
+      throw new AppError(
+        `Amount exceeds paid amount. Paid amount: ${rent_bill.paid_amount}`,
+        400
+      );
+    }
+
+    // 2. Validate Payment Method
+    const paymentMethod = await getRecord(
+      payment_method_id,
+      "payment_methods",
+      "company_id",
+      company_id,
+      client
+    );
+
+    if (!paymentMethod) {
+      throw new AppError("Payment method not found", 404);
+    }
+
+    const updatedRemarks = this.appendRemark(
+      rent_bill.remarks,
+      "Refund to customer",
+      {
+        amount,
+        payment_method_id,
+        note: note || `Refunded to customer.`
+      }
+    );
+
+    await executeInTransaction(
+      client,
+      `
+      UPDATE rent_bills
+      SET
+        total_paid = total_paid - $1,
+        remarks = $2
+      WHERE id = $3
+      AND branch_id =$4
+      RETURNING *
+      `,
+      [
+        amount,
+        JSON.stringify(updatedRemarks),
+        bill_id,
+        branch_id
+      ]
+    );
+    await this.createRentPayment(
+      {
+        branch_id,
+        amount,
+        payment_method_id,
+        row_type: "bill",
+        row_id: bill_id,
+        cash_flow: "out", // Keep your architecture rule; typically refunds are cash-out, but keeping your original config
+        note: note || "Refuned to customer",
+        remarks: [
+          {
+            action: "Refund to customer",
+            amount,
+            at: new Date().toISOString()
+          }
+        ]
+      },
+      client
+    );
+
+
+    return {
+      message: "balances refunded and processed successfully",
     };
   }
 

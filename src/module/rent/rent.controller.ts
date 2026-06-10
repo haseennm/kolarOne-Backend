@@ -2,7 +2,7 @@
 import { transaction } from "../../config/db";
 import { getStatusCode, getStatusText } from "../../utils/extra";
 import { RentService } from "./rent.service";
-import { CreateAdvanceBody, CreateRentParams,  FetchRentQuery, PayBillBody, ReturnAdvanceBody, ReturnRentParams} from "./rent.types";
+import { CreateAdvanceBody, CreateRentParams,  FetchRentQuery, PayBillBody, ReturnAdvanceBody, ReturnBillAmountBody, ReturnRentParams} from "./rent.types";
 
 export class RentController {
   private rentService = new RentService();
@@ -31,6 +31,11 @@ export class RentController {
     })
   }
 
+  async refundBill(body: ReturnBillAmountBody) {
+    return transaction(async (client) => {
+      return this.rentService.refundBillAmount(body, client);
+    })
+  }
   async returnAdvance(body: ReturnAdvanceBody) {
     return transaction(async (client) => {
       return this.rentService.returnAdvance(body, client);

@@ -83,7 +83,27 @@ export interface ReturnAdvanceBody {
   payment_method_id: number;
   note?: string;
 }
+export interface ReturnBillAmountBody {
+  bill_id: number;     // Changed from ledger_id
+  company_id: number;
+  branch_id: number;
+  amount: number;
+  payment_method_id: number;
+  note?: string;
+}
 
+export const returnBillAmountSchema = {
+  type: "object",
+  required: ["bill_id", "company_id", "branch_id", "amount", "payment_method_id"],
+  properties: {
+    bill_id: { type: "string" },
+    company_id: { type: "number" },
+    branch_id: { type: "number" },
+    amount: { type: "number" },
+    payment_method_id: { type: "number" },
+    note: { type: "string" }
+  }
+};
 export const returnAdvanceSchema = {
   type: "object",
   required: ["customer_id", "company_id", "branch_id", "amount", "payment_method_id"],
