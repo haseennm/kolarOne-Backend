@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { transaction } from "../../config/db";
 import { cns, getStatusCode, getStatusText, getTransactionCode } from "../../utils/extra";
 import StockService from "./stock.service";
-import { StockAdditionalBody, StockChangeBody, StockCreateBody, StockDelete, StockEditBody, StockFetchParams, StockPriceSet, StockReport } from "./stock.types";
+import { StockAdditionalBody, StockAdjustFetchParams, StockChangeBody, StockCreateBody, StockDelete, StockEditBody, StockFetchParams, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
 import { AppError } from "../../utils/AppError";
 
 export default class StockController {
@@ -96,12 +96,41 @@ export default class StockController {
       );
     })
   }
+  async changeQty(data: StockQtyChangeBody) {
+    const service = new StockService();
+    return transaction(async (client: PoolClient) => {
+
+      await service.changeQty(
+        {
+          ...data
+        }
+        ,
+        client
+      );
+    })
+  }
 
   async fetchStock(data: StockFetchParams) {
 
     const service = new StockService();
 
     const stocksWithCode = await service.fetchStock(data);
+
+    const stocks = stocksWithCode.stocks.map((row) => ({
+      ...row,
+      status: getStatusText(row.status),
+    }));
+
+    return {
+      stocks,
+      pagination: { ...stocksWithCode.pagination }
+    };
+  }
+  async fetchStockAdjust(data: StockAdjustFetchParams) {
+
+    const service = new StockService();
+
+    const stocksWithCode = await service.fetchAdjustedStock(data);
 
     const stocks = stocksWithCode.stocks.map((row) => ({
       ...row,

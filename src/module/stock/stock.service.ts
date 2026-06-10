@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord } from "../../utils/extra";
-import { StockAdditionalParams, StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams, StockPriceSet, StockReport } from "./stock.types";
+import { StockAdditionalParams, StockAdjustFetchParams, StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
 
 const generateBarcode = (): string => {
   return Math.floor(10000000000 + Math.random() * 90000000000).toString();
@@ -470,6 +470,128 @@ export default class StockService {
         limit: limit,
         total: Number(total[0].count),
         totalPages: Math.ceil(Number(total[0].count) / limit),
+      },
+    };
+  }
+  async fetchAdjustedStock(data: StockAdjustFetchParams) {
+    const { filters, offset } = data;
+
+    let where: string[] = [];
+    let values: any[] = [];
+
+    // stock adjustment status
+    values.push(0);
+    where.push(`sa.status != $${values.length}`);
+
+    if (filters?.id) {
+      values.push(filters.id);
+      where.push(`sa.id = $${values.length}`);
+    }
+
+    if (filters?.product_id) {
+      values.push(filters.product_id);
+      where.push(`s.product_id = $${values.length}`);
+    }
+
+    if (filters?.firm_id) {
+      values.push(filters.firm_id);
+      where.push(`s.firm_id = $${values.length}`);
+    }
+
+    if (filters?.branch_id) {
+      values.push(filters.branch_id);
+      where.push(`sa.branch_id = $${values.length}`);
+    }
+
+    values.push(filters.company_id);
+    where.push(`b.company_id = $${values.length}`);
+
+    if (filters?.status !== undefined) {
+      values.push(filters.status);
+      where.push(`sa.status = $${values.length}`);
+    }
+
+    if (filters?.barcode) {
+      values.push(filters.barcode);
+      where.push(`s.barcode = $${values.length}`);
+    }
+
+    if (filters?.quantity !== undefined) {
+      values.push(filters.quantity);
+      where.push(`sa.quantity >= $${values.length}`);
+    }
+
+    if (filters?.flow_type) {
+      values.push(filters.flow_type);
+      where.push(`sa.flow_type = $${values.length}`);
+    }
+
+    if (filters?.search) {
+      values.push(`%${filters.search}%`);
+
+      where.push(`(
+      s.batch_number ILIKE $${values.length}
+      OR p.name ILIKE $${values.length}
+      OR s.barcode ILIKE $${values.length}
+      OR fi.firm_name ILIKE $${values.length}
+    )`);
+    }
+
+    const whereClause = where.length
+      ? `WHERE ${where.join(" AND ")}`
+      : "";
+
+    const sortBy = filters.sort_by || "sa.id";
+    const sortOrder =
+      filters.sort_order === "asc" ? "ASC" : "DESC";
+
+    const stockQuery = `
+    SELECT
+      sa.*,
+      s.batch_number,
+      s.barcode,
+      p.name AS product_name,
+      fi.firm_name
+    FROM stock_adjustments sa
+    LEFT JOIN stocks s ON sa.stock_id = s.id
+    LEFT JOIN products p ON s.product_id = p.id
+    LEFT JOIN branches b ON sa.branch_id = b.id
+    LEFT JOIN firm fi ON s.firm_id = fi.id
+    ${whereClause}
+    ORDER BY ${sortBy} ${sortOrder}
+    LIMIT $${values.length + 1}
+    OFFSET $${values.length + 2}
+  `;
+
+    const countQuery = `
+    SELECT COUNT(*)
+    FROM stock_adjustments sa
+    LEFT JOIN stocks s ON sa.stock_id = s.id
+    LEFT JOIN products p ON s.product_id = p.id
+    LEFT JOIN branches b ON sa.branch_id = b.id
+    LEFT JOIN firm fi ON s.firm_id = fi.id
+    ${whereClause}
+  `;
+
+    const limit = filters.limit ?? 50;
+
+    const stocks = await query(stockQuery, [
+      ...values,
+      limit,
+      offset
+    ]);
+
+    const total = await query(countQuery, values);
+
+    return {
+      stocks,
+      pagination: {
+        page: filters.page,
+        limit,
+        total: Number(total[0].count),
+        totalPages: Math.ceil(
+          Number(total[0].count) / limit
+        ),
       },
     };
   }
@@ -1003,9 +1125,18 @@ export default class StockService {
       [product_id, branch_id, "I", qty, reason, stock_id, statusCode]
     );
   }
-
+  private validateValue(price: number, label: string) {
+    if (price <= 0) {
+      throw new AppError(`${label} must be greater than 0`, 400);
+    }
+  }
   async updateSellingPrice(data: StockPriceSet, client: PoolClient) {
-    const { firm_id, r_id, selling_price } = data;
+    const { firm_id, r_id, branch_price, mrp_price, retail_price, special_retail_price, wholesale_price, } = data;
+    this.validateValue(mrp_price, "MRP price");
+    this.validateValue(retail_price, "Retail price");
+    this.validateValue(special_retail_price, "Special retail price");
+    this.validateValue(wholesale_price, "Wholesale price");
+    this.validateValue(branch_price, "Branch price");
 
     const isStockExist = await getRecord(
       r_id,
@@ -1023,12 +1154,16 @@ export default class StockService {
       client,
       `
     UPDATE stock
-    SET selling_price = $1
-    WHERE id = $2
-      AND firm_id = $3
+    SET branch_price = $1
+    AND mrp_price =$2
+    AND retail_price =$3
+    AND special_retail_price =$4
+    AND wholesale_price =$5
+    WHERE id = $6
+      AND firm_id = $7
     RETURNING *;
     `,
-      [selling_price, r_id, firm_id]
+      [branch_price, mrp_price, retail_price, special_retail_price, wholesale_price, r_id, firm_id]
     );
 
     if (!updatedStock.rows.length) {
@@ -1036,5 +1171,67 @@ export default class StockService {
     }
 
     return updatedStock.rows[0];
+  }
+  async changeQty(data: StockQtyChangeBody, client: PoolClient) {
+    const {
+      available_qty,
+      branch_id,
+      note,
+      r_id
+    } = data
+    const isStockExist = await getRecord(
+      r_id,
+      "stock",
+      "branch_id",
+      branch_id,
+      client
+    );
+
+    if (!isStockExist) {
+      throw new AppError("Stock not found", 404);
+    }
+    const changed_qty = Number(isStockExist.available_qty) - Number(available_qty)
+    if (changed_qty === 0) {
+      throw new AppError("Available quantity must be changed", 400);
+    }
+    const flow_type = changed_qty > 0 ? "Stock payment" : "Stock receipt"
+    const updatedStock = await executeInTransaction(
+      client,
+      `
+    UPDATE stock
+    SET available_qty = $1
+    WHERE id = $2
+      AND branch_id = $3 
+      AND status != 0
+    RETURNING *;
+    `,
+      [available_qty, r_id, branch_id]
+    );
+
+    if (!updatedStock.rows.length) {
+      throw new AppError("Failed to update Available quantity", 400);
+    }
+    const stockQuery = `
+        INSERT INTO stock_adjustments (
+          quantity,
+          branch_id,
+          stock_id,
+          note,
+          flow_type
+        )
+        VALUES ($1,$2,$3,$4,$5)
+        RETURNING *;
+      `;
+
+    const values = [
+      Math.abs(changed_qty),
+      branch_id,
+      r_id,
+      note,
+      flow_type
+    ];
+
+    await executeInTransaction(client, stockQuery, values);
+    return `${flow_type} created successfully. Quantity changed: ${Math.abs(changed_qty)}`;
   }
 }

@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import StockController from "./stock.controller";
-import { StockAdditionalBody, StockDelete, StockFetchBody, StockPriceSet, StockReport } from "./stock.types";
+import { StockAdditionalBody, StockAdjustFetchBody, StockDelete, StockFetchBody, StockPriceSet, StockReport } from "./stock.types";
 
 export async function stockRouter(app: FastifyInstance) {
 
@@ -66,6 +66,65 @@ export async function stockRouter(app: FastifyInstance) {
       return reply.code(200).send(data);
     }
   );
+  app.post<{ Body: StockAdjustFetchBody }>(
+    "/adjustment/history",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["company_id","branch_id"],
+          properties: {
+            id: { type: "number" },
+
+            company_id: { type: "number" },
+            branch_id: { type: "number" },
+            firm_id: { type: "number" },
+            product_id: { type: "number" },
+
+            status: { type: "number" },
+
+            search: { type: "string" },
+            flow_type: { type: "string", enum: ["Stock payment", "Stock receipt"] },
+
+            quantity: { type: "number" },
+            sort_by: { type: "string" },
+            sort_order: { type: "string", enum: ["asc", "desc"] },
+
+            page: {
+              type: "number",
+              minimum: 1,
+              default: 1
+            },
+            limit: {
+              type: "number",
+              minimum: 1,
+              default: 10
+            }
+          }
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: StockAdjustFetchBody }>,
+      reply: FastifyReply
+    ) => {
+
+      const { page = 1, limit = 10, ...filters } = request.body;
+
+      const controller = new StockController(); // ✅ changed
+
+      const data = await controller.fetchStockAdjust({   // ✅ changed
+        offset: (page - 1) * limit,
+        filters: {
+          ...filters,
+          page,
+          limit
+        }
+      });
+      console.log(data)
+      return reply.code(200).send(data);
+    }
+  );
   app.post<{ Body: StockReport }>(
     "/reports",
     {
@@ -116,7 +175,7 @@ export async function stockRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["company_id", "qty", "product_id", "branch_id","firm_id"],
+          required: ["company_id", "qty", "product_id", "branch_id", "firm_id"],
           properties: {
             company_id: { type: "number" },
             qty: { type: "number" },
@@ -172,4 +231,35 @@ export async function stockRouter(app: FastifyInstance) {
       });
     }
   );
+  app.post<{ Body: StockPriceSet }>(
+    "/edit/available_qty",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["branch_id", "r_id", "available_qty", "note"],
+          properties: {
+            r_id: { type: "number" },
+            available_qty: { type: "number" },
+            branch_id: { type: "number" },
+            note: { type: "string" },
+          }
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: StockPriceSet }>,
+      reply: FastifyReply
+    ) => {
+      const controller = new StockController();
+
+      const stock = await controller.setPrice(request.body);
+
+      return reply.code(201).send({
+        status: "Success",
+        message: stock
+      });
+    }
+  );
+
 }
