@@ -18,6 +18,8 @@ const TABLES = [
 
     'stock',
     'ledger_transactions'
+,
+    'rent_bill_items','rent_bills','loss_stocks','rent_customer_ledger','rent_payments'
 ]
 
 export default class MaintenanceService {

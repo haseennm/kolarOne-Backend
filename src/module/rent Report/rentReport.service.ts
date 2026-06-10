@@ -662,14 +662,14 @@ export class ReportService {
         (
           SELECT COALESCE(SUM(rp.amount),0)
           FROM rent_payments rp
-          WHERE rp.branch_id = $1
+          WHERE rp.branch_id = $1 AND cash_flow = 'in'
           AND DATE(rp.created_at) = CURRENT_DATE
         ) AS today_revenue,
 
         (
         SELECT COALESCE(SUM(rp.amount),0)
         FROM rent_payments rp
-        WHERE rp.branch_id = $1
+        WHERE rp.branch_id = $1 AND cash_flow = 'in'
         AND DATE_TRUNC('month', rp.created_at)
             = DATE_TRUNC('month', CURRENT_DATE)
        ) AS month_revenue,

@@ -1,8 +1,9 @@
 import { PoolClient } from "pg";
 import { AppError } from "../../utils/AppError";
 import { executeInTransaction } from "../../config/db";
-import { ConfirmSalaryParams, CreateSalaryParams, GenerateSalaryBody, GetSalaryBody, SalaryGenerationRow } from "./voice.assistance.types";
 import { getRecord } from "../../utils/extra";
+import { CreateSalaryParams } from "../salary/salary.types";
+import { SalaryGenerationRow } from "./voice.assistance.types";
 
 const FULL_DAY_MINUTES = 360;
 const HALF_DAY_MINUTES = 210;
@@ -255,105 +256,105 @@ export default class SalaryService {
 
     return fetchResult.rows as SalaryGenerationRow[];
   }
-  async confirmSalary(data: ConfirmSalaryParams, client: any) {
+  // async confirmSalary(data: ConfirmSalaryParams, client: any) {
 
-    const { r_id, entity_id, entity_type, final_salary, remark, statusCode } = data;
+  //   const { r_id, entity_id, entity_type, final_salary, remark, statusCode } = data;
 
-    const is_salary_exist = await executeInTransaction(
-      client,
-      `
-    SELECT * FROM salary_generations
-    WHERE id = $1
-      AND entity_id = $2
-      AND entity_type = $3
-    `,
-      [r_id, entity_id, entity_type]
-    );
+  //   const is_salary_exist = await executeInTransaction(
+  //     client,
+  //     `
+  //   SELECT * FROM salary_generations
+  //   WHERE id = $1
+  //     AND entity_id = $2
+  //     AND entity_type = $3
+  //   `,
+  //     [r_id, entity_id, entity_type]
+  //   );
 
-    if (is_salary_exist.rowCount === 0) {
-      throw new AppError("Salary not found", 404);
-    }
+  //   if (is_salary_exist.rowCount === 0) {
+  //     throw new AppError("Salary not found", 404);
+  //   }
 
-    const salary = is_salary_exist.rows[0];
+  //   const salary = is_salary_exist.rows[0];
 
-    if (salary.status === 5) {
-      throw new AppError(
-        "This record cannot be modified because it has already been paid.",
-        409
-      );
-    }
+  //   if (salary.status === 5) {
+  //     throw new AppError(
+  //       "This record cannot be modified because it has already been paid.",
+  //       409
+  //     );
+  //   }
 
-    const status =
-      statusCode === 99
-        ? salary.status
-        : statusCode;
+  //   const status =
+  //     statusCode === 99
+  //       ? salary.status
+  //       : statusCode;
 
-    const adjustment =
-      (final_salary ?? salary.final_salary) - salary.gross_salary;
+  //   const adjustment =
+  //     (final_salary ?? salary.final_salary) - salary.gross_salary;
 
-    const updateQuery = `
-    UPDATE salary_generations
-    SET
-      final_salary = $1,
-      status = $2,
-      remarks = CASE
-        WHEN remarks IS NULL THEN $3::jsonb
-        WHEN jsonb_typeof(remarks) = 'array'
-          THEN remarks || $3::jsonb
-        ELSE jsonb_build_array(remarks) || $3::jsonb
-      END,
-      adjustments = $4
-    WHERE id = $5
-      AND entity_id = $6
-      AND entity_type = $7
-    RETURNING *;
-  `;
+  //   const updateQuery = `
+  //   UPDATE salary_generations
+  //   SET
+  //     final_salary = $1,
+  //     status = $2,
+  //     remarks = CASE
+  //       WHEN remarks IS NULL THEN $3::jsonb
+  //       WHEN jsonb_typeof(remarks) = 'array'
+  //         THEN remarks || $3::jsonb
+  //       ELSE jsonb_build_array(remarks) || $3::jsonb
+  //     END,
+  //     adjustments = $4
+  //   WHERE id = $5
+  //     AND entity_id = $6
+  //     AND entity_type = $7
+  //   RETURNING *;
+  // `;
 
-    const values = [
-      final_salary ?? salary.final_salary,
-      status,
-      JSON.stringify(remark),
-      adjustment,
-      r_id,
-      entity_id,
-      entity_type
-    ];
+  //   const values = [
+  //     final_salary ?? salary.final_salary,
+  //     status,
+  //     JSON.stringify(remark),
+  //     adjustment,
+  //     r_id,
+  //     entity_id,
+  //     entity_type
+  //   ];
 
-    const { rows } = await executeInTransaction(client, updateQuery, values);
+  //   const { rows } = await executeInTransaction(client, updateQuery, values);
 
-    return {
-      data: rows[0]
-    };
-  }
-  async getSalary(
-    data: GetSalaryBody,
-    client: PoolClient
-  ): Promise<SalaryGenerationRow[]> {
+  //   return {
+  //     data: rows[0]
+  //   };
+  // }
+  // async getSalary(
+  //   data: GetSalaryBody,
+  //   client: PoolClient
+  // ): Promise<SalaryGenerationRow[]> {
 
-    const { salary_month, entity_id, entity_type, staff_ids } = data;
+  //   const { salary_month, entity_id, entity_type, staff_ids } = data;
 
-    let query = `
-    SELECT 
-      sg.*,
-      s.full_name
-    FROM salary_generations sg
-    JOIN staff s ON sg.staff_id = s.id
-    WHERE sg.salary_month = $1
-      AND sg.entity_id = $2
-      AND sg.entity_type = $3
-  `;
+  //   let query = `
+  //   SELECT 
+  //     sg.*,
+  //     s.full_name
+  //   FROM salary_generations sg
+  //   JOIN staff s ON sg.staff_id = s.id
+  //   WHERE sg.salary_month = $1
+  //     AND sg.entity_id = $2
+  //     AND sg.entity_type = $3
+  // `;
 
-    const params: any[] = [salary_month, entity_id, entity_type];
+  //   const params: any[] = [salary_month, entity_id, entity_type];
 
-    if (staff_ids && staff_ids.length > 0) {
-      query += ` AND sg.staff_id = ANY($4)`;
-      params.push(staff_ids);
-    }
+  //   if (staff_ids && staff_ids.length > 0) {
+  //     query += ` AND sg.staff_id = ANY($4)`;
+  //     params.push(staff_ids);
+  //   }
 
-    query += ` ORDER BY s.full_name ASC`;
+  //   query += ` ORDER BY s.full_name ASC`;
 
-    const result = await executeInTransaction(client, query, params);
+  //   const result = await executeInTransaction(client, query, params);
 
-    return result.rows as SalaryGenerationRow[];
-  }
+  //   return result.rows as SalaryGenerationRow[];
+  // }
 }
