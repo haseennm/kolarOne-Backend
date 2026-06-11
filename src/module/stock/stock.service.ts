@@ -1149,22 +1149,31 @@ export default class StockService {
     if (!isStockExist) {
       throw new AppError("Stock not found", 404);
     }
-
-    const updatedStock = await executeInTransaction(
-      client,
-      `
-    UPDATE stock
-    SET branch_price = $1
-    AND mrp_price =$2
-    AND retail_price =$3
-    AND special_retail_price =$4
-    AND wholesale_price =$5
-    WHERE id = $6
-      AND firm_id = $7
-    RETURNING *;
-    `,
-      [branch_price, mrp_price, retail_price, special_retail_price, wholesale_price, r_id, firm_id]
-    );
+    console.log("insert data", [branch_price, mrp_price, retail_price, special_retail_price, wholesale_price, r_id, firm_id])
+  const updatedStock = await executeInTransaction(
+  client,
+  `
+  UPDATE stock
+  SET 
+    branch_price = $1,
+    mrp_price = $2,
+    retail_price = $3,
+    special_retail_price = $4,
+    wholesale_price = $5
+  WHERE id = $6
+    AND firm_id = $7
+  RETURNING *;
+  `,
+  [
+    branch_price,
+    mrp_price,
+    retail_price,
+    special_retail_price,
+    wholesale_price,
+    r_id,
+    firm_id
+  ]
+);
 
     if (!updatedStock.rows.length) {
       throw new AppError("Failed to update selling price", 400);
@@ -1190,7 +1199,7 @@ export default class StockService {
     if (!isStockExist) {
       throw new AppError("Stock not found", 404);
     }
-    const changed_qty = Number(isStockExist.available_qty) - Number(available_qty)
+    const changed_qty = Number(isStockExist.available_quantity) - Number(available_qty)
     if (changed_qty === 0) {
       throw new AppError("Available quantity must be changed", 400);
     }
@@ -1199,7 +1208,7 @@ export default class StockService {
       client,
       `
     UPDATE stock
-    SET available_qty = $1
+    SET available_quantity = $1
     WHERE id = $2
       AND branch_id = $3 
       AND status != 0

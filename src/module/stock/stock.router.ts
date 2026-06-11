@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import StockController from "./stock.controller";
-import { StockAdditionalBody, StockAdjustFetchBody, StockDelete, StockFetchBody, StockPriceSet, StockReport } from "./stock.types";
+import { StockAdditionalBody, StockAdjustFetchBody, StockDelete, StockFetchBody, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
 
 export async function stockRouter(app: FastifyInstance) {
 
@@ -235,7 +235,7 @@ export async function stockRouter(app: FastifyInstance) {
       });
     }
   );
-  app.post<{ Body: StockPriceSet }>(
+  app.post<{ Body: StockQtyChangeBody }>(
     "/edit/available_qty",
     {
       schema: {
@@ -252,12 +252,12 @@ export async function stockRouter(app: FastifyInstance) {
       }
     },
     async (
-      request: FastifyRequest<{ Body: StockPriceSet }>,
+      request: FastifyRequest<{ Body: StockQtyChangeBody }>,
       reply: FastifyReply
     ) => {
       const controller = new StockController();
 
-      const stock = await controller.setPrice(request.body);
+      const stock = await controller.changeQty(request.body);
 
       return reply.code(201).send({
         status: "Success",
