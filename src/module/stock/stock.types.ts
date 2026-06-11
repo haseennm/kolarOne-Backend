@@ -20,13 +20,17 @@ export interface StockEditBody {
   branch_id: number;
   firm_id: number;
   purchase_id: number | null;
-  selling_price?: number;
   product_id?: number;
   available_qty?: number;
   purchased_qty?: number;
   status?: 'Damaged' | 'Good';
   movement_type?: 'I' | 'O';
   reason?: string;
+  mrp_price?: number;
+  wholesale_price?: number;
+  retail_price?: number;
+  branch_price?: number;
+  special_retail_price?: number
 }
 export interface StockEditParams extends Omit<StockEditBody, "status"> {
   statusCode?: number

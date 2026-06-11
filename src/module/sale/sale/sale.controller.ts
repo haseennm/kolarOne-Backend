@@ -12,7 +12,7 @@ import { AppError } from "../../../utils/AppError";
 export default class SaleController {
 
   async saleCreate(data: SaleCreateBody) {
-    const { paid, final_amount, status, company_id, created_by, items, payments, ...rest } = data;
+    const { paid, final_amount, company_id, created_by, items, payments, ...rest } = data;
 
     const remark = {
       action: "Created",
@@ -21,7 +21,6 @@ export default class SaleController {
     };
 
     return transaction(async (client: PoolClient) => {
-      const statusCode = getStatusCode(status ?? "Completed");
 
       const service = new SaleService();
       const sale = await service.createSale(
@@ -30,7 +29,6 @@ export default class SaleController {
           paid,
           final_amount,
           remark,
-          statusCode,
           company_id,
           payments
         },
@@ -122,7 +120,7 @@ export default class SaleController {
   }
 
   async saleEdit(data: SaleEditBody) {
-    const { paid, final_amount, status, company_id, updated_by, items, payments, ...rest } = data;
+    const { paid, final_amount, company_id, updated_by, items, payments, ...rest } = data;
 
     const remark = {
       action: "Updated",
@@ -131,7 +129,6 @@ export default class SaleController {
     };
 
     return transaction(async (client: PoolClient) => {
-      const statusCode = getStatusCode(status ?? "Completed");
 
       const service = new SaleService();
       const sale = await service.editSale(
@@ -140,7 +137,6 @@ export default class SaleController {
           paid,
           final_amount,
           remark,
-          statusCode,
           company_id,
           payments
         },
@@ -159,7 +155,7 @@ export default class SaleController {
               sale_id: sale.id,
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
-              status: status ?? "Completed",
+              status:  "Completed",
               product_id: item.product_id,
               stock_id: item.stock_id,
               saled_qty: item.saled_qty,

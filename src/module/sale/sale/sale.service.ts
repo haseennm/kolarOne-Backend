@@ -1,11 +1,22 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { getRecord } from "../../../utils/extra";
+import { getRecord, getStatusCode } from "../../../utils/extra";
 import { GetReportSalePurchaseLedger, RepayBalanceSale, SaleCreateParams, SaleDeleteParams, SaleEditParams, SaleFetchParams } from "./sale.types";
 
 export default class SaleService {
+  private billStatus(final_amount: number, paid_amount: number) {
 
+    if (paid_amount <= 0) {
+      return getStatusCode("Unpaid");
+    }
+
+    if (paid_amount >= final_amount) {
+      return getStatusCode("Paid");
+    }
+
+    return getStatusCode("Partial");
+  }
   async createSale(data: SaleCreateParams, client: PoolClient) {
     const {
       customer_id,
@@ -16,7 +27,6 @@ export default class SaleService {
       net_amount,
       payments,
       remark,
-      statusCode,
       subtotal,
       paid,
       total_cgst,
@@ -108,7 +118,7 @@ export default class SaleService {
       client,
       `SELECT CONCAT('SL-', nextval('sale_ref_seq')) AS ref`
     );
-
+    const status = this.billStatus(final_amount, paid)
     const ref_no = refResult.rows[0].ref;
     const query = `
     INSERT INTO sales (
@@ -149,7 +159,7 @@ export default class SaleService {
       final_amount ?? 0,
       JSON.stringify(paymentobj),
       notes ?? null,
-      statusCode,
+      status,
       JSON.stringify(remark ?? {}),
       firm_id,
       paid,
@@ -172,7 +182,6 @@ export default class SaleService {
       net_amount,
       paid,
       remark,
-      statusCode,
       subtotal,
       total_cgst,
       total_igst,
@@ -236,6 +245,7 @@ export default class SaleService {
         reference: p.reference ?? null
       }))
       : (is_sale_exist.payments || []);
+    const status = this.billStatus((final_amount ?? is_sale_exist.final_amount), (paid ?? is_sale_exist.paid))
 
     const updateQuery = `
       UPDATE sales SET
@@ -269,7 +279,7 @@ export default class SaleService {
       final_amount ?? is_sale_exist.final_amount,
       JSON.stringify(paymentobj),
       notes ?? is_sale_exist.notes,
-      statusCode ?? is_sale_exist.status,
+      status,
       JSON.stringify([remark]),
       paid ?? is_sale_exist.paid,
       firm_id,

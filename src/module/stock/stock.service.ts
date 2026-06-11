@@ -148,7 +148,6 @@ export default class StockService {
     const {
       available_qty,
       branch_id,
-      selling_price,
       firm_id,
       product_id,
       purchase_id,
@@ -157,8 +156,14 @@ export default class StockService {
       movement_type,
       reason,
       company_id,
-      stock_id
+      stock_id,
+      branch_price, mrp_price, retail_price, special_retail_price, wholesale_price,
     } = data;
+    if (mrp_price) this.validateValue(mrp_price, "MRP price");
+    if (retail_price) this.validateValue(retail_price, "Retail price");
+    if (special_retail_price) this.validateValue(special_retail_price, "Special retail price");
+    if (wholesale_price) this.validateValue(wholesale_price, "Wholesale price");
+    if (branch_price) this.validateValue(branch_price, "Branch price");
 
     const is_stock_exist = await getRecord(
       stock_id,
@@ -197,14 +202,18 @@ export default class StockService {
   UPDATE stock SET
     available_quantity = $1,
     status = $2,
-    selling_price = $3,
-    product_id = $4,
-    purchase_id = $5,
-    purchased_qty = $6
+     mrp_price =$3
+  wholesale_price =$4
+  retail_price =$5
+  branch_price =$6
+  special_retail_price =$7
+    product_id = $8,
+    purchase_id = $9,
+    purchased_qty = $10
     
-  WHERE id = $7
-  AND firm_id = $8
-    AND branch_id = $9
+  WHERE id = $11
+  AND firm_id = $12
+    AND branch_id = $13
   RETURNING *;
 `;
     const sold_qty = Number(is_stock_exist.purchased_qty) - Number(is_stock_exist.available_quantity);
@@ -212,7 +221,11 @@ export default class StockService {
     const values = [
       new_available_qty ?? is_stock_exist.available_quantity,
       statusCode ?? is_stock_exist.status,
-      selling_price ?? is_stock_exist.selling_price,
+      mrp_price ?? is_stock_exist.mrp_price,
+      wholesale_price ?? is_stock_exist.wholesale_price,
+      retail_price ?? is_stock_exist.retail_price,
+      branch_price ?? is_stock_exist.branch_price,
+      special_retail_price ?? is_stock_exist.special_retail_price,
       product_id ?? is_stock_exist.product_id,
       purchase_id ?? is_stock_exist.purchase_id,
       purchased_qty ?? is_stock_exist.purchased_qty,
@@ -1131,7 +1144,7 @@ export default class StockService {
     }
   }
   async updateSellingPrice(data: StockPriceSet, client: PoolClient) {
-    const { firm_id, r_id, branch_price, mrp_price, retail_price, special_retail_price, wholesale_price, } = data;
+    const { firm_id, r_id, branch_price, mrp_price, retail_price, special_retail_price, wholesale_price } = data;
     this.validateValue(mrp_price, "MRP price");
     this.validateValue(retail_price, "Retail price");
     this.validateValue(special_retail_price, "Special retail price");
@@ -1150,9 +1163,9 @@ export default class StockService {
       throw new AppError("Stock not found", 404);
     }
     console.log("insert data", [branch_price, mrp_price, retail_price, special_retail_price, wholesale_price, r_id, firm_id])
-  const updatedStock = await executeInTransaction(
-  client,
-  `
+    const updatedStock = await executeInTransaction(
+      client,
+      `
   UPDATE stock
   SET 
     branch_price = $1,
@@ -1164,16 +1177,16 @@ export default class StockService {
     AND firm_id = $7
   RETURNING *;
   `,
-  [
-    branch_price,
-    mrp_price,
-    retail_price,
-    special_retail_price,
-    wholesale_price,
-    r_id,
-    firm_id
-  ]
-);
+      [
+        branch_price,
+        mrp_price,
+        retail_price,
+        special_retail_price,
+        wholesale_price,
+        r_id,
+        firm_id
+      ]
+    );
 
     if (!updatedStock.rows.length) {
       throw new AppError("Failed to update selling price", 400);

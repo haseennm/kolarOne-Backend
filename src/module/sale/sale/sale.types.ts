@@ -26,7 +26,6 @@ export interface SaleCreateBody {
 }
 export interface SaleCreateParams
   extends Omit<SaleCreateBody, "status" | "created_by" | "items"> {
-  statusCode: number;
   remark: object
 }
 export interface SaleEditBody {
