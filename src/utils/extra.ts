@@ -33,6 +33,9 @@ export const STATUS_MAP = {
   16: 'Overdue',
   17: 'Blacklist',
   18: 'Returned',
+  19: 'Hold',
+  20: 'Denied',
+  21: 'Accepted'
 } as const
 export const STATUS_REVERSE_MAP = Object.fromEntries(
   Object.entries(STATUS_MAP).map(([key, value]) => [
@@ -67,6 +70,17 @@ export async function getRecord(id: number | string, table: string, bussiness_ca
   return isrowExist.rows[0] || null;
 }
 
+// const ENTITY_MAP = {
+//   Company: "C",
+//   Branch: "B",
+//   Firm: "F",
+// } as const;
+
+// export type EntityKey = keyof typeof ENTITY_MAP;
+
+// export function convertEntityType(entityType: EntityKey): string {
+//    return ENTITY_MAP[entityType.toLowerCase() as EntityKey];
+// }
 const ENTITY_MAP = {
   Company: "C",
   Branch: "B",
@@ -75,8 +89,18 @@ const ENTITY_MAP = {
 
 export type EntityKey = keyof typeof ENTITY_MAP;
 
-export function convertEntityType(entityType: EntityKey): string {
-  return ENTITY_MAP[entityType];
+export function convertEntityType(entityType: string): string {
+  const formatted =
+    entityType.charAt(0).toUpperCase() +
+    entityType.slice(1).toLowerCase();
+
+  const converted = ENTITY_MAP[formatted as EntityKey];
+
+  if (!converted) {
+    throw new Error(`Invalid entity type: ${entityType}`);
+  }
+
+  return converted;
 }
 
 export function convertEntityCode(code: string): EntityKey | undefined {
