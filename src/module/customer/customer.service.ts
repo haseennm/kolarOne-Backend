@@ -35,7 +35,9 @@ export default class CustomerService {
       gstin,
       notes,
       statusCode,
-      remark
+      remark,
+      credit_days,
+      credit_limit
     } = data;
 
     const result = transaction(async (client) => {
@@ -73,11 +75,13 @@ export default class CustomerService {
         gstin,
         notes,
         status,
-        remarks
+        remarks,
+        credit_days,
+        credit_limit
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-        $11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+        $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
       )
       RETURNING *;
       `;
@@ -102,7 +106,9 @@ export default class CustomerService {
         gstin || null,
         notes || null,
         statusCode,
-        JSON.stringify(remark)
+        JSON.stringify(remark),
+        credit_days || 10,
+        credit_limit || 10000
       ];
 
       const { rows } = await executeInTransaction(client, queryText, values);
@@ -115,81 +121,167 @@ export default class CustomerService {
 
   async fetchCustomer(data: FetchCustomerParams) {
 
-    const { filters = {} } = data;
+  const { filters = {} } = data;
 
-    const limit = filters.limit ?? 10;
-    const page = filters.page ?? 1;
-    const offset = (page - 1) * limit;
+  const limit = filters.limit ?? 10;
+  const page = filters.page ?? 1;
+  const offset = (page - 1) * limit;
 
-    let where: string[] = [];
-    let values: any[] = [];
+  let where: string[] = [];
+  let values: any[] = [];
 
-    where.push(`status != $${values.length + 1}`);
-    values.push(0);
+  where.push(`status != $${values.length + 1}`);
+  values.push(0);
 
-    if (filters?.search) {
+  if (filters?.search) {
 
-      values.push(`%${filters.search}%`);
-      const index = values.length;
+    values.push(`%${filters.search}%`);
+    const index = values.length;
 
-      where.push(`
+    where.push(`
       (
         customer_name ILIKE $${index}
         OR phone_number ILIKE $${index}
         OR email ILIKE $${index}
         OR gstin ILIKE $${index}
       )
-      `);
-    }
-
-    if (filters?.id) {
-      values.push(filters.id);
-      where.push(`id = $${values.length}`);
-    }
-
-    if (filters?.company_id) {
-      values.push(filters.company_id);
-      where.push(`company_id = $${values.length}`);
-    }
-
-    if (filters?.customer_type) {
-      values.push(filters.customer_type);
-      where.push(`customer_type = $${values.length}`);
-    }
-    if (filters?.status) {
-      values.push(filters.status);
-      where.push(`status = $${values.length}`);
-    }
-
-    const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
-
-    const customerQuery = `
-      SELECT * FROM customers
-      ${whereClause}
-      ORDER BY id DESC
-      LIMIT $${values.length + 1}
-      OFFSET $${values.length + 2}
-    `;
-
-    const countQuery = `
-      SELECT COUNT(*) FROM customers
-      ${whereClause}
-    `;
-
-    const customers = await query<FetchDbCustomer>(
-      customerQuery,
-      [...values, limit, offset]
-    );
-
-    const total = await query<CountResult>(countQuery, values);
-
-    return {
-      customers,
-      page,
-      limit,
-      total: Number(total[0].count),
-    };
+    `);
   }
+
+  if (filters?.id) {
+    values.push(filters.id);
+    where.push(`id = $${values.length}`);
+  }
+
+  if (filters?.company_id) {
+    values.push(filters.company_id);
+    where.push(`company_id = $${values.length}`);
+  }
+
+  if (filters?.customer_type) {
+    values.push(filters.customer_type);
+    where.push(`customer_type = $${values.length}`);
+  }
+
+  if (filters?.status !== undefined) {
+    values.push(filters.status);
+    where.push(`status = $${values.length}`);
+  }
+
+  const whereClause = where.length
+    ? `WHERE ${where.join(" AND ")}`
+    : "";
+
+  const customerQuery = `
+    SELECT * FROM customers
+    ${whereClause}
+    ORDER BY id DESC
+    LIMIT $${values.length + 1}
+    OFFSET $${values.length + 2}
+  `;
+
+  const countQuery = `
+    SELECT COUNT(*) FROM customers
+    ${whereClause}
+  `;
+
+  const customers = await query<FetchDbCustomer>(
+    customerQuery,
+    [...values, limit, offset]
+  );
+
+  const total = await query<CountResult>(countQuery, values);
+
+  // SALE VALIDATION
+  if (filters?.is_sale) {
+
+    for (const customer of customers) {
+
+      const balanceQuery = `
+        SELECT
+          COALESCE(SUM(pb.balance), 0) AS current_credit,
+          MIN(pb.updated_at) AS earliest_date
+        FROM party_balance pb
+
+        LEFT JOIN sales s
+          ON pb.ref_type = 'S'
+          AND pb.ref_id = s.id
+
+        LEFT JOIN sale_return sr
+          ON pb.ref_type = 'SR'
+          AND pb.ref_id = sr.id
+
+        LEFT JOIN sales s_sr
+          ON sr.sale_id = s_sr.id
+
+        WHERE
+          pb.balance > 0
+          AND pb.flow = 'I'
+          AND pb.status != 0
+          AND (
+            s.customer_id = $1
+            OR s_sr.customer_id = $1
+          )
+      `;
+
+      const balanceResult = await query(balanceQuery, [customer.id]);
+
+      const currentCredit = Number(
+        balanceResult[0]?.current_credit ?? 0
+      );
+
+      const earliestDate = balanceResult[0]?.earliest_date;
+
+      customer.can_sale = true;
+
+      // CREDIT DAYS VALIDATION
+      if (earliestDate && customer.credit_days > 0) {
+
+        const today = new Date();
+
+        const oldDate = new Date(earliestDate);
+
+        const diffTime = today.getTime() - oldDate.getTime();
+
+        const reachedDays = Math.floor(
+          diffTime / (1000 * 60 * 60 * 24)
+        );
+
+        if (reachedDays > customer.credit_days) {
+
+          customer.can_sale = false;
+
+          customer.reason =
+            `Cannot make sale due to exceeded credit days. ` +
+            `Customer credit days is ${customer.credit_days} ` +
+            `and reached days is ${reachedDays}`;
+
+          continue;
+        }
+      }
+
+      // CREDIT LIMIT VALIDATION
+      if (
+        customer.credit_limit > 0 &&
+        currentCredit > customer.credit_limit
+      ) {
+
+        customer.can_sale = false;
+
+        customer.reason =
+          `Cannot make sale. Customer credit limit is ` +
+          `${customer.credit_limit} and current due is ${currentCredit}`;
+      }
+    }
+  }
+
+  return {
+    customers,
+    page,
+    limit,
+    total: Number(total[0].count),
+  };
+}
 
   async updateCustomer(data: EditCustomerParams) {
 
@@ -214,7 +306,9 @@ export default class CustomerService {
       gstin,
       notes,
       statusCode,
-      remark
+      remark,
+      credit_days,
+      credit_limit
     } = data;
 
     const result = transaction(async (client) => {
@@ -258,8 +352,10 @@ export default class CustomerService {
             WHEN jsonb_typeof(remarks) = 'array'
               THEN remarks || $19::jsonb
             ELSE jsonb_build_array(remarks) || $19::jsonb
-          END
-      WHERE id = $20
+          END,
+          credit_days=$20,
+          credit_limit=$21
+      WHERE id = $22
       RETURNING *;
       `;
 
@@ -283,6 +379,8 @@ export default class CustomerService {
         notes ?? isCustomerExist.notes,
         statusCode ?? isCustomerExist.status,
         JSON.stringify(remark),
+        credit_days ?? isCustomerExist.credit_days,
+        credit_limit ?? isCustomerExist.credit_limit,
         id
       ];
 
@@ -435,32 +533,32 @@ export default class CustomerService {
 
   /* ============================================================ */
 
- private async getCustomerReportByFirms(
-  client: any,
-  firmIds: number[],
-  startDate?: string,
-  endDate?: string
-) {
-  const hasDate = Boolean(startDate && endDate);
+  private async getCustomerReportByFirms(
+    client: any,
+    firmIds: number[],
+    startDate?: string,
+    endDate?: string
+  ) {
+    const hasDate = Boolean(startDate && endDate);
 
-  const salesDate = hasDate
-    ? `AND s.invoice_date BETWEEN $2 AND $3`
-    : "";
+    const salesDate = hasDate
+      ? `AND s.invoice_date BETWEEN $2 AND $3`
+      : "";
 
-  const returnDate = hasDate
-    ? `AND sr.return_date BETWEEN $2 AND $3`
-    : "";
+    const returnDate = hasDate
+      ? `AND sr.return_date BETWEEN $2 AND $3`
+      : "";
 
-  const params = hasDate
-    ? [firmIds, startDate, endDate]
-    : [firmIds];
+    const params = hasDate
+      ? [firmIds, startDate, endDate]
+      : [firmIds];
 
-  /* ================= SALES ================= */
+    /* ================= SALES ================= */
 
-  // 1. Most items sold (count)
-  const mostItemsSold = await executeInTransaction(
-    client,
-    `
+    // 1. Most items sold (count)
+    const mostItemsSold = await executeInTransaction(
+      client,
+      `
     SELECT 
       c.id AS customer_id,
       c.customer_name,
@@ -481,13 +579,13 @@ export default class CustomerService {
     GROUP BY c.id, c.customer_name
     ORDER BY total_items DESC
     `,
-    params
-  );
+      params
+    );
 
-  // 2. Most amount spent
-  const mostAmount = await executeInTransaction(
-    client,
-    `
+    // 2. Most amount spent
+    const mostAmount = await executeInTransaction(
+      client,
+      `
     SELECT 
       c.id AS customer_id,
       c.customer_name,
@@ -503,13 +601,13 @@ export default class CustomerService {
     GROUP BY c.id, c.customer_name
     ORDER BY total_amount DESC
     `,
-    params
-  );
+      params
+    );
 
-  // 3. Most quantity sold
-  const mostQuantity = await executeInTransaction(
-    client,
-    `
+    // 3. Most quantity sold
+    const mostQuantity = await executeInTransaction(
+      client,
+      `
     SELECT 
       c.id AS customer_id,
       c.customer_name,
@@ -530,13 +628,13 @@ export default class CustomerService {
     GROUP BY c.id, c.customer_name
     ORDER BY total_quantity DESC
     `,
-    params
-  );
+      params
+    );
 
-  // 4. Customers with pending balance
-  const customersWithBalance = await executeInTransaction(
-    client,
-    `
+    // 4. Customers with pending balance
+    const customersWithBalance = await executeInTransaction(
+      client,
+      `
     SELECT 
       COUNT(DISTINCT c.id) AS total_customers_with_balance
     FROM customers c
@@ -548,15 +646,15 @@ export default class CustomerService {
 
     ${salesDate}
     `,
-    params
-  );
+      params
+    );
 
-  /* ================= RETURN ================= */
+    /* ================= RETURN ================= */
 
-  // 5. Most items returned
-  const mostReturnItems = await executeInTransaction(
-    client,
-    `
+    // 5. Most items returned
+    const mostReturnItems = await executeInTransaction(
+      client,
+      `
     SELECT 
       c.id AS customer_id,
       c.customer_name,
@@ -581,13 +679,13 @@ export default class CustomerService {
     GROUP BY c.id, c.customer_name
     ORDER BY total_items DESC
     `,
-    params
-  );
+      params
+    );
 
-  // 6. Most return amount
-  const mostReturnAmount = await executeInTransaction(
-    client,
-    `
+    // 6. Most return amount
+    const mostReturnAmount = await executeInTransaction(
+      client,
+      `
     SELECT 
       c.id AS customer_id,
       c.customer_name,
@@ -607,13 +705,13 @@ export default class CustomerService {
     GROUP BY c.id, c.customer_name
     ORDER BY total_amount DESC
     `,
-    params
-  );
+      params
+    );
 
-  // 7. Most return quantity
-  const mostReturnQuantity = await executeInTransaction(
-    client,
-    `
+    // 7. Most return quantity
+    const mostReturnQuantity = await executeInTransaction(
+      client,
+      `
     SELECT 
       c.id AS customer_id,
       c.customer_name,
@@ -638,22 +736,22 @@ export default class CustomerService {
     GROUP BY c.id, c.customer_name
     ORDER BY total_quantity DESC
     `,
-    params
-  );
+      params
+    );
 
-  return {
-    sales: {
-      most_items: mostItemsSold.rows,
-      most_amount: mostAmount.rows,
-      most_quantity: mostQuantity.rows,
-      customers_with_balance:
-        customersWithBalance.rows[0]?.total_customers_with_balance || 0
-    },
-    return: {
-      most_items: mostReturnItems.rows,
-      most_amount: mostReturnAmount.rows,
-      most_quantity: mostReturnQuantity.rows
-    }
-  };
-}
+    return {
+      sales: {
+        most_items: mostItemsSold.rows,
+        most_amount: mostAmount.rows,
+        most_quantity: mostQuantity.rows,
+        customers_with_balance:
+          customersWithBalance.rows[0]?.total_customers_with_balance || 0
+      },
+      return: {
+        most_items: mostReturnItems.rows,
+        most_amount: mostReturnAmount.rows,
+        most_quantity: mostReturnQuantity.rows
+      }
+    };
+  }
 }

@@ -1,32 +1,26 @@
 export interface CreateCustomerBody {
   company_id: number;
   customer_type: "B2B" | "B2C" | "both";
-
   customer_name: string;
   gender?: "MALE" | "FEMALE" | "OTHER" | null;
-
   email?: string | null;
   phone_number: string;
   alternate_phone?: string | null;
-
   billing_address?: string | null;
   billing_district?: string | null;
   billing_state?: string | null;
   billing_pin?: number | null;
-
   shipping_address?: string | null;
   shipping_district?: string | null;
   shipping_state?: string | null;
   shipping_pin?: number | null;
-
   state_code?: string | null;
-
   gstin?: string | null;
-
   notes?: string[];
-
   status: string;
   created_by: string;
+  credit_days?: number;
+  credit_limit?: number;
 }
 
 export interface CreateCustomerParams
@@ -43,6 +37,7 @@ export interface FetchCustomerBody {
   search?: string | null;
   customer_type?: "B2B" | "B2C" | "both";
   status?: string | number;
+  is_sale?:boolean
 }
 
 export interface FetchCustomerParams {
@@ -55,6 +50,10 @@ export interface FetchDbCustomer
   id: string;
   status: number;
   remarks: object | null;
+  credit_days: number;
+  credit_limit: number;
+  can_sale?: boolean;
+  reason?: string;
 }
 
 export type CountResult = {
@@ -82,7 +81,9 @@ export interface EditCustomerBody {
   gstin?: string | null;
   notes?: string[];
   status?: string | null;
-  blacklist_reason?:string;
+  blacklist_reason?: string;
+  credit_days?: number;
+  credit_limit?: number;
   updated_by: string;
 }
 
@@ -112,7 +113,7 @@ export interface GetCustomerReport {
   end_date?: string;
 }
 
-export interface CustomerRemark  {
+export interface CustomerRemark {
   action: string;
   updated_by: string;
   updated_at: number;

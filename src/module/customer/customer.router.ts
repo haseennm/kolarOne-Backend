@@ -79,7 +79,9 @@ export async function customerRouter(app: FastifyInstance): Promise<void> {
               items: { type: "string" }
             },
             status: { type: "string" },
-            created_by: { type: "string" }
+            created_by: { type: "string" },
+            credit_days: { type: "string" },
+            credit_limit: { type: "string" }
           }
         }
       }
@@ -217,7 +219,9 @@ export async function customerRouter(app: FastifyInstance): Promise<void> {
               enum: ["Active", "Inactive", "blacklist"]
             },
             updated_by: { type: "string" },
-            blacklist_reason: { type: "string" }
+            blacklist_reason: { type: "string" },
+            credit_days: { type: "string" },
+            credit_limit: { type: "string" }
           }
         }
       }
