@@ -109,7 +109,7 @@ async getBranchPerformance({ company_id }: { company_id: number }) {
           WHEN s.invoice_date = CURRENT_DATE THEN 1 END) AS total_bills_today,
 
         -- Stock Value (current inventory)
-        COALESCE(SUM(st.available_quantity * st.selling_price), 0) AS stock_value,
+        COALESCE(SUM(st.available_quantity * st.mrp_price), 0) AS stock_value,
 
         -- LOW STOCK
      COALESCE((
