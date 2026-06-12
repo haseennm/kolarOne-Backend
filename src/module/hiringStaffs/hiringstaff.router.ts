@@ -3,6 +3,7 @@ import {
   CreateHireStaffBody,
   DeleteHireStaffBody,
   EditStatusHireStaffBody,
+  EncryptHireStaffBody,
   FetchHireStaffBody,
 } from "./hiringstaff.types";
 
@@ -167,7 +168,7 @@ export async function hiringStaffRouter(app: FastifyInstance) {
 
             company_id: { type: "number" },
             branch_id: { type: "number" },
-            status: { type: "string", enum: ["Accept", "Deny", "Hold","Pending"] },
+            status: { type: "string", enum: ["Accept", "Deny", "Hold", "Pending"] },
             search: { type: "string" },
 
             page: {
@@ -290,5 +291,71 @@ export async function hiringStaffRouter(app: FastifyInstance) {
 
     }
   );
+  app.post<{ Body: EncryptHireStaffBody }>(
+    "/encryption",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["type", "company_id", "id", "name"],
+          properties: {
+
+            type: { type: "string" },
+            company_id: { type: "number" },
+            id: { type: "number" },
+            name: { type: "string" }
+
+          }
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: EncryptHireStaffBody }>,
+      reply: FastifyReply
+    ) => {
+
+      const controller = new HiringStaffController();
+      const data = await controller.encryptUrl(request.body);
+
+      return reply.code(200).send({
+        status: "Success",
+        url: data
+      });
+
+    }
+  );
+type DecryptBody = {
+  url: string;
+};
+
+app.post<{ Body: DecryptBody }>(
+  "/decryption",
+  {
+    schema: {
+      body: {
+        type: "object",
+        required: ["url"],
+        properties: {
+          url: { type: "string" }
+        }
+      }
+    }
+  },
+  async (
+    request: FastifyRequest<{ Body: DecryptBody }>,
+    reply: FastifyReply
+  ) => {
+
+    const controller = new HiringStaffController();
+
+    
+    const data = await controller.decryptUrl(request.body.url);
+
+    return reply.code(200).send({
+      status: "Success",
+      url: data
+    });
+  }
+);
 
 }

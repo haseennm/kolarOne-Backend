@@ -1,48 +1,83 @@
 import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
+import { Cryption } from "../../utils/cryption";
 import { convertEntityType, EntityKey, getStatusText } from "../../utils/extra";
 import StaffService from "./hiringstaff.service";
-import { CreateHireStaffBody, DeleteHireStaffBody, EditStatusHireStaffBody } from "./hiringstaff.types";
+import { CreateHireStaffBody, DeleteHireStaffBody, EditStatusHireStaffBody, EncryptHireStaffBody } from "./hiringstaff.types";
 
 export default class HiringStaffController {
 
 
   async createHireStaff(data: CreateHireStaffBody) {
-    let { entity_type, ...rest } = data;
-    console.log("controller data",data)
-    const validBloodGroups = [
-      "A+", "A-",
-      "B+", "B-",
-      "AB+", "AB-",
-      "O+", "O-"
-    ];
-    if (!entity_type) {
-      throw new AppError("entity type is req", 400)
-    }
-    if (data.blood_group && !validBloodGroups.includes(data.blood_group)) {
-      throw new AppError("Invalid blood group", 400);
-    }
-    const remark = {
-      action: "Created",
-      created_at: Date.now(),
-    };
 
-    return transaction(async (client) => {
-      entity_type = convertEntityType(entity_type as EntityKey);
-      const service = new StaffService();
-      let entity_table = ""
-      if (entity_type === "C") entity_table = "company"
-      if (entity_type === "B") entity_table = "branches"
-      if (entity_type === "F") entity_table = "firm"
-      const staff_created = await service.createHireStaff({
-        ...rest,
-        remark,
-        entity_type,
-        entity_table,
-      }, client);
-      return `Staff ${staff_created.full_name} has been created successfully.`;
-    })
+  let { entity_type, ...rest } = data;
+
+  const requiredFields = [
+    "full_name",
+    "phone_number",
+    "email",
+    "date_of_birth",
+    "expected_salary",
+    "working_from",
+    "working_to",
+    "entity_type",
+    "entity_id",
+    "company_id"
+  ];
+
+  for (const field of requiredFields) {
+
+    const value = data[field as keyof CreateHireStaffBody];
+
+    if (
+      value === undefined ||
+      value === null ||
+      value === ""
+    ) {
+      throw new AppError(`${field} is required`, 400);
+    }
   }
+
+  console.log("controller data", data);
+
+  const validBloodGroups = [
+    "A+", "A-",
+    "B+", "B-",
+    "AB+", "AB-",
+    "O+", "O-"
+  ];
+
+  if (data.blood_group && !validBloodGroups.includes(data.blood_group)) {
+    throw new AppError("Invalid blood group", 400);
+  }
+
+  const remark = {
+    action: "Created",
+    created_at: Date.now(),
+  };
+
+  return transaction(async (client) => {
+
+    entity_type = convertEntityType(entity_type as EntityKey);
+
+    const service = new StaffService();
+
+    let entity_table = "";
+
+    if (entity_type === "C") entity_table = "company";
+    if (entity_type === "B") entity_table = "branches";
+    if (entity_type === "F") entity_table = "firm";
+
+    const staff_created = await service.createHireStaff({
+      ...rest,
+      remark,
+      entity_type,
+      entity_table,
+    }, client);
+
+    return `Staff ${staff_created.full_name} has been created successfully.`;
+  });
+}
 
   async fetchHireStaff(data: any) {
 
@@ -123,6 +158,19 @@ export default class HiringStaffController {
 
       return `Staff ${staff.full_name} has been deleted successfully.`;
     });
+  }
+  async encryptUrl(data: EncryptHireStaffBody) {
+    const cryption = new Cryption
+    const encrypted = cryption.encrypt(data)
+    console.log(encrypted)
+    return `http://192.168.0.103:5173/apply?${encrypted}`
+  }
+  async decryptUrl(data: string) {
+    const cryption = new Cryption
+    const cleanedData = data.replace("http://192.168.0.103:5173/apply?", "");
+    const decrypt = cryption.decrypt(cleanedData);
+    console.log(decrypt)
+    return decrypt
   }
 
 }

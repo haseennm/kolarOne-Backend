@@ -6,7 +6,7 @@ export interface CreateHireStaffBody {
   address?: string;
   phone_number: string;
   residence_phone?: string;
-  date_of_birth?: string;
+  date_of_birth: string;
   driving_license_no?: string;
   languages_known?: string[]
   passport_no?: string;
@@ -15,9 +15,9 @@ export interface CreateHireStaffBody {
   previous_organization?: string;
   blood_group?: string;
   identification_mark?: string;
-  working_from?: string; // "09:00"
-  working_to?: string;   // "18:00"
-  expected_salary?: number;
+  working_from: string; // "09:00"
+  working_to: string;   // "18:00"
+  expected_salary: number;
   designation?: string;
   entity_type: string;
   entity_id: number;
@@ -82,6 +82,12 @@ export interface DeleteHireStaffBody {
   entity_id: number;
   entity_type: number;
   deleted_by: string;
+}
+export interface EncryptHireStaffBody {
+  type: string;
+  company_id: number;
+  id: number;
+  name: number;
 }
 
 export interface DeleteHireStaffParams
