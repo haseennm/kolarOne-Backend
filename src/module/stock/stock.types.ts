@@ -3,7 +3,6 @@ export interface StockCreateBody {
   branch_id: number;
   purchase_id: number | null;
   product_id: number;
-  selling_price?: number;
   available_qty: number;
   purchased_qty: number;
   status: 'Damaged' | 'Good';
@@ -69,6 +68,12 @@ export interface StockFetchBody {
   search?: string | null;
   status?: number;
 }
+
+export interface FetchPopup {
+  branch_id: number;
+  stock_id?: number;
+  product_id?: number;
+}
 export interface StockAdjustFetchBody {
   page?: number;
   limit?: number;
@@ -118,7 +123,6 @@ export interface StockAdditionalBody {
   firm_id: number;
   branch_id: number;
   product_id: number;
-  selling_price?: number;
   insert_batch_number?: number;
   qty: number;
   status: 'Damaged' | 'Good';

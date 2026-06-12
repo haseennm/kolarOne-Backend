@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import StockController from "./stock.controller";
-import { StockAdditionalBody, StockAdjustFetchBody, StockDelete, StockFetchBody, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
+import { FetchPopup, StockAdditionalBody, StockAdjustFetchBody, StockDelete, StockFetchBody, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
 
 export async function stockRouter(app: FastifyInstance) {
 
@@ -62,7 +62,30 @@ export async function stockRouter(app: FastifyInstance) {
           limit
         }
       });
-      console.log(data)
+      return reply.code(200).send(data);
+    }
+  );
+  app.post<{ Body: FetchPopup }>(
+    "/get/popup",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["branch_id","stock_id","product_id"],
+          properties: {
+            branch_id: { type: "number" },
+            stock_id: { type: "number" },
+            product_id: { type: "number" }
+          }
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: FetchPopup }>,
+      reply: FastifyReply
+    ) => {
+      const controller = new StockController(); 
+      const data = await controller.fetchPopupStock(request.body);
       return reply.code(200).send(data);
     }
   );
@@ -121,7 +144,6 @@ export async function stockRouter(app: FastifyInstance) {
           limit
         }
       });
-      console.log(data)
       return reply.code(200).send(data);
     }
   );
@@ -211,7 +233,6 @@ export async function stockRouter(app: FastifyInstance) {
           required: ["firm_id", "r_id", "mrp_price","retail_price","wholesale_price","branch_price","special_retail_price"],
           properties: {
             r_id: { type: "number" },
-            selling_price: { type: "number" },
             special_retail_price: { type: "number" },
             branch_price: { type: "number" },
             wholesale_price: { type: "number" },

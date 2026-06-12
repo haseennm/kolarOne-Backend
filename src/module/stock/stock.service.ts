@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord } from "../../utils/extra";
-import { StockAdditionalParams, StockAdjustFetchParams, StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
+import { FetchPopup, StockAdditionalParams, StockAdjustFetchParams, StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
 
 const generateBarcode = (): string => {
   return Math.floor(10000000000 + Math.random() * 90000000000).toString();
@@ -34,7 +34,6 @@ export default class StockService {
     const {
       available_qty,
       branch_id,
-      selling_price,
       firm_id,
       product_id,
       purchase_id,
@@ -89,7 +88,6 @@ export default class StockService {
   INSERT INTO stock (
     available_quantity,
     branch_id,
-    selling_price,
     firm_id,
     product_id,
     purchase_id,
@@ -98,14 +96,13 @@ export default class StockService {
     purchased_qty,
     barcode
   )
-  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
   RETURNING *;
 `;
 
     const values = [
       available_qty,
       branch_id,
-      selling_price,
       firm_id,
       product_id,
       purchase_id,
@@ -301,12 +298,10 @@ export default class StockService {
 
     const finalAvailableQty = stockQty + calculation;
 
-    console.log("finalAvailableQty", finalAvailableQty);
     const finalPurchasedQty = is_relate_purchase
       ? Number(stock.purchased_qty) + calculation
       : Number(stock.purchased_qty);
 
-    console.log("finalPurchasedQty", finalPurchasedQty)
     if (finalAvailableQty > finalPurchasedQty) {
       throw new AppError(
         "Available quantity cannot exceed purchased quantity",
@@ -486,6 +481,69 @@ export default class StockService {
       },
     };
   }
+  async popupStock(data: FetchPopup) {
+  const { branch_id, stock_id, product_id } = data;
+
+  let where: string[] = [];
+  let values: any[] = [];
+
+  values.push(branch_id);
+  where.push(`s.branch_id = $${values.length}`);
+
+  values.push(0);
+  where.push(`s.status != $${values.length}`);
+
+  if (stock_id) {
+    values.push(stock_id);
+    where.push(`s.id = $${values.length}`);
+  }
+
+  if (product_id) {
+    values.push(product_id);
+    where.push(`s.product_id = $${values.length}`);
+  }
+
+  const whereClause = where.length
+    ? `WHERE ${where.join(" AND ")}`
+    : "";
+
+  const stockQuery = `
+    SELECT 
+      s.id,
+      s.product_id,
+      s.purchase_id,
+      s.available_quantity,
+      p.name AS product_name,
+      pc.name AS category_name,
+      br.name AS brand_name,
+      v.vendor_name
+    FROM stock s
+    LEFT JOIN products p 
+      ON s.product_id = p.id
+    LEFT JOIN product_categories pc 
+      ON p.category_id = pc.id
+    LEFT JOIN brand br 
+      ON p.brand_id = br.id
+    LEFT JOIN purchases pu 
+      ON s.purchase_id = pu.id
+    LEFT JOIN vendors v 
+      ON pu.vendor_id = v.id
+    ${whereClause}
+  `;
+
+  const stocks = await query(stockQuery, values);
+
+  const total_available_quantity = stocks.reduce(
+    (sum: number, item: any) =>
+      sum + Number(item.available_quantity || 0),
+    0
+  );
+
+  return {
+    total_available_quantity,
+    stocks,
+  };
+}
   async fetchAdjustedStock(data: StockAdjustFetchParams) {
     const { filters, offset } = data;
 
@@ -861,7 +919,6 @@ export default class StockService {
   ) {
     const {
       branch_id,
-      selling_price,
       firm_id,
       product_id,
       qty,
@@ -902,7 +959,6 @@ export default class StockService {
       return await this.handleBatchStock({
         batch_number: `BATCH-${insert_batch_number}`,
         branch_id,
-        selling_price,
         firm_id,
         product_id,
         qty,
@@ -915,7 +971,6 @@ export default class StockService {
     // 🎯 SCENARIO 2 → Auto batch
     return await this.createWithAutoBatch({
       branch_id,
-      selling_price,
       firm_id,
       product_id,
       qty,
@@ -932,7 +987,6 @@ export default class StockService {
     const {
       batch_number,
       branch_id,
-      selling_price,
       firm_id,
       product_id,
       qty,
@@ -984,7 +1038,6 @@ export default class StockService {
       client,
       qty,
       branch_id,
-      selling_price,
       firm_id,
       product_id,
       statusCode,
@@ -1010,7 +1063,6 @@ export default class StockService {
   private async createWithAutoBatch(params: any) {
     const {
       branch_id,
-      selling_price,
       firm_id,
       product_id,
       qty,
@@ -1039,7 +1091,6 @@ export default class StockService {
       client,
       qty,
       branch_id,
-      selling_price,
       firm_id,
       product_id,
       statusCode,
@@ -1067,7 +1118,6 @@ export default class StockService {
       client,
       qty,
       branch_id,
-      selling_price,
       firm_id,
       product_id,
       statusCode,
@@ -1080,7 +1130,6 @@ export default class StockService {
       INSERT INTO stock (
         available_quantity,
         branch_id,
-        selling_price,
         firm_id,
         product_id,
         purchase_id,
@@ -1088,13 +1137,12 @@ export default class StockService {
         status,
         batch_number
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
       RETURNING *;
       `,
       [
         qty,
         branch_id,
-        selling_price ?? 0,
         firm_id,
         product_id,
         null,
@@ -1162,7 +1210,6 @@ export default class StockService {
     if (!isStockExist) {
       throw new AppError("Stock not found", 404);
     }
-    console.log("insert data", [branch_price, mrp_price, retail_price, special_retail_price, wholesale_price, r_id, firm_id])
     const updatedStock = await executeInTransaction(
       client,
       `

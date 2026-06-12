@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { transaction } from "../../config/db";
 import { cns, getStatusCode, getStatusText, getTransactionCode } from "../../utils/extra";
 import StockService from "./stock.service";
-import { StockAdditionalBody, StockAdjustFetchParams, StockChangeBody, StockCreateBody, StockDelete, StockEditBody, StockFetchParams, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
+import { FetchPopup, StockAdditionalBody, StockAdjustFetchParams, StockChangeBody, StockCreateBody, StockDelete, StockEditBody, StockFetchParams, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
 import { AppError } from "../../utils/AppError";
 
 export default class StockController {
@@ -125,6 +125,15 @@ export default class StockController {
       stocks,
       pagination: { ...stocksWithCode.pagination }
     };
+  }
+  async fetchPopupStock(data: FetchPopup) {
+
+    const service = new StockService();
+
+    return await service.popupStock(data);
+    
+
+ 
   }
   async fetchStockAdjust(data: StockAdjustFetchParams) {
 

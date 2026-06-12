@@ -43,7 +43,7 @@ export default class PurchaseController {
             branch_id: rest.branch_id,
             purchase_id: purchase.id,
             product_id: item.product_id,
-            selling_price: 0,
+
             available_qty: item.received_qty,
             purchased_qty: item.purchased_qty,
             status: "Good",
@@ -172,8 +172,6 @@ export default class PurchaseController {
               purchase_id: purchase.id,
 
               product_id: item.product_id,
-              selling_price: 0,
-
               available_qty: item.received_qty,
               purchased_qty: item.purchased_qty,
 
