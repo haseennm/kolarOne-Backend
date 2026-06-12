@@ -55,7 +55,7 @@ export function getStatusText(code: number): string {
   return STATUS_MAP[code as keyof typeof STATUS_MAP] ?? 'Unknown'
 }
 
-export async function getRecord(id: number | string, table: string, bussiness_category: string, bussiness_id: number, client: PoolClient) {
+export async function getRecord(id: number | string, table: string, bussiness_category: string, bussiness_id: number | string, client: PoolClient) {
   // bussiness_category = branch or company or firm
   // bussiness_id is row id
   //  const allowedTables = ["company", "branches", "firm","product_categories"];

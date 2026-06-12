@@ -2,10 +2,12 @@ import { AppError } from "../../utils/AppError";
 import { getStatusCode, getStatusText, isValidDateFormat } from "../../utils/extra";
 import VendorService from "./vendor.service";
 import {
+  AddNewBranch,
   CreateVendorBody,
   DeleteVendorBody,
   EditVendorBody,
-  FetchVendorParams
+  FetchVendorParams,
+  RemoveBranchVendor
 } from "./vendor.types";
 
 export default class VendorController {
@@ -31,6 +33,22 @@ export default class VendorController {
     };
   }
 
+  async addnewBranch(data: AddNewBranch) {
+
+    const { branch_name, ...rest } = data;
+
+    const remark = {
+      action: "Add new branch",
+      branch_name,
+      added_at: Date.now()
+    };
+
+    const service = new VendorService();
+
+    return service.addVendorNewBranch({
+      ...rest,branch_name
+    }, remark);
+  }
   async createVendor(data: CreateVendorBody) {
 
     const { created_by, status, ...rest } = data;
@@ -91,6 +109,22 @@ export default class VendorController {
 
     return service.deleteVendor({
       ...rest,
+      remark
+    });
+  }
+  async removeBranchVendor(data: RemoveBranchVendor) {
+
+
+    const remark = {
+      action: "Removed",
+      branch_name:data.branch_name,
+      updated_at: Date.now()
+    };
+
+    const service = new VendorService();
+
+    return service.removeBranchVendor({
+      ...data,
       remark
     });
   }

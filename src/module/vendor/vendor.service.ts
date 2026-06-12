@@ -2,12 +2,14 @@ import { query, transaction, executeInTransaction } from "../../config/db";
 import { getFirstDayOfCurrentMonth, getFirstDayOfCurrentYear, getLastDayOfCurrentMonth, getLastDayOfCurrentYear, getRecord } from "../../utils/extra";
 import { AppError } from "../../utils/AppError";
 import {
+  AddNewBranch,
   CountResult,
   CreateVendorParams,
   DeleteVendorParams,
   EditVendorParams,
   FetchDbVendor,
-  FetchVendorParams
+  FetchVendorParams,
+  RemoveBranchVendorParams
 } from "./vendor.types";
 
 export default class VendorService {
@@ -25,15 +27,16 @@ export default class VendorService {
       pan,
       state_code,
       statusCode,
-      remark
+      remark,
+      branch_id
     } = data;
 
     const result = transaction(async (client) => {
 
-      const company = await getRecord(company_id, "company", "id", company_id, client);
+      const branchExist = await getRecord(branch_id, "branches", "company_id", company_id, client);
 
-      if (!company) {
-        throw new AppError("Company not found", 404);
+      if (!branchExist) {
+        throw new AppError("Branch not found", 404);
       }
 
       const queryText = `
@@ -48,9 +51,10 @@ export default class VendorService {
         state_code,
         status,
         remarks,
+        branches,
         company_id
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
       RETURNING *;
       `;
 
@@ -65,6 +69,7 @@ export default class VendorService {
         state_code,
         statusCode,
         JSON.stringify(remark),
+        [Number(branch_id)],
         company_id
       ];
 
@@ -87,7 +92,7 @@ export default class VendorService {
     let where: string[] = [];
     let values: any[] = [];
 
-    where.push(`status != $${values.length + 1}`);
+    where.push(`v.status != $${values.length + 1}`);
     values.push(0);
 
     if (filters.search) {
@@ -97,39 +102,53 @@ export default class VendorService {
 
       where.push(`
       (
-        vendor_name ILIKE $${index}
-        OR phone_number ILIKE $${index}
-        OR email ILIKE $${index}
-        OR gstin ILIKE $${index}
-        OR pan ILIKE $${index}
+        v.vendor_name ILIKE $${index}
+        OR v.phone_number ILIKE $${index}
+        OR v.email ILIKE $${index}
+        OR v.gstin ILIKE $${index}
+        OR v.pan ILIKE $${index}
       )
       `);
     }
 
-    if (filters.id) {
-      values.push(filters.id);
-      where.push(`id = $${values.length}`);
-    }
-
     if (filters.company_id) {
       values.push(filters.company_id);
-      where.push(`company_id = $${values.length}`);
+      where.push(`v.company_id = $${values.length}`);
+    }
+    if (filters.id) {
+      values.push(filters.id);
+      where.push(`v.id = $${values.length}`);
+    }
+    if (filters.branch_id) {
+      values.push(filters.branch_id);
+      where.push(`$${values.length} = ANY(v.branches)`);
+    }
+    if (filters.gstin) {
+      values.push(filters.gstin);
+      where.push(`v.gstin = $${values.length}`);
     }
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
     const vendorQuery = `
-    SELECT * FROM vendors
-    ${whereClause}
-    ORDER BY vendor_name
-    LIMIT $${values.length + 1}
-    OFFSET $${values.length + 2}
-    `;
+SELECT 
+  v.*,
+  ARRAY_REMOVE(ARRAY_AGG(b.branch_name), NULL) AS branch_names
+FROM vendors v
+LEFT JOIN branches b 
+  ON b.id = ANY(v.branches)
+${whereClause}
+GROUP BY v.id
+ORDER BY v.vendor_name
+LIMIT $${values.length + 1}
+OFFSET $${values.length + 2}
+`;
 
-    const countQuery = `
-    SELECT COUNT(*) FROM vendors
-    ${whereClause}
-    `;
+  const countQuery = `
+SELECT COUNT(*) 
+FROM vendors v
+${whereClause}
+`;
 
     const vendors = await query<FetchDbVendor>(
       vendorQuery,
@@ -215,6 +234,56 @@ export default class VendorService {
 
     return result;
   }
+  async addVendorNewBranch(data: AddNewBranch, remark: object) {
+
+    const {
+      vendor_id,
+      branch_id,
+    } = data;
+
+    const result = transaction(async (client) => {
+
+      const vendor = await getRecord(vendor_id, "vendors", "id", vendor_id, client);
+
+      if (!vendor) {
+        throw new AppError("Vendor not found", 404);
+      }
+
+      const queryText = `
+        UPDATE vendors
+        SET
+        branches =
+        CASE
+          WHEN NOT ($1 = ANY(branches))
+          THEN array_append(branches, $1)
+          ELSE branches
+        END,
+
+          remarks =
+          CASE
+            WHEN remarks IS NULL THEN $2::jsonb
+            WHEN jsonb_typeof(remarks)='array'
+              THEN remarks || $2::jsonb
+            ELSE jsonb_build_array(remarks) || $2::jsonb
+          END
+
+        WHERE id = $3
+        RETURNING *;
+      `;
+
+      const values = [
+        Number(branch_id),
+        JSON.stringify(remark),
+        vendor_id
+      ];
+
+      const { rows } = await executeInTransaction(client, queryText, values);
+
+      return rows[0];
+    });
+
+    return result;
+  }
 
   async deleteVendor(data: DeleteVendorParams) {
 
@@ -227,8 +296,8 @@ export default class VendorService {
       if (!vendor) {
         throw new AppError("Vendor not found", 404);
       }
-
-      const queryText = `
+      const result = transaction(async (client) => {
+        const queryText = `
       UPDATE vendors
       SET
         status = 0,
@@ -241,12 +310,69 @@ export default class VendorService {
       WHERE id = $2
       `;
 
+        await executeInTransaction(client, queryText, [
+          JSON.stringify(remark),
+          r_id
+        ]);
+
+        return `Vendor ${vendor.vendor_name} deleted`;
+      });
+
+      return result;
+    })
+  }
+  async removeBranchVendor(data: RemoveBranchVendorParams) {
+
+    const { r_id, remark, branch_id, company_id } = data;
+
+    const result = transaction(async (client) => {
+
+      // check vendor exists
+      const vendor = await getRecord(r_id, "vendors", "company_id", company_id, client);
+
+      if (!vendor) {
+        throw new AppError("Vendor not found", 404);
+      }
+
+      // validate branch exists in branches array
+      if (!vendor.branches.includes(Number(branch_id))) {
+        throw new AppError("Vendor does not belong to this branch", 400);
+      }
+
+      const updatedBranches = vendor.branches.filter(
+        (id: number) => id !== Number(branch_id)
+      );
+
+      const queryText = `
+      UPDATE vendors
+      SET
+        branches = array_remove(branches, $1),
+
+        status = CASE
+          WHEN array_length(array_remove(branches, $1), 1) IS NULL
+          THEN 0
+          ELSE status
+        END,
+
+        remarks =
+        CASE
+          WHEN remarks IS NULL THEN $2::jsonb
+          WHEN jsonb_typeof(remarks)='array'
+            THEN remarks || $2::jsonb
+          ELSE jsonb_build_array(remarks) || $2::jsonb
+        END
+
+      WHERE id = $3
+      RETURNING *;
+    `;
+
       await executeInTransaction(client, queryText, [
+        Number(branch_id),
         JSON.stringify(remark),
         r_id
       ]);
 
-      return `Vendor ${vendor.vendor_name} deleted`;
+      return `Vendor removed from branch successfully`;
     });
 
     return result;
@@ -353,32 +479,32 @@ export default class VendorService {
     });
   }
 
- private async getVendorReportByFirms(
-  client: any,
-  firmIds: number[],
-  startDate?: string,
-  endDate?: string
-) {
-  const hasDate = Boolean(startDate && endDate);
+  private async getVendorReportByFirms(
+    client: any,
+    firmIds: number[],
+    startDate?: string,
+    endDate?: string
+  ) {
+    const hasDate = Boolean(startDate && endDate);
 
-  const purchaseDate = hasDate
-    ? `AND p.bill_date BETWEEN $2 AND $3`
-    : "";
+    const purchaseDate = hasDate
+      ? `AND p.bill_date BETWEEN $2 AND $3`
+      : "";
 
-  const returnDate = hasDate
-    ? `AND pr.return_date BETWEEN $2 AND $3`
-    : "";
+    const returnDate = hasDate
+      ? `AND pr.return_date BETWEEN $2 AND $3`
+      : "";
 
-  const params = hasDate
-    ? [firmIds, startDate, endDate]
-    : [firmIds];
+    const params = hasDate
+      ? [firmIds, startDate, endDate]
+      : [firmIds];
 
-  /* ================= PURCHASE ================= */
+    /* ================= PURCHASE ================= */
 
-  // 1. Most items bought (count)
-  const purchaseMostItems = await executeInTransaction(
-    client,
-    `
+    // 1. Most items bought (count)
+    const purchaseMostItems = await executeInTransaction(
+      client,
+      `
     SELECT 
       v.id AS vendor_id,
       v.vendor_name,
@@ -399,13 +525,13 @@ export default class VendorService {
     GROUP BY v.id, v.vendor_name
     ORDER BY total_items DESC
     `,
-    params
-  );
+      params
+    );
 
-  // 2. Most amount spent
-  const purchaseMostAmount = await executeInTransaction(
-    client,
-    `
+    // 2. Most amount spent
+    const purchaseMostAmount = await executeInTransaction(
+      client,
+      `
     SELECT 
       v.id AS vendor_id,
       v.vendor_name,
@@ -421,13 +547,13 @@ export default class VendorService {
     GROUP BY v.id, v.vendor_name
     ORDER BY total_amount DESC
     `,
-    params
-  );
+      params
+    );
 
-  // 3. Most quantity bought
-  const purchaseMostQuantity = await executeInTransaction(
-    client,
-    `
+    // 3. Most quantity bought
+    const purchaseMostQuantity = await executeInTransaction(
+      client,
+      `
     SELECT 
       v.id AS vendor_id,
       v.vendor_name,
@@ -448,15 +574,15 @@ export default class VendorService {
     GROUP BY v.id, v.vendor_name
     ORDER BY total_quantity DESC
     `,
-    params
-  );
+      params
+    );
 
-  /* ================= RETURN ================= */
+    /* ================= RETURN ================= */
 
-  // 4. Most items returned
-  const returnMostItems = await executeInTransaction(
-    client,
-    `
+    // 4. Most items returned
+    const returnMostItems = await executeInTransaction(
+      client,
+      `
     SELECT 
       v.id AS vendor_id,
       v.vendor_name,
@@ -481,13 +607,13 @@ export default class VendorService {
     GROUP BY v.id, v.vendor_name
     ORDER BY total_items DESC
     `,
-    params
-  );
+      params
+    );
 
-  // 5. Most return amount
-  const returnMostAmount = await executeInTransaction(
-    client,
-    `
+    // 5. Most return amount
+    const returnMostAmount = await executeInTransaction(
+      client,
+      `
     SELECT 
       v.id AS vendor_id,
       v.vendor_name,
@@ -507,13 +633,13 @@ export default class VendorService {
     GROUP BY v.id, v.vendor_name
     ORDER BY total_amount DESC
     `,
-    params
-  );
+      params
+    );
 
-  // 6. Most return quantity
-  const returnMostQuantity = await executeInTransaction(
-    client,
-    `
+    // 6. Most return quantity
+    const returnMostQuantity = await executeInTransaction(
+      client,
+      `
     SELECT 
       v.id AS vendor_id,
       v.vendor_name,
@@ -538,20 +664,20 @@ export default class VendorService {
     GROUP BY v.id, v.vendor_name
     ORDER BY total_quantity DESC
     `,
-    params
-  );
+      params
+    );
 
-  return {
-    purchase: {
-      most_items: purchaseMostItems.rows,
-      most_amount: purchaseMostAmount.rows,
-      most_quantity: purchaseMostQuantity.rows
-    },
-    return: {
-      most_items: returnMostItems.rows,
-      most_amount: returnMostAmount.rows,
-      most_quantity: returnMostQuantity.rows
-    }
-  };
-}
+    return {
+      purchase: {
+        most_items: purchaseMostItems.rows,
+        most_amount: purchaseMostAmount.rows,
+        most_quantity: purchaseMostQuantity.rows
+      },
+      return: {
+        most_items: returnMostItems.rows,
+        most_amount: returnMostAmount.rows,
+        most_quantity: returnMostQuantity.rows
+      }
+    };
+  }
 }

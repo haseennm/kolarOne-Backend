@@ -1,11 +1,13 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import VendorController from "./vendor.controller";
 import {
+  AddNewBranch,
   CreateVendorBody,
   DeleteVendorBody,
   EditVendorBody,
   FetchVendorBody,
-  GetVendorReportBody
+  GetVendorReportBody,
+  RemoveBranchVendor
 } from "./vendor.types";
 import { cns } from "../../utils/extra";
 
@@ -18,9 +20,10 @@ export async function vendorRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["vendor_name", "company_id", "status", "created_by"],
+          required: ["vendor_name", "company_id", "status", "created_by", "gstin", "branch_id"],
           properties: {
             company_id: { type: "number" },
+            branch_id: { type: "number" },
 
             vendor_name: {
               type: "string",
@@ -238,6 +241,48 @@ export async function vendorRouter(app: FastifyInstance) {
       });
     }
   );
+  app.post<{ Body: AddNewBranch }>(
+    "/add/branch",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["vendor_id", "branch_id", "branch_name"],
+          properties: {
+            vendor_id: {
+              type: "string",
+              format: "uuid"
+            },
+            branch_id: {
+              type: "number"
+            },
+
+            branch_name: {
+              type: "string",
+              minLength: 2,
+              maxLength: 255
+            }
+          }
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: AddNewBranch }>,
+      reply: FastifyReply
+    ) => {
+
+      cns(request.url, request.body);
+
+      const controller = new VendorController();
+
+      const vendor = await controller.addnewBranch(request.body);
+
+      return reply.code(200).send({
+        status: "Success",
+        message: vendor
+      });
+    }
+  );
 
   // DELETE
   app.post<{ Body: DeleteVendorBody }>(
@@ -279,60 +324,100 @@ export async function vendorRouter(app: FastifyInstance) {
       });
     }
   );
+  app.post<{ Body: RemoveBranchVendor }>(
+    "/remove/branch",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["r_id", "company_id", "branch_id", "branch_name"],
+          properties: {
+            r_id: {
+              type: "string",
+              format: "uuid"
+            },
 
-  app.post<{ Body: GetVendorReportBody }>(
-  "/reports",
-  {
-    schema: {
-      body: {
-        type: "object",
-        required: ["level"],
-        properties: {
-          level: {
-            type: "string",
-            enum: ["firm", "branch", "company"]
-          },
+            company_id: { type: "number" },
+            branch_id: { type: "number" },
 
-          firm_id: {
-            type: ["number", "null"]
-          },
-
-          branch_id: {
-            type: ["number", "null"]
-          },
-
-          company_id: {
-            type: ["number", "null"]
-          },
-
-          start_date: {
-            type: ["string", "null"],
-            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
-          },
-
-          end_date: {
-            type: ["string", "null"],
-            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+            branch_name: {
+              type: "string"
+            }
           }
         }
       }
+    },
+    async (
+      request: FastifyRequest<{ Body: RemoveBranchVendor }>,
+      reply: FastifyReply
+    ) => {
+
+      cns(request.url, request.body);
+
+      const controller = new VendorController();
+
+      const vendor = await controller.removeBranchVendor(request.body);
+
+      return reply.code(200).send({
+        status: "Success",
+        message: vendor
+      });
     }
-  },
-  async (
-    request: FastifyRequest<{ Body: GetVendorReportBody }>,
-    reply: FastifyReply
-  ) => {
+  );
 
-    cns(request.url, request.body);
+  app.post<{ Body: GetVendorReportBody }>(
+    "/reports",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["level"],
+          properties: {
+            level: {
+              type: "string",
+              enum: ["firm", "branch", "company"]
+            },
 
-    const controller = new VendorController();
+            firm_id: {
+              type: ["number", "null"]
+            },
 
-    const report = await controller.getVendorReport(request.body);
+            branch_id: {
+              type: ["number", "null"]
+            },
 
-    return reply.code(200).send({
-      status: "Success",
-      data: report
-    });
-  }
-);
+            company_id: {
+              type: ["number", "null"]
+            },
+
+            start_date: {
+              type: ["string", "null"],
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+
+            end_date: {
+              type: ["string", "null"],
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+            }
+          }
+        }
+      }
+    },
+    async (
+      request: FastifyRequest<{ Body: GetVendorReportBody }>,
+      reply: FastifyReply
+    ) => {
+
+      cns(request.url, request.body);
+
+      const controller = new VendorController();
+
+      const report = await controller.getVendorReport(request.body);
+
+      return reply.code(200).send({
+        status: "Success",
+        data: report
+      });
+    }
+  );
 }
