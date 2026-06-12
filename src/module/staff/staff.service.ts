@@ -519,7 +519,6 @@ export default class StaffService {
 
     const { r_id, remark, company_id, entity_id, entity_type } = data;
 
-    console.log(data)
     const isStaffExist = await getRecord(
       r_id,
       "staff",
@@ -535,7 +534,6 @@ export default class StaffService {
       throw new AppError("Entity id not matching", 400);
     }
     if (isStaffExist.entity_type !== entity_type) {
-      console.log(isStaffExist.entity_type, entity_type)
       throw new AppError("Entity type not matching", 400);
     }
 

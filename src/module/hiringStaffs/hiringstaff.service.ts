@@ -151,7 +151,6 @@ if ((already_exist.rowCount ?? 0) > 0) {
 
   async fetchHireStaff(data: FetchHireStaffParams) {
     const { filters, offset } = data;
-    console.log(filters)
     let where: string[] = [];
     let values: any[] = [];
     let joins: string[] = [];
@@ -197,8 +196,6 @@ if ((already_exist.rowCount ?? 0) > 0) {
     const whereClause = where.length
       ? `WHERE ${where.join(" AND ")}`
       : "";
-    console.log(values)
-    console.log(where)
     const staffQuery = `
     SELECT 
       s.*

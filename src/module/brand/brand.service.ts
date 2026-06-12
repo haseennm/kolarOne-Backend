@@ -54,8 +54,6 @@ export default class BrandService {
   }
   async fetchBrand(data: FetchBrandParams) {
     const { offset, filters = {} } = data;
-    console.log("filters", data)
-    console.log("filters.filter?.company_id", filters.company_id)
     const limit = filters.limit ?? 10;
     const page = filters.page ?? 1;
 

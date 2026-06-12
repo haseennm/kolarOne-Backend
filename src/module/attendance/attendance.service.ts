@@ -164,7 +164,6 @@ export default class AttendanceService {
     const staff_entity_id = staffData.entity_id;
     let staff_entity_type_debug = staffData.entity_type
     if (staffData.entity_type === "F") staff_entity_type_debug = "B"
-    console.log(staff_entity_type_debug, entity_type_input)
     if (staff_entity_type_debug !== entity_type_input) {
       throw new AppError("Entity type does not match this staff", 400);
     }
@@ -174,7 +173,6 @@ export default class AttendanceService {
     if (staff_entity_type === "B" || staff_entity_type === "C") {
       resolved_entity_id = staff_entity_id;
     } else if (staff_entity_type === "F") {
-      console.log("175")
       const branchFirm = await executeInTransaction(
         client,
         `
@@ -188,12 +186,10 @@ export default class AttendanceService {
       if (branchFirm.rowCount === 0) {
         throw new AppError("Firm not found", 404);
       }
-      console.log(branchFirm.rows[0])
       resolved_entity_id = branchFirm.rows[0].branch_id;
     } else {
       throw new AppError("Invalid entity type for staff", 400);
     }
-    console.log(resolved_entity_id, entity_id_input)
     if (Number(resolved_entity_id) !== Number(entity_id_input)) {
       throw new AppError("Entity ID mismatch for this staff", 403);
     }

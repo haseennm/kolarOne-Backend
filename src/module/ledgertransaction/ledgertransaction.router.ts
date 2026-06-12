@@ -73,7 +73,6 @@ export async function ledgerTransactionRouter(app: FastifyInstance) {
       request: FastifyRequest<{ Body: CreateLedgerTransactionBody }>,
       reply: FastifyReply
     ) => {
-      console.log(request.body)
       const controller = new LedgerTransactionController();
       const data = await controller.createTransaction(request.body);
 

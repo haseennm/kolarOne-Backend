@@ -99,7 +99,6 @@ export default class ProfitShareService {
         RETURNING *;
       `;
     const values = [partner_id, entity_id, entity_type, profit_share, statusCode, JSON.stringify([remark])];
-    console.log(entity_type)
     const { rows } = await executeInTransaction(client, queryText, values);
     return rows[0];
 
@@ -172,7 +171,6 @@ export default class ProfitShareService {
       entity_id,
       entity_type
     } = data;
-    console.log(data)
     const offset = (page - 1) * limit;
 
     let conditions: string[] = ["pps.status != 0"];

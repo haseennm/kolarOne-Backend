@@ -21,7 +21,6 @@ export class RentLossController {
   async fetchLossRent(data: FetchLossRentParams) {
 
     const res = await this.rentLossService.fetchLossRent(data);
-    console.log(res)
     return {
       ...res,
       data: res.data.map(rent => ({

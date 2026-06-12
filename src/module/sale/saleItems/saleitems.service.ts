@@ -240,7 +240,6 @@ export default class SaleItemService {
   async deleteSaleItem(data: DeleteSaleItemParams, client: PoolClient) {
 
     const { sale_id, firm_id, remark } = data;
-    console.log(data)
     const isItemExist = await executeInTransaction(client,
       `SELECT * FROM sales_items WHERE sale_id =$1 AND firm_id= $2`,
       [sale_id, firm_id]

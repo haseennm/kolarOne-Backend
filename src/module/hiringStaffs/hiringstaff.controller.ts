@@ -38,7 +38,6 @@ export default class HiringStaffController {
     }
   }
 
-  console.log("controller data", data);
 
   const validBloodGroups = [
     "A+", "A-",
@@ -162,14 +161,12 @@ export default class HiringStaffController {
   async encryptUrl(data: EncryptHireStaffBody) {
     const cryption = new Cryption
     const encrypted = cryption.encrypt(data)
-    console.log(encrypted)
     return `http://192.168.0.103:5173/apply?${encrypted}`
   }
   async decryptUrl(data: string) {
     const cryption = new Cryption
     const cleanedData = data.replace("http://192.168.0.103:5173/apply?", "");
     const decrypt = cryption.decrypt(cleanedData);
-    console.log(decrypt)
     return decrypt
   }
 

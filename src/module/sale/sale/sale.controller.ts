@@ -53,7 +53,7 @@ export default class SaleController {
         await saleItem.createSaleItem({
           sale_id: sale.id,
           firm_id: rest.firm_id,
-          status: status ?? "Completed",
+          status:  "Completed",
           product_id: item.product_id,
           stock_id: stock.id,
           saled_qty: item.saled_qty,
@@ -176,7 +176,6 @@ export default class SaleController {
             },
             client
           );
-          console.log("item.saled_qty !== saleItemData.saled_qty", Number(item.saled_qty), "!== ", Number(saleItemData.old_row.saled_qty))
           if (Number(item.saled_qty) !== Number(saleItemData.old_row.saled_qty)) {
             await stockController.reduceStock(
               {

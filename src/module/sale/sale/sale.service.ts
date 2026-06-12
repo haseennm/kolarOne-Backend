@@ -773,7 +773,6 @@ OFFSET $${values.length + 2}
     const newPaid =
       (Number(is_sale_exist.paid) || 0) +
       payments.reduce((sum, p) => sum + p.amount, 0);
-    console.log("newPaid", newPaid)
     const paymentObj = payments.map((p) => ({
       payment_method_id: p.payment_method_id,
       amount: p.amount,

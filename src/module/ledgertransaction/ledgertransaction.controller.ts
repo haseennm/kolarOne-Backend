@@ -87,7 +87,6 @@ export default class LedgerTransactionController {
         statusCode, entity_type, entity_id
       }, client);
       const payment_transactions_service = new PaymentTransactionService()
-      console.log(entity_id, entity_type)
       await payment_transactions_service.editPaymentTransaction({
         company_id,
         amount,

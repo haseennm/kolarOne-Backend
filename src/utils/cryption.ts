@@ -33,7 +33,6 @@ export class Cryption {
   }
   decrypt<T = any>(encryptedString: string): T {
     // 1. Split the component parts out of the string
-    console.log("encryptedString",encryptedString)
     const [ivHex, authTagHex, encryptedHex] = encryptedString.split(':');
 
     if (!ivHex || !authTagHex || !encryptedHex) {

@@ -158,7 +158,6 @@ export default class PurchaseReturnController {
             },
             client
           );
-          console.log("item.returned_qty", Number(item.returned_qty), "::purchase_return_item.row.returned_qty", Number(purchase_return_item.row.returned_qty))
          if (Number(item.returned_qty) !== Number(purchase_return_item.row.returned_qty)) {
             await stockController.reduceStock(
               {

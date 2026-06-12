@@ -82,7 +82,6 @@ export default class PartyBalanceController {
 
   async rePayPartyBalance(data: RepayPartyBalanceBody) {
     return transaction(async (client) => {
-      console.log("first", data)
       const {
         updated_by,
         pay_amount,
@@ -92,7 +91,6 @@ export default class PartyBalanceController {
         company_id,
         ...rest
       } = data;
-      console.log("data", data)
       const service = new PartyBalanceService();
 
       const remarks = {
@@ -143,7 +141,6 @@ export default class PartyBalanceController {
       }
 
       const payment_transactions = new PaymentTransactionService();
-      console.log("payment_method_id", payment_method_id)
 
 if (rest.payments && rest.payments.length > 0) {
   for (const payment of rest.payments) {

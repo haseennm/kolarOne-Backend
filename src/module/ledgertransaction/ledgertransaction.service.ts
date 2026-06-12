@@ -90,7 +90,6 @@ export default class LedgerTransactionService {
 
   async fetchLedgerTransaction(data: FetchLedgerTransactionParams) {
     const { filters, offset } = data;
-    console.log(data)
     let where: string[] = [];
     let values: any[] = [];
 
