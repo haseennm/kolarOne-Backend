@@ -126,6 +126,7 @@ export default class FirmController {
       branch_id: firm.branch_id,
       company_id: firm.company_id,
       message: `Firm ${firm.firm_name} Login success`,
+      name:firm.firm_name,
       role: firm.role
     };
   }

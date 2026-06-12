@@ -108,7 +108,8 @@ export default class BranchController {
             token: token,
             company_id:branch.company_id,
             message: `branch ${branch.branch_name} Login success`,
-            role:branch.role
+            role:branch.role,
+            name:branch.branch_name
         }
     }
 }

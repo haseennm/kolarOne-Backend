@@ -26,7 +26,7 @@ export default class CompanyController {
     }
   }
   async createCompany(data: CreateCompanyBody) {
-    const { created_by, status,password, ...rest } = data;
+    const { created_by, status, password, ...rest } = data;
     const hashed = await hashPassword(password)
 
     const remark = {
@@ -46,33 +46,33 @@ export default class CompanyController {
 
     return company;
   }
- async editCompany(data: EditCompanyBody) {
+  async editCompany(data: EditCompanyBody) {
 
     const { id, updated_by, status, ...rest } = data;
 
     const remark = {
-        action: "Updated",
-        updated_by,
-        updated_at: Date.now(),
+      action: "Updated",
+      updated_by,
+      updated_at: Date.now(),
     };
 
     let statusCode = 99;
 
     if (typeof status === "string") {
-        statusCode = getStatusCode(status);
+      statusCode = getStatusCode(status);
     }
 
     const service = new CompanyService();
 
     const company = await service.updateCompany({
-        id,
-        ...rest,
-        remark,
-        statusCode
+      id,
+      ...rest,
+      remark,
+      statusCode
     });
 
     return company;
-}
+  }
   async deleteCompany(data: DeleteCompanyBody) {
     const { deleted_by, ...rest } = data;
 
@@ -82,7 +82,7 @@ export default class CompanyController {
       updated_at: Date.now(),
     };
 
-    
+
     const service = new CompanyService();
 
     const company = await service.deleteCompany({
@@ -92,24 +92,25 @@ export default class CompanyController {
     return company;
   }
 
-   async loginCompany(data: CompanyLoginBody) {
-      const { password,username } = data
-      const service = new CompanyService();
-      const company = await service.loginCompany(data);
-      const isValid = await verifyPassword(password, company.password)
-  
-      if (!isValid) {
-        throw new AppError('Invalid credentials', 401)
-      }
-  
-      const token = generateToken({
-        id: company.id,
-        username: username,
-      })
-  
-      return {
-        token: token,
-        message: `company ${company.company_name} Login success`
-      }
+  async loginCompany(data: CompanyLoginBody) {
+    const { password, username } = data
+    const service = new CompanyService();
+    const company = await service.loginCompany(data);
+    const isValid = await verifyPassword(password, company.password)
+
+    if (!isValid) {
+      throw new AppError('Invalid credentials', 401)
     }
+
+    const token = generateToken({
+      id: company.id,
+      username: username,
+    })
+
+    return {
+      token: token,
+      message: `company ${company.company_name} Login success`,
+      name: company.company_name
+    }
+  }
 }
