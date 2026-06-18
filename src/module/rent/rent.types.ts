@@ -9,12 +9,45 @@ export interface CreateRentParams {
   payment_method_id?: number;
   amount_received?: number;
   remarks?: any[];
+  guarantor?: string
 }
 
 export interface CreateRentItem {
   rent_stock_id: number;
   quantity_taken: number;
   rate_per_item?: number | null;
+}
+
+export interface UpdateRentPayment {
+  amount?: number;
+  payment_method_id?: number;
+  advance_deductions?: AdvanceDeduction[];
+  note?: string;
+}
+
+export interface UpdateRentItem {
+  id?: number;
+  product_id?: number;
+  rent_stock_id?: number;
+  quantity_taken?: number;
+  returned_qty?: number;
+  rate_per_item?: number | null;
+  status?: number;
+  amount: number;
+  remark?: string;
+}
+
+export interface UpdateRentParams {
+  bill_id: number;
+  company_id: number;
+  branch_id: number;
+  customer_id?: string;
+  expected_return_date?: string | Date | null;
+  guarantor?: string | null;
+  total_amount?: number;
+  remark?: string;
+  items?: UpdateRentItem[];
+  payment?: UpdateRentPayment;
 }
 
 export interface AdvanceDeduction {
@@ -35,27 +68,23 @@ export interface ReturnRentParams {
 
   remarks?: any[];
 }
-
-// Master Payment structure used by both rent and loss modules
 export interface CreateRentPaymentParams {
   branch_id: number;
   amount: number;
-  payment_method_id: number;
-  row_type: "bill" | "advance" | "loss"; 
+  payment_method_id: number | null;
+  row_type: "bill" | "advance" | "loss";
   row_id: number;
   cash_flow: "in" | "out";
   note?: string | null;
   remarks?: any[];
   status?: number;
 }
-
 export interface ReturnRentItem {
   bill_item_id: number;
   return_qty: number;
   amount: number;
 
 }
-
 export interface PayBillBody {
   bill_id: number;
   company_id: number;
@@ -65,16 +94,14 @@ export interface PayBillBody {
   advance_deductions?: AdvanceDeduction[];
   note?: string;
 }
-
 export interface CreateAdvanceBody {
   customer_id: string;
   company_id: number;
   branch_id: number;
   amount: number;
-  payment_method_id: number;
+  payment_method_id: number |null;
   note?: string;
 }
-
 export interface ReturnAdvanceBody {
   customer_id: number;     // Changed from ledger_id
   company_id: number;
@@ -90,8 +117,8 @@ export interface ReturnBillAmountBody {
   amount: number;
   payment_method_id: number;
   note?: string;
+  discount?:boolean
 }
-
 export const returnBillAmountSchema = {
   type: "object",
   required: ["bill_id", "company_id", "branch_id", "amount", "payment_method_id"],
@@ -116,7 +143,6 @@ export const returnAdvanceSchema = {
     note: { type: "string" }
   }
 };
-
 export interface FetchRentQuery {
   branch_id: number;
   page?: number;
@@ -152,14 +178,12 @@ export interface FetchAdvanceLedgerParams {
 
   search?: string;
 }
-
-// Add these to the bottom of your rent.types.ts file
-
 export const createRentSchema = {
   type: "object",
   required: ["customer_id", "branch_id", "company_id", "items"],
   properties: {
     customer_id: { type: "string" },
+    guarantor: { type: "string" },
     branch_id: { type: "number" },
     company_id: { type: "number" },
     expected_return_date: { type: "string" },
@@ -179,7 +203,6 @@ export const createRentSchema = {
     }
   }
 };
-
 export const returnRentSchema = {
   type: "object",
   required: ["bill_id", "company_id", "branch_id", "items"],
@@ -214,6 +237,39 @@ export const returnRentSchema = {
   }
 };
 
+export const updateRentSchema = {
+  type: "object",
+  required: ["bill_id", "company_id", "branch_id"],
+  properties: {
+    bill_id: { type: "number" },
+    company_id: { type: "number" },
+    total_amount: { type: ["number", "null"] },
+    branch_id: { type: "number" },
+    customer_id: { type: "string" },
+    expected_return_date: { type: ["string", "null"] },
+    guarantor: { type: ["string", "null"] },
+    remark: { type: "string" },
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "number" },
+          product_id: { type: "number" },
+          rent_stock_id: { type: "number" },
+          quantity_taken: { type: "number" },
+          returned_qty: { type: "number" },
+          rate_per_item: { type: ["number", "null"] },
+          status: { type: "number" },
+          amount: { type: "number" },
+          remark: { type: "string" }
+        }
+      }
+    },
+ 
+  }
+};
+
 export const payBillSchema = {
   type: "object",
   required: ["bill_id", "company_id", "amount", "branch_id", "payment_method_id"],
@@ -237,7 +293,6 @@ export const payBillSchema = {
     }
   }
 };
-
 export const createAdvanceSchema = {
   type: "object",
   required: ["customer_id", "company_id", "branch_id", "amount", "payment_method_id"],
@@ -250,9 +305,6 @@ export const createAdvanceSchema = {
     note: { type: "string" }
   }
 };
-
-
-
 export const fetchRentSchema = {
   type: "object",
   properties: {

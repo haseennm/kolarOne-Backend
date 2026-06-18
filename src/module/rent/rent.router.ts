@@ -5,8 +5,10 @@ import {
   returnAdvanceSchema,
   payBillSchema,
   createRentSchema,
+  updateRentSchema,
   PayBillBody,
   CreateRentParams,
+  UpdateRentParams,
   ReturnRentParams,
   returnRentSchema,
   CreateAdvanceBody,
@@ -62,6 +64,31 @@ export async function rentRouter(app: FastifyInstance): Promise<void> {
 
       const data =
         await controller.returnRent(
+          request.body
+        );
+
+      return reply.send({
+        status: "Success",
+        message: data
+      });
+    }
+  );
+  app.post<{ Body: UpdateRentParams }>(
+    "/update",
+    {
+      schema: {
+        body: updateRentSchema
+      }
+    },
+    async (
+      request,
+      reply
+    ) => {
+      const controller =
+        new RentController();
+
+      const data =
+        await controller.updateRent(
           request.body
         );
 

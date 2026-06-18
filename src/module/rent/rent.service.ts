@@ -1,5 +1,5 @@
 import { PoolClient } from "pg";
-import { CreateAdvanceBody, CreateRentItem, CreateRentParams, CreateRentPaymentParams, ReturnRentParams, ReturnAdvanceBody, PayBillBody, FetchRentParams, FetchAdvanceLedgerParams, ReturnBillAmountBody } from "./rent.types";
+import { CreateAdvanceBody, CreateRentItem, CreateRentParams, CreateRentPaymentParams, ReturnRentParams, ReturnAdvanceBody, PayBillBody, FetchRentParams, FetchAdvanceLedgerParams, ReturnBillAmountBody, UpdateRentParams } from "./rent.types";
 import { executeInTransaction, pool } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord, getStatusCode } from "../../utils/extra";
@@ -393,7 +393,7 @@ export class RentService {
           branch_id,
           amount,
           payment_method_id,
-          row_type: "loss",
+          row_type: "bill",
           row_id: bill_id,
           cash_flow: "in",
           note: null,
@@ -476,7 +476,7 @@ export class RentService {
           branch_id,
           amount,
           payment_method_id,
-          row_type: "loss",
+          row_type: "bill",
           row_id: ledgerId,
           cash_flow: "in",
           note: null,
@@ -576,20 +576,22 @@ export class RentService {
         404
       );
     }
+    if (payment_method_id) {
 
-    const paymentMethod = await getRecord(
-      payment_method_id,
-      "payment_methods",
-      "company_id",
-      company_id,
-      client
-    );
-
-    if (!paymentMethod) {
-      throw new AppError(
-        "Payment method not found",
-        404
+      const paymentMethod = await getRecord(
+        payment_method_id,
+        "payment_methods",
+        "company_id",
+        company_id,
+        client
       );
+
+      if (!paymentMethod) {
+        throw new AppError(
+          "Payment method not found",
+          404
+        );
+      }
     }
 
     const remarks = [
@@ -636,7 +638,7 @@ export class RentService {
         branch_id,
         amount,
         payment_method_id,
-        row_type: "loss",
+        row_type: "advance",
         row_id: ledger.id,
         cash_flow: "in",
         note: null,
@@ -759,9 +761,9 @@ export class RentService {
           branch_id,
           amount: deduction,
           payment_method_id,
-          row_type: "loss",
+          row_type: "advance",
           row_id: ledger.id,
-          cash_flow: "in", // Keep your architecture rule; typically refunds are cash-out, but keeping your original config
+          cash_flow: "out",
           note: note || null,
           remarks: [
             {
@@ -794,7 +796,8 @@ export class RentService {
       payment_method_id,
       note,
       company_id,
-      branch_id
+      branch_id,
+      discount
     } = params;
 
     if (amount <= 0) {
@@ -832,10 +835,10 @@ export class RentService {
     if (!paymentMethod) {
       throw new AppError("Payment method not found", 404);
     }
-
+    const remark_text = discount === true ? "Refund to customer with discount" : "Refund to customer without discount"
     const updatedRemarks = this.appendRemark(
       rent_bill.remarks,
-      "Refund to customer",
+      remark_text,
       {
         amount,
         payment_method_id,
@@ -843,9 +846,10 @@ export class RentService {
       }
     );
 
-    await executeInTransaction(
-      client,
-      `
+    if (discount === false) {
+      await executeInTransaction(
+        client,
+        `
       UPDATE rent_bills
       SET
         total_paid = total_paid - $1,
@@ -854,13 +858,34 @@ export class RentService {
       AND branch_id =$4
       RETURNING *
       `,
-      [
-        amount,
-        JSON.stringify(updatedRemarks),
-        bill_id,
-        branch_id
-      ]
-    );
+        [
+          amount,
+          JSON.stringify(updatedRemarks),
+          bill_id,
+          branch_id
+        ]
+      );
+    } else {
+      await executeInTransaction(
+        client,
+        `
+      UPDATE rent_bills
+      SET
+        total_paid = total_paid - $1,
+        total_amount = total_amount - $1,
+        remarks = $2
+      WHERE id = $3
+      AND branch_id =$4
+      RETURNING *
+      `,
+        [
+          amount,
+          JSON.stringify(updatedRemarks),
+          bill_id,
+          branch_id
+        ]
+      );
+    }
     await this.createRentPayment(
       {
         branch_id,
@@ -869,7 +894,7 @@ export class RentService {
         row_type: "bill",
         row_id: bill_id,
         cash_flow: "out", // Keep your architecture rule; typically refunds are cash-out, but keeping your original config
-        note: note || "Refuned to customer",
+        note: note || discount === true ? "discount" : null,
         remarks: [
           {
             action: "Refund to customer",
@@ -898,9 +923,40 @@ export class RentService {
       items,
       payment_method_id,
       amount_received,
-      company_id
+      company_id,
+      guarantor
     } = params;
+    if (guarantor === customer_id) {
+      throw new AppError(
+        "Guarantor and customer must be different users.",
+        422
+      );
+    }
+    if (guarantor) {
+      const guarantorExist = await getRecord(
+        guarantor,
+        "customers",
+        "company_id",
+        company_id,
+        client
+      );
+      if (!guarantorExist) {
+        throw new AppError(
+          "Guarantor not found",
+          404
+        );
+      }
+      if (
+        guarantorExist.status ===
+        getStatusCode("Blacklist")
+      ) {
+        throw new AppError(
+          "Guarantor is blacklisted",
+          400
+        );
+      }
 
+    }
     const customer = await getRecord(
       customer_id,
       "customers",
@@ -965,7 +1021,8 @@ export class RentService {
         total_amount,
         total_paid,
         status,
-        remarks
+        remarks,
+        guarantor
       )
       VALUES (
         $1,$2,$3,
@@ -974,7 +1031,8 @@ export class RentService {
         0,
         0,
         $5,
-        $6
+        $6,
+        $7
       )
       RETURNING *
       `,
@@ -984,7 +1042,8 @@ export class RentService {
           billNumber,
           expected_return_date || null,
           getStatusCode("Active"),
-          JSON.stringify(billRemarks)
+          JSON.stringify(billRemarks),
+          guarantor
         ]
       );
 
@@ -1262,7 +1321,7 @@ export class RentService {
           branch_id,
           amount,
           payment_method_id,
-          row_type: "loss",
+          row_type: "bill",
           row_id: bill_id,
           cash_flow: "in",
           note: null,
@@ -1341,9 +1400,9 @@ export class RentService {
       await this.createRentPayment(
         {
           branch_id,
-          amount,
+          amount: amount - extraAdvance,
           payment_method_id,
-          row_type: "loss",
+          row_type: "bill",
           row_id: bill_id,
           cash_flow: "in",
           note: null,
@@ -1780,6 +1839,517 @@ export class RentService {
         "Rent returned successfully"
     };
   }
+
+  async updateRent(
+    params: UpdateRentParams,
+    client: PoolClient
+  ) {
+    const {
+      bill_id,
+      company_id,
+      branch_id,
+      customer_id,
+      expected_return_date,
+      guarantor,
+      remark,
+      items = [],
+      total_amount
+    } = params;
+
+    const billResult = await executeInTransaction(
+      client,
+      `
+    SELECT *
+    FROM rent_bills
+    WHERE id = $1
+    AND branch_id = $2
+    AND status != $3
+    FOR UPDATE
+    `,
+      [
+        bill_id,
+        branch_id,
+        getStatusCode("Deleted")
+      ]
+    );
+
+    const bill = billResult.rows[0];
+
+    if (!bill) {
+      throw new AppError(
+        "Rent bill not found",
+        404
+      );
+    }
+
+    const nextCustomerId =
+      customer_id ?? bill.customer_id;
+
+    if (customer_id) {
+      const customer = await getRecord(
+        customer_id,
+        "customers",
+        "company_id",
+        company_id,
+        client
+      );
+
+      if (!customer) {
+        throw new AppError(
+          "Customer not found",
+          404
+        );
+      }
+
+      if (
+        customer.status ===
+        getStatusCode("Blacklist")
+      ) {
+        throw new AppError(
+          "Customer is blacklisted",
+          400
+        );
+      }
+    }
+
+    if (
+      guarantor &&
+      guarantor === nextCustomerId
+    ) {
+      throw new AppError(
+        "Guarantor and customer must be different users.",
+        422
+      );
+    }
+
+    if (guarantor) {
+      const guarantorExist = await getRecord(
+        guarantor,
+        "customers",
+        "company_id",
+        company_id,
+        client
+      );
+
+      if (!guarantorExist) {
+        throw new AppError(
+          "Guarantor not found",
+          404
+        );
+      }
+      if (
+        guarantorExist.status ===
+        getStatusCode("Blacklist")
+      ) {
+        throw new AppError(
+          "Guarantor is blacklisted",
+          400
+        );
+      }
+    }
+
+    let billRemarks = this.appendRemark(
+      bill.remarks,
+      "rent_updated",
+      {
+        remark: remark || null
+      }
+    );
+
+    await executeInTransaction(
+      client,
+      `
+    UPDATE rent_bills
+    SET
+      customer_id = $1,
+      expected_return_date = $2,
+      guarantor = $3,
+      remarks = $4,
+      total_amount =$5
+    WHERE id = $6
+    AND branch_id = $7
+    `,
+      [
+        nextCustomerId,
+        expected_return_date === undefined
+          ? bill.expected_return_date
+          : expected_return_date,
+        guarantor === undefined
+          ? bill.guarantor
+          : guarantor,
+        JSON.stringify(billRemarks),
+        total_amount ?? bill.total_amount,
+        bill_id,
+        branch_id
+      ]
+    );
+
+    const editedItemIds = items
+      .filter(item => item.id)
+      .map(item => item.id);
+
+    const duplicateItemIds =
+      editedItemIds.filter(
+        (id, index) =>
+          editedItemIds.indexOf(id) !== index
+      );
+
+    if (duplicateItemIds.length > 0) {
+      throw new AppError(
+        "Duplicate rent item found in update items",
+        400
+      );
+    }
+
+    for (const item of items) {
+      const existingItemResult = item.id
+        ? await executeInTransaction(
+          client,
+          `
+        SELECT *
+        FROM rent_bill_items
+        WHERE id = $1
+        AND bill_id = $2
+        AND status != $3
+        FOR UPDATE
+        `,
+          [
+            item.id,
+            bill_id,
+            getStatusCode("Deleted")
+          ]
+        )
+        : null;
+
+      const existingItem =
+        existingItemResult?.rows[0];
+
+      if (item.id && !existingItem) {
+        throw new AppError(
+          "Rent bill item not found",
+          404
+        );
+      }
+
+      if (
+        !existingItem &&
+        (!item.rent_stock_id || !item.quantity_taken)
+      ) {
+        throw new AppError(
+          "rent_stock_id and quantity_taken are required for new items",
+          400
+        );
+      }
+
+      const rentStockId =
+        item.rent_stock_id ??
+        existingItem.rent_stock_id;
+
+      const quantityTaken =
+        item.quantity_taken ??
+        Number(existingItem.quantity_taken);
+
+      const returnedQty =
+        item.returned_qty ??
+        Number(existingItem?.returned_qty || 0);
+
+      if (quantityTaken <= 0) {
+        throw new AppError(
+          "Quantity taken must be greater than 0",
+          400
+        );
+      }
+
+      if (returnedQty < 0) {
+        throw new AppError(
+          "Returned quantity cannot be negative",
+          400
+        );
+      }
+
+      if (returnedQty > quantityTaken) {
+        throw new AppError(
+          "Returned quantity cannot be greater than quantity taken",
+          400
+        );
+      }
+
+      const stockResult = await executeInTransaction(
+        client,
+        `
+      SELECT *
+      FROM rental_stocks
+      WHERE id = $1
+      AND branch_id = $2
+      AND status != $3
+      FOR UPDATE
+      `,
+        [
+          rentStockId,
+          branch_id,
+          getStatusCode("Deleted")
+        ]
+      );
+
+      const stock = stockResult.rows[0];
+
+      if (!stock) {
+        throw new AppError(
+          `Rental stock ${rentStockId} not found`,
+          404
+        );
+      }
+
+      const productId =
+        item.product_id ?? stock.product_id;
+
+      if (
+        productId &&
+        Number(productId) !== Number(stock.product_id)
+      ) {
+        throw new AppError(
+          "Product does not belong to selected rental stock",
+          400
+        );
+      }
+
+      const oldReserved = existingItem
+        ? Number(existingItem.quantity_taken) -
+        Number(existingItem.returned_qty)
+        : 0;
+
+      const newReserved =
+        Number(quantityTaken) - Number(returnedQty);
+
+      if (
+        existingItem &&
+        Number(existingItem.rent_stock_id) !==
+        Number(rentStockId)
+      ) {
+        await executeInTransaction(
+          client,
+          `
+        UPDATE rental_stocks
+        SET available_units = available_units + $1
+        WHERE id = $2 AND branch_id =$3
+        `,
+          [
+            oldReserved,
+            existingItem.rent_stock_id,
+            branch_id
+          ]
+        );
+
+        if (
+          Number(stock.available_units) <
+          newReserved
+        ) {
+          throw new AppError(
+            `${stock.unique_name} has only ${stock.available_units} units available`,
+            400
+          );
+        }
+
+        await executeInTransaction(
+          client,
+          `
+        UPDATE rental_stocks
+        SET available_units = available_units - $1
+        WHERE id = $2
+        `,
+          [
+            newReserved,
+            rentStockId
+          ]
+        );
+      } else {
+        const reservedDifference =
+          newReserved - oldReserved;
+
+        if (
+          reservedDifference > 0 &&
+          Number(stock.available_units) <
+          reservedDifference
+        ) {
+          throw new AppError(
+            `${stock.unique_name} has only ${stock.available_units} units available`,
+            400
+          );
+        }
+
+        if (reservedDifference !== 0) {
+          await executeInTransaction(
+            client,
+            `
+          UPDATE rental_stocks
+          SET available_units =
+            available_units - $1
+          WHERE id = $2
+          `,
+            [
+              reservedDifference,
+              rentStockId
+            ]
+          );
+        }
+      }
+
+      const rate =
+        item.rate_per_item ??
+        existingItem?.rate_per_item ??
+        stock.hourly_rate ??
+        0;
+
+      const amount = item.amount
+
+      const itemRemarks = this.appendRemark(
+        existingItem?.remarks || [],
+        existingItem
+          ? "item_updated"
+          : "item_added",
+        {
+          remark: item.remark || null
+        }
+      );
+
+      const itemStatus =
+        item.status ??
+        (
+          returnedQty === quantityTaken
+            ? getStatusCode("Returned")
+            : getStatusCode("Active")
+        );
+
+      if (existingItem) {
+        await executeInTransaction(
+          client,
+          `
+        UPDATE rent_bill_items
+        SET
+          product_id = $1,
+          rent_stock_id = $2,
+          quantity_taken = $3,
+          returned_qty = $4,
+          rate_per_item = $5,
+          amount = $6,
+          status = $7,
+          remarks = $8
+        WHERE id = $9
+        AND bill_id = $10
+        `,
+          [
+            productId,
+            rentStockId,
+            quantityTaken,
+            returnedQty,
+            rate,
+            amount,
+            itemStatus,
+            JSON.stringify(itemRemarks),
+            item.id,
+            bill_id
+          ]
+        );
+      } else {
+        await executeInTransaction(
+          client,
+          `
+        INSERT INTO rent_bill_items (
+          bill_id,
+          product_id,
+          rent_stock_id,
+          quantity_taken,
+          returned_qty,
+          rate_per_item,
+          amount,
+          status,
+          remarks
+        )
+        VALUES (
+          $1,$2,$3,$4,$5,$6,$7,$8,$9
+        )
+        `,
+          [
+            bill_id,
+            productId,
+            rentStockId,
+            quantityTaken,
+            returnedQty,
+            rate,
+            amount,
+            itemStatus,
+            JSON.stringify(itemRemarks)
+          ]
+        );
+      }
+    }
+
+
+
+
+    const refreshedBill =
+      await executeInTransaction(
+        client,
+        `
+      SELECT *
+      FROM rent_bills
+      WHERE id = $1
+      `,
+        [bill_id]
+      );
+
+    const updatedBill =
+      refreshedBill.rows[0];
+
+    const allReturned =
+      await this.checkAllItemsReturned(
+        bill_id,
+        client
+      );
+
+    const status =
+      this.getRentBillStatus(
+        allReturned,
+        Number(updatedBill.total_paid),
+        Number(updatedBill.total_amount)
+      );
+
+    await executeInTransaction(
+      client,
+      `
+    UPDATE rent_bills
+    SET
+      status = $1::int,
+      actual_close_date = CASE
+        WHEN $1::int = $2::int
+        THEN NOW()
+        ELSE actual_close_date
+      END
+    WHERE id = $3::int
+    `,
+      [
+        status,
+        getStatusCode("Completed"),
+        bill_id
+      ]
+    );
+    if (updatedBill.total_paid > updatedBill.total_amount) {
+      await this.createAdvance(
+        {
+          customer_id: updatedBill.customer_id,
+          branch_id,
+          amount: Number(updatedBill.total_paid) - Number(updatedBill.total_amount),
+          payment_method_id: null,
+          company_id
+        },
+        client
+      );
+    }
+    return {
+      message: "Rent updated successfully"
+    };
+  }
+
   async fetchRent(params: FetchRentParams) {
     const {
       branch_id,
@@ -1790,7 +2360,6 @@ export class RentService {
       search,
       status,
       customer_id,
-
       from_date,
       to_date
     } = params;
@@ -1999,16 +2568,27 @@ export class RentService {
     const payments =
       await pool.query(
         `
-      SELECT *
-      FROM rent_payments
-      WHERE
-        (
-          row_type = 'bill'
-          AND row_id = $1
-        )
-      ORDER BY id DESC
-      `,
-        [bill_id]
+    SELECT
+      rp.*,
+
+      pm.method_name AS payment_method_name
+
+    FROM rent_payments rp
+
+    LEFT JOIN payment_methods pm
+      ON pm.id = rp.payment_method_id
+
+    WHERE
+      rp.row_type = 'bill'
+      AND rp.row_id = $1
+      AND rp.branch_id = $2
+
+    ORDER BY rp.id DESC
+    `,
+        [
+          bill_id,
+          branch_id
+        ]
       );
 
     return {
