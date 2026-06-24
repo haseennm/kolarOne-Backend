@@ -101,7 +101,8 @@ export interface StockAdjustFetchParams {
 }
 export interface StockDelete {
   purchase_id: number;
-  firm_id: number
+  firm_id: number;
+  stock_id?: number;
 }
 export interface StockReport {
   level: "firm" | "branch" | "company";

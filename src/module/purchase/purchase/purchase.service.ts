@@ -1,10 +1,21 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { getRecord } from "../../../utils/extra";
+import { getRecord, getStatusCode } from "../../../utils/extra";
 import { PurchaseCreateParams, PurchaseDeleteParams, PurchaseEditParams, PurchaseFetchParams, RepayBalancePurchase } from "./purchase.types";
 
 export default class PurchaseService {
+  private billStatus(final_amount: number, paid_amount: number) {
+    if (paid_amount <= 0) {
+      return getStatusCode("Unpaid");
+    }
+
+    if (paid_amount >= final_amount) {
+      return getStatusCode("Paid");
+    }
+
+    return getStatusCode("Partial");
+  }
 
   async createPurchase(data: PurchaseCreateParams, client: PoolClient) {
     const {
@@ -17,7 +28,6 @@ export default class PurchaseService {
       payment_amount,
       payment_method_id,
       remark,
-      statusCode,
       subtotal,
       total_cgst,
       total_igst,
@@ -123,7 +133,7 @@ export default class PurchaseService {
       final_amount ?? 0,
       payment_amount ?? 0,
       notes ?? null,
-      statusCode,
+      this.billStatus(final_amount ?? 0, payment_amount ?? 0),
       JSON.stringify(remark) ?? {},
       payment_method_id ?? null,
       transaction_reference ?? null,
@@ -145,7 +155,6 @@ export default class PurchaseService {
       payment_amount,
       payment_method_id,
       remark,
-      statusCode,
       subtotal,
       total_cgst,
       total_igst,
@@ -167,7 +176,7 @@ export default class PurchaseService {
     );
 
     if (!is_purchase_exist) {
-      throw new AppError("Firm not found", 404);
+      throw new AppError("Purchase not found", 404);
     }
     if (payment_method_id && payment_method_id !== is_purchase_exist.payment_method_id) {
       const is_payment_method_exist = await getRecord(
@@ -246,7 +255,10 @@ export default class PurchaseService {
       final_amount ?? is_purchase_exist.final_amount,
       payment_amount ?? is_purchase_exist.payment_amount,
       notes ?? is_purchase_exist.notes,
-      statusCode ?? is_purchase_exist.status,
+      this.billStatus(
+        final_amount ?? is_purchase_exist.final_amount,
+        payment_amount ?? is_purchase_exist.payment_amount
+      ),
       JSON.stringify([remark]),
       payment_method_id ?? is_purchase_exist.payment_method_id,
       transaction_reference ?? is_purchase_exist.transaction_reference,

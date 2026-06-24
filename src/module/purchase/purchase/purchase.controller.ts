@@ -1,5 +1,6 @@
 import { PoolClient } from "pg";
-import { transaction } from "../../../config/db";
+import { executeInTransaction, transaction } from "../../../config/db";
+import { AppError } from "../../../utils/AppError";
 import { convertEntityType, EntityKey, getStatusCode, getStatusText, getTransactionCode, PaymentTransactionTypeCodeMap } from "../../../utils/extra";
 import { PurchaseCreateBody, PurchaseDeleteBody, PurchaseEditBody, PurchaseFetchParams } from "./purchase.types";
 import StockController from "../../stock/stock.controller";
@@ -58,7 +59,7 @@ export default class PurchaseController {
             purchase_id: purchase.id,
             firm_id: rest.firm_id,
             branch_id: rest.branch_id,
-            status: status ?? "Completed",
+            status: item.status ?? status ?? "Completed",
             product_id: item.product_id,
             stock_id: stock.id,
             received_qty: item.received_qty,
@@ -113,7 +114,7 @@ export default class PurchaseController {
     });
   }
   async purchaseEdit(data: PurchaseEditBody) {
-    const { payment_amount, final_amount, status, company_id, updated_by, items, ...rest } = data;
+    const { payment_amount, final_amount, status, company_id, updated_by, items, delete_item_ids, ...rest } = data;
 
     const remark = {
       action: "Updated",
@@ -138,8 +139,93 @@ export default class PurchaseController {
 
       const stockController = new StockController();
       const purchaseItem = new PurchaseItemController();
+      const deletedItemIds = new Set(delete_item_ids ?? []);
+      if (items?.some((item) => item.item_id && deletedItemIds.has(item.item_id))) {
+        throw new AppError("Cannot edit and delete the same purchase item", 400);
+      }
+
+      if (delete_item_ids?.length) {
+        for (const item_id of delete_item_ids) {
+          const deletedItem = await purchaseItem.deletePurchaseItem(
+            {
+              purchase_id: purchase.id,
+              firm_id: rest.firm_id,
+              item_id,
+            },
+            client
+          );
+
+          await stockController.deleteStock(
+            {
+              purchase_id: purchase.id,
+              firm_id: rest.firm_id,
+              stock_id: deletedItem.stock_id,
+            },
+            client
+          );
+        }
+      }
+
       if (items) {
+        const newProductIds = new Set<number>();
         for (const item of items) {
+          const isNewItem = item.is_new === true || !item.item_id;
+          if (isNewItem) {
+            if (!item.product_id) {
+              throw new AppError("Product is required to add purchase item", 400);
+            }
+            if (newProductIds.has(item.product_id)) {
+              throw new AppError("Duplicate item in purchase edit request", 400);
+            }
+            newProductIds.add(item.product_id);
+            await this.ensurePurchaseItemCanBeAdded(
+              {
+                purchase_id: purchase.id,
+                firm_id: rest.firm_id,
+                product_id: item.product_id,
+              },
+              client
+            );
+
+            const stock = await stockController.createStock(
+              {
+                firm_id: rest.firm_id,
+                branch_id: rest.branch_id,
+                purchase_id: purchase.id,
+                product_id: item.product_id,
+                available_qty: item.received_qty!,
+                purchased_qty: item.purchased_qty!,
+                status: "Good",
+                movement_type: "I",
+                reason: getTransactionCode("purchase"),
+                company_id
+              },
+              client
+            );
+
+            await purchaseItem.createPurchaseItem(
+              {
+                purchase_id: purchase.id,
+                firm_id: rest.firm_id,
+                branch_id: rest.branch_id,
+                status: item.status ?? status ?? "Completed",
+                product_id: item.product_id,
+                stock_id: stock.id,
+                received_qty: item.received_qty!,
+                purchased_qty: item.purchased_qty!,
+                unit: item.unit!,
+                unit_price: item.unit_price!,
+                sub_total: item.sub_total!,
+                total_igst: item.total_igst ?? 0,
+                total_sgst: item.total_sgst ?? 0,
+                total_cgst: item.total_cgst ?? 0,
+                net_amount: item.net_amount!,
+              },
+              client
+            );
+
+            continue;
+          }
 
           const purchase_item = await purchaseItem.editPurchaseItem(
             {
@@ -147,7 +233,7 @@ export default class PurchaseController {
               purchase_id: purchase.id,
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
-              status: status ?? "Completed",
+              status: item.status ?? status ?? "Completed",
               product_id: item.product_id,
               stock_id: item.stock_id,
               received_qty: item.received_qty,
@@ -183,7 +269,7 @@ export default class PurchaseController {
           );
         }
       }
-      const difference = (payment_amount ?? 0) - (final_amount ?? 0);
+      const difference = Number(purchase.payment_amount ?? 0) - Number(purchase.final_amount ?? 0);
       const party_balance_controller = new PartyBalanceController();
 
 
@@ -216,18 +302,39 @@ export default class PurchaseController {
       const payment_transactions_service = new PaymentTransactionService()
       await payment_transactions_service.editPaymentTransaction({
         company_id,
-        amount: payment_amount,
-        payment_method_id: null,
+        amount: purchase.payment_amount,
+        payment_method_id: purchase.payment_method_id ?? null,
         ref_id: rest.purchase_id,
         ref_type: PaymentTransactionTypeCodeMap["purchase"],
         status: statusCode,
-        transaction_reference: null,
+        transaction_reference: purchase.transaction_reference ?? null,
         business_id: rest.firm_id,
         business_ref: "F"
       }, client)
 
-      return `purchase ${purchase.bill_number} has been created successfully.`;
+      return `purchase ${purchase.bill_number} has been updated successfully.`;
     });
+  }
+
+  private async ensurePurchaseItemCanBeAdded(
+    data: { purchase_id: number; firm_id: number; product_id: number },
+    client: PoolClient
+  ) {
+    const existingItem = await executeInTransaction(
+      client,
+      `SELECT id
+       FROM purchase_items
+       WHERE purchase_id = $1
+       AND firm_id = $2
+       AND product_id = $3
+       AND status != 0
+       LIMIT 1`,
+      [data.purchase_id, data.firm_id, data.product_id]
+    );
+
+    if (existingItem.rows.length > 0) {
+      throw new AppError("This item already exists in this purchase", 400);
+    }
   }
 
   async purchaseFetch(data: PurchaseFetchParams) {

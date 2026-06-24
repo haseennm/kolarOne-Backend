@@ -176,6 +176,25 @@ export default class PurchaseItemService {
     if (!is_item_exist) {
       throw new AppError("Purchase item not found", 404);
     }
+    const final_product_id = product_id ?? is_item_exist.product_id;
+    if (final_product_id !== is_item_exist.product_id) {
+      const duplicateItem = await executeInTransaction(
+        client,
+        `SELECT id
+         FROM purchase_items
+         WHERE purchase_id = $1
+         AND firm_id = $2
+         AND product_id = $3
+         AND id != $4
+         AND status != 0
+         LIMIT 1`,
+        [purchase_id, firm_id, final_product_id, item_id]
+      );
+
+      if (duplicateItem.rows.length > 0) {
+        throw new AppError("This item already exists in this purchase", 400);
+      }
+    }
     const final_received_qty = received_qty ?? is_item_exist.received_qty;
     const final_purchased_qty = purchased_qty ?? is_item_exist.purchased_qty;
     if (final_received_qty > final_purchased_qty) {
@@ -196,15 +215,16 @@ export default class PurchaseItemService {
       total_sgst = $7,
       total_igst = $8,
       net_amount = $9,
-      stock_id = $10,
+      product_id = $10,
+      stock_id = $11,
       remarks =
-      CASE
-          WHEN remarks IS NULL THEN $11:: jsonb
+        CASE
+          WHEN remarks IS NULL THEN $12:: jsonb
           WHEN jsonb_typeof(remarks) = 'array'
-            THEN remarks || $11:: jsonb
-          ELSE jsonb_build_array(remarks) || $11:: jsonb
+            THEN remarks || $12:: jsonb
+          ELSE jsonb_build_array(remarks) || $12:: jsonb
     END
-      WHERE id = $12 AND firm_id =$13
+      WHERE id = $13 AND firm_id =$14
     RETURNING *;
     `;
 
@@ -218,6 +238,7 @@ export default class PurchaseItemService {
       total_sgst ?? is_item_exist.total_sgst,
       total_igst ?? is_item_exist.total_igst,
       net_amount ?? is_item_exist.net_amount,
+      final_product_id,
       stock_id ?? is_item_exist.stock_id,
       JSON.stringify(remark),
       item_id,
@@ -230,12 +251,16 @@ export default class PurchaseItemService {
 
   async deletePurchaseItem(data: DeletePurchaseItemParams, client: PoolClient) {
 
-    const { purchase_id, firm_id, remark } = data;
+    const { purchase_id, firm_id, item_id, remark } = data;
     const isItemExist = await executeInTransaction(client,
-      `SELECT * FROM purchase_items WHERE purchase_id =$1 AND firm_id= $2`,
-      [purchase_id, firm_id]
+      `SELECT * FROM purchase_items
+       WHERE purchase_id = $1
+       AND firm_id = $2
+       AND status != 0
+       ${item_id ? "AND id = $3" : ""}`,
+      item_id ? [purchase_id, firm_id, item_id] : [purchase_id, firm_id]
     )
-    if (!isItemExist) {
+    if (isItemExist.rows.length === 0) {
       throw new AppError("Purchase item not found for this purchase", 404)
     }
 
@@ -251,13 +276,14 @@ SET
   END
 WHERE purchase_id = $2 
   AND firm_id = $3
+  ${item_id ? "AND id = $4" : ""}
 RETURNING *;
     `;
 
     const { rows } = await executeInTransaction(
       client,
       deleteQuery,
-      [remark, purchase_id, firm_id]
+      item_id ? [JSON.stringify(remark), purchase_id, firm_id, item_id] : [JSON.stringify(remark), purchase_id, firm_id]
     );
 
     return rows[0];

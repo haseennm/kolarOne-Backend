@@ -48,12 +48,17 @@ export default class PurchaseItemController {
       action: "Update",
       created_at: Date.now(),
     }
+    const { item_id } = rest;
+    if (!item_id) {
+      throw new AppError("Purchase item id is required", 400);
+    }
 
     const service = new PurchaseItemService();
 
     const purchase_item = service.updatePurchaseItem(
       {
         ...rest,
+        item_id,
         statusCode,
         remark
       },
@@ -89,8 +94,8 @@ export default class PurchaseItemController {
       deleted_at: Date.now(),
     };
     const service = new PurchaseItemService();
-    await service.deletePurchaseItem({...data,remark},  client);
+    const deletedItem = await service.deletePurchaseItem({...data,remark},  client);
 
-    return `Purchase item has been deleted successfully.`;
+    return deletedItem;
   }
 }

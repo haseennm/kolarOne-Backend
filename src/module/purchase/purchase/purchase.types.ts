@@ -49,9 +49,10 @@ export interface PurchaseEditBody {
   transaction_reference?: string | null;
   payment_method_id?: number;
   items?: EditPurchaseItemBody[];
+  delete_item_ids?: number[];
 }
 export interface PurchaseEditParams
-  extends Omit<PurchaseEditBody, "status" | "updated_by" | "items"> {
+  extends Omit<PurchaseEditBody, "status" | "updated_by" | "items" | "delete_item_ids"> {
   statusCode?: number;
   remark: object
 }

@@ -43,7 +43,6 @@ export default class StockService {
       reason,
       company_id
     } = data;
-
     // ✅ Validate firm exists
     const isFirmExist = await getRecord(
       firm_id,
@@ -137,7 +136,6 @@ export default class StockService {
       stock_id,
       statusCode
     ];
-
     await executeInTransaction(client, movement_query, movement_values);
     return rows[0]
   }
@@ -199,11 +197,11 @@ export default class StockService {
   UPDATE stock SET
     available_quantity = $1,
     status = $2,
-     mrp_price =$3
-  wholesale_price =$4
-  retail_price =$5
-  branch_price =$6
-  special_retail_price =$7
+     mrp_price =$3,
+  wholesale_price =$4,
+  retail_price =$5,
+  branch_price =$6,
+  special_retail_price =$7,
     product_id = $8,
     purchase_id = $9,
     purchased_qty = $10
@@ -482,32 +480,32 @@ export default class StockService {
     };
   }
   async popupStock(data: FetchPopup) {
-  const { branch_id, stock_id, product_id } = data;
+    const { branch_id, stock_id, product_id } = data;
 
-  let where: string[] = [];
-  let values: any[] = [];
+    let where: string[] = [];
+    let values: any[] = [];
 
-  values.push(branch_id);
-  where.push(`s.branch_id = $${values.length}`);
+    values.push(branch_id);
+    where.push(`s.branch_id = $${values.length}`);
 
-  values.push(0);
-  where.push(`s.status != $${values.length}`);
+    values.push(0);
+    where.push(`s.status != $${values.length}`);
 
-  if (stock_id) {
-    values.push(stock_id);
-    where.push(`s.id = $${values.length}`);
-  }
+    if (stock_id) {
+      values.push(stock_id);
+      where.push(`s.id = $${values.length}`);
+    }
 
-  if (product_id) {
-    values.push(product_id);
-    where.push(`s.product_id = $${values.length}`);
-  }
+    if (product_id) {
+      values.push(product_id);
+      where.push(`s.product_id = $${values.length}`);
+    }
 
-  const whereClause = where.length
-    ? `WHERE ${where.join(" AND ")}`
-    : "";
+    const whereClause = where.length
+      ? `WHERE ${where.join(" AND ")}`
+      : "";
 
-  const stockQuery = `
+    const stockQuery = `
     SELECT 
       s.id,
       s.product_id,
@@ -531,19 +529,19 @@ export default class StockService {
     ${whereClause}
   `;
 
-  const stocks = await query(stockQuery, values);
+    const stocks = await query(stockQuery, values);
 
-  const total_available_quantity = stocks.reduce(
-    (sum: number, item: any) =>
-      sum + Number(item.available_quantity || 0),
-    0
-  );
+    const total_available_quantity = stocks.reduce(
+      (sum: number, item: any) =>
+        sum + Number(item.available_quantity || 0),
+      0
+    );
 
-  return {
-    total_available_quantity,
-    stocks,
-  };
-}
+    return {
+      total_available_quantity,
+      stocks,
+    };
+  }
   async fetchAdjustedStock(data: StockAdjustFetchParams) {
     const { filters, offset } = data;
 
@@ -668,12 +666,16 @@ export default class StockService {
   }
 
   async deleteStock(data: StockDelete, client: PoolClient) {
-    const { firm_id, purchase_id } = data;
+    const { firm_id, purchase_id, stock_id } = data;
 
     const result = await executeInTransaction(
       client,
-      `SELECT * FROM stock WHERE purchase_id = $1 AND firm_id = $2`,
-      [purchase_id, firm_id]
+      `SELECT * FROM stock
+       WHERE purchase_id = $1
+       AND firm_id = $2
+       AND status != 0
+       ${stock_id ? "AND id = $3" : ""}`,
+      stock_id ? [purchase_id, firm_id, stock_id] : [purchase_id, firm_id]
     );
 
     if (result.rows.length === 0) {
@@ -682,17 +684,33 @@ export default class StockService {
 
     const stocks = result.rows;
 
+    if (stock_id) {
+      const stockUsedInSales = await executeInTransaction(
+        client,
+        `SELECT 1 FROM sales_items WHERE stock_id = $1 LIMIT 1`,
+        [stock_id]
+      );
+
+      if (stockUsedInSales.rows.length > 0) {
+        throw new AppError(
+          "Stock from this purchase item is already used in sales, cannot delete",
+          400
+        );
+      }
+    }
+
     const deleteQuery = `
     UPDATE stock
     SET status = 0
     WHERE purchase_id = $1 AND firm_id = $2
+    ${stock_id ? "AND id = $3" : ""}
     RETURNING *;
   `;
 
     const { rows } = await executeInTransaction(
       client,
       deleteQuery,
-      [purchase_id, firm_id]
+      stock_id ? [purchase_id, firm_id, stock_id] : [purchase_id, firm_id]
     );
 
     for (const stock of stocks) {

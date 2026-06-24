@@ -22,10 +22,12 @@ export interface CreatePurchaseItemParams
   remark: object;
 }
 export interface EditPurchaseItemBody {
-  item_id: number
+  item_id?: number
   purchase_id: number;
   firm_id: number;
   branch_id: number;
+  is_new?: boolean;
+  batches?: unknown[];
   status?: string;
   product_id?: number;
   stock_id?: number;
@@ -40,7 +42,8 @@ export interface EditPurchaseItemBody {
   net_amount?: number;
 }
 export interface EditPurchaseItemParams
-  extends Omit<EditPurchaseItemBody, "status"> {
+  extends Omit<EditPurchaseItemBody, "status" | "item_id"> {
+  item_id: number;
   statusCode?: number;
   remark: object;
 }
@@ -93,6 +96,7 @@ export interface FetchDbPurchaseItem {
 export interface DeletePurchaseItemBody {
   purchase_id: number;
   firm_id: number;
+  item_id?: number;
 }
 export interface DeletePurchaseItemParams
   extends DeletePurchaseItemBody {

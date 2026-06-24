@@ -213,7 +213,6 @@ export async function purchaseRouter(app: FastifyInstance) {
               items: {
                 type: "object",
                 required: [
-                  "item_id",
                   "product_id",
                   "received_qty",
                   "purchased_qty",
@@ -227,6 +226,12 @@ export async function purchaseRouter(app: FastifyInstance) {
                 ],
                 properties: {
                   item_id: { type: "number" },
+                  is_new: { type: "boolean" },
+                  batches: { type: "array" },
+                  status: {
+                    type: "string",
+                    enum: ["Completed", "Confirm", "Cancelled"]
+                  },
                   product_id: { type: "number" },
                   received_qty: { type: "number" },
                   purchased_qty: { type: "number" },
@@ -239,6 +244,10 @@ export async function purchaseRouter(app: FastifyInstance) {
                   net_amount: { type: "number" }
                 }
               }
+            },
+            delete_item_ids: {
+              type: "array",
+              items: { type: "number" }
             }
           }
         }
