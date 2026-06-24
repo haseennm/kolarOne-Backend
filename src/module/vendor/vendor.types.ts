@@ -1,6 +1,6 @@
 export interface CreateVendorBody {
   company_id: number;
-  branch_id: number;
+  firm_id?: number[];
   vendor_name: string;
   email?: string | null;
   phone_number?: string | null;
@@ -11,6 +11,7 @@ export interface CreateVendorBody {
   state_code?: string | null;
   status: string;
   created_by: string;
+  branch_id?:number;
 }
 
 export interface CreateVendorParams
@@ -25,7 +26,7 @@ export interface FetchVendorBody {
 
   id?: string;
   gstin?: string;
-  branch_id?: number;
+  firm_id?: number;
   company_id?: number;
 
   search?: string | null;
@@ -42,7 +43,7 @@ export interface FetchDbVendor
   id: string;
   status: number;
   remarks: object | null;
-  branch_names: string[];
+  firm_names: string[];
 }
 
 export type CountResult = {
@@ -75,10 +76,11 @@ export interface EditVendorParams
   statusCode?: number;
 }
 
-export interface AddNewBranch {
+export interface AddNewFirm {
   vendor_id: string;
-  branch_id: number;
-  branch_name: string;
+  firm_id: number;
+  company_id: number;
+  firm_name: string;
 }
 export interface DeleteVendorBody {
   r_id: string;
@@ -90,15 +92,15 @@ export interface DeleteVendorParams
   extends Omit<DeleteVendorBody, "deleted_by"> {
   remark: object;
 }
-export interface RemoveBranchVendor {
+export interface RemoveFirmVendor {
   r_id: string;
-  branch_id: number;
+  firm_id: number;
   company_id:number
-  branch_name:string
+  firm_name:string
 }
 
-export interface RemoveBranchVendorParams
-  extends RemoveBranchVendor {
+export interface RemoveFirmVendorParams
+  extends RemoveFirmVendor {
   remark: object;
 }
 

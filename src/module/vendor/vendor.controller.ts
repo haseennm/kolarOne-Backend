@@ -2,12 +2,12 @@ import { AppError } from "../../utils/AppError";
 import { getStatusCode, getStatusText, isValidDateFormat } from "../../utils/extra";
 import VendorService from "./vendor.service";
 import {
-  AddNewBranch,
+  AddNewFirm,
   CreateVendorBody,
   DeleteVendorBody,
   EditVendorBody,
   FetchVendorParams,
-  RemoveBranchVendor
+  RemoveFirmVendor,
 } from "./vendor.types";
 
 export default class VendorController {
@@ -33,20 +33,20 @@ export default class VendorController {
     };
   }
 
-  async addnewBranch(data: AddNewBranch) {
+  async addnewFirm(data: AddNewFirm) {
 
-    const { branch_name, ...rest } = data;
+    const { firm_name, ...rest } = data;
 
     const remark = {
-      action: "Add new branch",
-      branch_name,
+      action: "Add new Firm",
+      firm_name,
       added_at: Date.now()
     };
 
     const service = new VendorService();
 
-    return service.addVendorNewBranch({
-      ...rest,branch_name
+    return service.addVendorNewFirm({
+      ...rest, firm_name
     }, remark);
   }
   async createVendor(data: CreateVendorBody) {
@@ -112,18 +112,18 @@ export default class VendorController {
       remark
     });
   }
-  async removeBranchVendor(data: RemoveBranchVendor) {
+  async removeFirmVendor(data: RemoveFirmVendor) {
 
 
     const remark = {
-      action: "Removed",
-      branch_name:data.branch_name,
+      action: "Removed firm",
+      firm_name: data.firm_name,
       updated_at: Date.now()
     };
 
     const service = new VendorService();
 
-    return service.removeBranchVendor({
+    return service.removeFirmVendor({
       ...data,
       remark
     });

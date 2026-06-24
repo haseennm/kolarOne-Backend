@@ -1,15 +1,15 @@
 import { query, transaction, executeInTransaction } from "../../config/db";
-import { getFirstDayOfCurrentMonth, getFirstDayOfCurrentYear, getLastDayOfCurrentMonth, getLastDayOfCurrentYear, getRecord } from "../../utils/extra";
+import { getRecord } from "../../utils/extra";
 import { AppError } from "../../utils/AppError";
 import {
-  AddNewBranch,
+  AddNewFirm,
   CountResult,
   CreateVendorParams,
   DeleteVendorParams,
   EditVendorParams,
   FetchDbVendor,
   FetchVendorParams,
-  RemoveBranchVendorParams
+  RemoveFirmVendorParams
 } from "./vendor.types";
 
 export default class VendorService {
@@ -28,15 +28,51 @@ export default class VendorService {
       state_code,
       statusCode,
       remark,
+      firm_id,
       branch_id
     } = data;
-
+console.log("firm_id",firm_id)
     const result = transaction(async (client) => {
+      if (firm_id && !branch_id) {
+        for (const firmId of firm_id) {
+          const firmExist = await getRecord(firmId, "firm", "id", firmId, client);
 
-      const branchExist = await getRecord(branch_id, "branches", "company_id", company_id, client);
+          if (!firmExist) {
+            throw new AppError("Firm not found", 404);
+          }
 
-      if (!branchExist) {
-        throw new AppError("Branch not found", 404);
+          const firmBranchId = firmExist.branch_id;
+
+          const branchExist = await getRecord(
+            firmBranchId,
+            "branches",
+            "company_id",
+            company_id,
+            client
+          );
+
+          if (!branchExist) {
+            throw new AppError(
+              `${firmExist.firm_name} does not belong to this company`,
+              404
+            );
+          }
+        }
+      }
+      if (firm_id && branch_id) {
+        for (const firmId of firm_id) {
+          const firmExist = await getRecord(
+            firmId,
+            "firm",
+            "id",
+            firmId,
+            client
+          );
+
+          if (!firmExist || Number(firmExist.branch_id) !== Number(branch_id)) {
+            throw new AppError(`Firm ${firmId} does not belong to this branch`, 404);
+          }
+        }
       }
 
       const queryText = `
@@ -51,7 +87,7 @@ export default class VendorService {
         state_code,
         status,
         remarks,
-        branches,
+        firms,
         company_id
       )
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
@@ -69,10 +105,10 @@ export default class VendorService {
         state_code,
         statusCode,
         JSON.stringify(remark),
-        [Number(branch_id)],
+        firm_id ? firm_id : null,
         company_id
       ];
-
+      console.log(values)
       const { rows } = await executeInTransaction(client, queryText, values);
 
       return `${rows[0].vendor_name} created`;
@@ -119,9 +155,9 @@ export default class VendorService {
       values.push(filters.id);
       where.push(`v.id = $${values.length}`);
     }
-    if (filters.branch_id) {
-      values.push(filters.branch_id);
-      where.push(`$${values.length} = ANY(v.branches)`);
+    if (filters.firm_id) {
+      values.push(filters.firm_id);
+      where.push(`$${values.length} = ANY(v.firms)`);
     }
     if (filters.gstin) {
       values.push(filters.gstin);
@@ -133,10 +169,10 @@ export default class VendorService {
     const vendorQuery = `
 SELECT 
   v.*,
-  ARRAY_REMOVE(ARRAY_AGG(b.branch_name), NULL) AS branch_names
+  ARRAY_REMOVE(ARRAY_AGG(b.firm_name), NULL) AS firm_names
 FROM vendors v
-LEFT JOIN branches b 
-  ON b.id = ANY(v.branches)
+LEFT JOIN firm b 
+  ON b.id = ANY(v.firms)
 ${whereClause}
 GROUP BY v.id
 ORDER BY v.vendor_name
@@ -144,7 +180,7 @@ LIMIT $${values.length + 1}
 OFFSET $${values.length + 2}
 `;
 
-  const countQuery = `
+    const countQuery = `
 SELECT COUNT(*) 
 FROM vendors v
 ${whereClause}
@@ -234,16 +270,17 @@ ${whereClause}
 
     return result;
   }
-  async addVendorNewBranch(data: AddNewBranch, remark: object) {
+  async addVendorNewFirm(data: AddNewFirm, remark: object) {
 
     const {
       vendor_id,
-      branch_id,
+      firm_id,
+      company_id
     } = data;
 
     const result = transaction(async (client) => {
 
-      const vendor = await getRecord(vendor_id, "vendors", "id", vendor_id, client);
+      const vendor = await getRecord(vendor_id, "vendors", "company_id", company_id, client);
 
       if (!vendor) {
         throw new AppError("Vendor not found", 404);
@@ -252,11 +289,11 @@ ${whereClause}
       const queryText = `
         UPDATE vendors
         SET
-        branches =
+        firms =
         CASE
-          WHEN NOT ($1 = ANY(branches))
-          THEN array_append(branches, $1)
-          ELSE branches
+          WHEN NOT ($1 = ANY(firms))
+          THEN array_append(firms, $1)
+          ELSE firms
         END,
 
           remarks =
@@ -272,7 +309,7 @@ ${whereClause}
       `;
 
       const values = [
-        Number(branch_id),
+        Number(firm_id),
         JSON.stringify(remark),
         vendor_id
       ];
@@ -321,35 +358,33 @@ ${whereClause}
       return result;
     })
   }
-  async removeBranchVendor(data: RemoveBranchVendorParams) {
+  async removeFirmVendor(data: RemoveFirmVendorParams) {
 
-    const { r_id, remark, branch_id, company_id } = data;
+    const { r_id, remark, firm_id, company_id } = data;
 
     const result = transaction(async (client) => {
 
-      // check vendor exists
       const vendor = await getRecord(r_id, "vendors", "company_id", company_id, client);
 
       if (!vendor) {
         throw new AppError("Vendor not found", 404);
       }
 
-      // validate branch exists in branches array
-      if (!vendor.branches.includes(Number(branch_id))) {
+      if (!vendor.firms.includes(Number(firm_id))) {
         throw new AppError("Vendor does not belong to this branch", 400);
       }
 
-      const updatedBranches = vendor.branches.filter(
-        (id: number) => id !== Number(branch_id)
+      const updatedfirms = vendor.firms.filter(
+        (id: number) => id !== Number(firm_id)
       );
 
       const queryText = `
       UPDATE vendors
       SET
-        branches = array_remove(branches, $1),
+        firms = array_remove(firms, $1),
 
         status = CASE
-          WHEN array_length(array_remove(branches, $1), 1) IS NULL
+          WHEN array_length(array_remove(firms, $1), 1) IS NULL
           THEN 0
           ELSE status
         END,
@@ -367,7 +402,7 @@ ${whereClause}
     `;
 
       await executeInTransaction(client, queryText, [
-        Number(branch_id),
+        Number(firm_id),
         JSON.stringify(remark),
         r_id
       ]);

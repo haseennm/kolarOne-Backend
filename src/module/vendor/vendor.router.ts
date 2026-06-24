@@ -1,13 +1,13 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import VendorController from "./vendor.controller";
 import {
-  AddNewBranch,
+  AddNewFirm,
   CreateVendorBody,
   DeleteVendorBody,
   EditVendorBody,
   FetchVendorBody,
   GetVendorReportBody,
-  RemoveBranchVendor
+  RemoveFirmVendor
 } from "./vendor.types";
 import { cns } from "../../utils/extra";
 
@@ -20,10 +20,15 @@ export async function vendorRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["vendor_name", "company_id", "status", "created_by", "gstin", "branch_id"],
+          required: ["vendor_name", "company_id", "status", "created_by", "gstin"],
           properties: {
             company_id: { type: "number" },
-            branch_id: { type: "number" },
+            firm_id: {
+              type: "array",
+              items: {
+                type: "number"
+              }
+            },
 
             vendor_name: {
               type: "string",
@@ -158,7 +163,7 @@ export async function vendorRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["id", "updated_by"],
+          required: ["id", "updated_by","company_id"],
           properties: {
             id: {
               type: "string",
@@ -241,23 +246,23 @@ export async function vendorRouter(app: FastifyInstance) {
       });
     }
   );
-  app.post<{ Body: AddNewBranch }>(
-    "/add/branch",
+  app.post<{ Body: AddNewFirm }>(
+    "/add/firm",
     {
       schema: {
         body: {
           type: "object",
-          required: ["vendor_id", "branch_id", "branch_name"],
+          required: ["vendor_id", "firm_id", "firm_name","company_id"],
           properties: {
             vendor_id: {
               type: "string",
               format: "uuid"
             },
-            branch_id: {
+            firm_id: {
               type: "number"
             },
 
-            branch_name: {
+            firm_name: {
               type: "string",
               minLength: 2,
               maxLength: 255
@@ -267,7 +272,7 @@ export async function vendorRouter(app: FastifyInstance) {
       }
     },
     async (
-      request: FastifyRequest<{ Body: AddNewBranch }>,
+      request: FastifyRequest<{ Body: AddNewFirm }>,
       reply: FastifyReply
     ) => {
 
@@ -275,7 +280,7 @@ export async function vendorRouter(app: FastifyInstance) {
 
       const controller = new VendorController();
 
-      const vendor = await controller.addnewBranch(request.body);
+      const vendor = await controller.addnewFirm(request.body);
 
       return reply.code(200).send({
         status: "Success",
@@ -324,13 +329,13 @@ export async function vendorRouter(app: FastifyInstance) {
       });
     }
   );
-  app.post<{ Body: RemoveBranchVendor }>(
-    "/remove/branch",
+  app.post<{ Body: RemoveFirmVendor }>(
+    "/remove/firm",
     {
       schema: {
         body: {
           type: "object",
-          required: ["r_id", "company_id", "branch_id", "branch_name"],
+          required: ["r_id", "company_id", "firm_id", "firm_name"],
           properties: {
             r_id: {
               type: "string",
@@ -338,9 +343,9 @@ export async function vendorRouter(app: FastifyInstance) {
             },
 
             company_id: { type: "number" },
-            branch_id: { type: "number" },
+            firm_id: { type: "number" },
 
-            branch_name: {
+            firm_name: {
               type: "string"
             }
           }
@@ -348,7 +353,7 @@ export async function vendorRouter(app: FastifyInstance) {
       }
     },
     async (
-      request: FastifyRequest<{ Body: RemoveBranchVendor }>,
+      request: FastifyRequest<{ Body: RemoveFirmVendor }>,
       reply: FastifyReply
     ) => {
 
@@ -356,7 +361,7 @@ export async function vendorRouter(app: FastifyInstance) {
 
       const controller = new VendorController();
 
-      const vendor = await controller.removeBranchVendor(request.body);
+      const vendor = await controller.removeFirmVendor(request.body);
 
       return reply.code(200).send({
         status: "Success",
