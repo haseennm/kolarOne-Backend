@@ -47,31 +47,31 @@ export default class BranchController {
         return branch;
     }
     async editBranch(data: EditBranchBody) {
-    const { id, updated_by, status, ...rest } = data;
+        const { id, updated_by, status, ...rest } = data;
 
-    const remark = {
-        action: "Updated",
-        updated_by,
-        updated_at: Date.now(),
-    };
+        const remark = {
+            action: "Updated",
+            updated_by,
+            updated_at: Date.now(),
+        };
 
-    let statusCode;
+        let statusCode;
 
-    if (typeof status === "string") {
-        statusCode = getStatusCode(status);
+        if (typeof status === "string") {
+            statusCode = getStatusCode(status);
+        }
+
+        const service = new BranchService();
+
+        const branch = await service.updateBranch({
+            id,
+            ...rest,
+            remark,
+            statusCode,
+        });
+
+        return branch;
     }
-
-    const service = new BranchService();
-
-    const branch = await service.updateBranch({
-        id,
-        ...rest,
-        remark,
-        statusCode,
-    });
-
-    return branch;
-}
     async deleteBranch(data: DeleteBranchBody) {
         const { deleted_by, ...rest } = data;
 
@@ -106,10 +106,11 @@ export default class BranchController {
 
         return {
             token: token,
-            company_id:branch.company_id,
+            company_id: branch.company_id,
             message: `branch ${branch.branch_name} Login success`,
-            role:branch.role,
-            name:branch.branch_name
+            role: branch.role,
+            state: branch.state,
+            name: branch.branch_name
         }
     }
 }

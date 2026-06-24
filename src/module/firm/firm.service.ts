@@ -300,8 +300,9 @@ RETURNING *;
       throw new AppError("Firm not found", 404);
     }
 
+
     const company_query = `
-      SELECT company_id 
+      SELECT company_id ,state
       FROM branches 
       WHERE id = $1 AND status != $2
     `;
@@ -312,7 +313,8 @@ RETURNING *;
 
     return {
       ...login.rows[0],
-      company_id: company.rows[0]?.company_id
+      company_id: company.rows[0]?.company_id,
+      state: company.rows[0]?.state
     };
   });
 

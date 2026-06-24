@@ -312,7 +312,7 @@ export default class BranchService {
     }
     async loginBranch(data: BranchLoginBody) {
         const { username } = data
-        const query = `SELECT id,password, branch_name, company_id,role FROM branches WHERE username = $1 AND status != $2`;
+        const query = `SELECT id,password, branch_name,state, company_id,role FROM branches WHERE username = $1 AND status != $2`;
         const values = [username, 0]
 
         const result = await pool.query(query, values);

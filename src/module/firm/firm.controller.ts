@@ -125,6 +125,7 @@ export default class FirmController {
       token: token,
       branch_id: firm.branch_id,
       company_id: firm.company_id,
+      state: firm.state,
       message: `Firm ${firm.firm_name} Login success`,
       name:firm.firm_name,
       role: firm.role
