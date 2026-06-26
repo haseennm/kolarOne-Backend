@@ -1,7 +1,7 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { cns, getRecord } from "../../utils/extra";
-import { CreateStaffParams, DeleteStaffParams, EditStaffParams, FetchDbStaff, FetchStaffParams, StaffCountResult, StaffLoginBody } from "./staff.types";
+import { cns, getRecord, getStatusCode } from "../../utils/extra";
+import { CreateStaffParams, DeleteStaffParams, EditStaffParams, FetchDbStaff, FetchStaffParams, StaffCountResult, StaffLoginBody, StaffTransfer, StaffTransferRemover } from "./staff.types";
 
 
 export default class StaffService {
@@ -221,42 +221,42 @@ export default class StaffService {
   }
 
 
- async fetchStaff(data: FetchStaffParams) {
-  const { filters, offset } = data;
+  async fetchStaff(data: FetchStaffParams) {
+    const { filters, offset } = data;
 
-  let where: string[] = [];
-  let values: any[] = [];
-  let joins: string[] = [];
+    let where: string[] = [];
+    let values: any[] = [];
+    let joins: string[] = [];
 
-  // Exclude deleted
-  where.push(`s.status != $${values.length + 1}`);
-  values.push(0);
+    // Exclude deleted
+    where.push(`s.status != $${values.length + 1}`);
+    values.push(0);
 
-  if (filters?.id) {
-    values.push(filters.id);
-    where.push(`s.id = $${values.length}`);
-  }
+    if (filters?.id) {
+      values.push(filters.id);
+      where.push(`s.id = $${values.length}`);
+    }
 
-  /**
-   * Entity handling
-   *
-   * B = Branch
-   * F = Firm
-   * C = Company
-   */
-  if (filters?.entity_type === "B" && filters?.entity_id) {
+    /**
+     * Entity handling
+     *
+     * B = Branch
+     * F = Firm
+     * C = Company
+     */
+    if (filters?.entity_type === "B" && filters?.entity_id) {
 
-    // Branch + firm staffs
-    if (filters?.firm_staff) {
+      // Branch + firm staffs
+      if (filters?.firm_staff) {
 
-      joins.push(`
+        joins.push(`
         LEFT JOIN firm f
           ON f.id = s.entity_id
       `);
 
-      values.push(filters.entity_id);
+        values.push(filters.entity_id);
 
-      where.push(`(
+        where.push(`(
         (
           s.entity_type = 'B'
           AND s.entity_id = $${values.length}
@@ -268,62 +268,62 @@ export default class StaffService {
         )
       )`);
 
+      } else {
+
+        // Only branch staffs
+        values.push(filters.entity_id);
+
+        where.push(`s.entity_type = 'B'`);
+        where.push(`s.entity_id = $${values.length}`);
+      }
+
     } else {
 
-      // Only branch staffs
-      values.push(filters.entity_id);
+      // Normal filtering for F and C
+      if (filters?.entity_type) {
+        values.push(filters.entity_type);
+        where.push(`s.entity_type = $${values.length}`);
+      }
 
-      where.push(`s.entity_type = 'B'`);
-      where.push(`s.entity_id = $${values.length}`);
+      if (filters?.entity_id) {
+        values.push(filters.entity_id);
+        where.push(`s.entity_id = $${values.length}`);
+      }
     }
 
-  } else {
-
-    // Normal filtering for F and C
-    if (filters?.entity_type) {
-      values.push(filters.entity_type);
-      where.push(`s.entity_type = $${values.length}`);
+    if (filters?.status !== undefined) {
+      values.push(filters.status);
+      where.push(`s.status = $${values.length}`);
     }
 
-    if (filters?.entity_id) {
-      values.push(filters.entity_id);
-      where.push(`s.entity_id = $${values.length}`);
+    if (filters?.role && filters.role.length) {
+      values.push(filters.role);
+      where.push(`s.role && $${values.length}::smallint[]`);
     }
-  }
 
-  if (filters?.status !== undefined) {
-    values.push(filters.status);
-    where.push(`s.status = $${values.length}`);
-  }
+    // Search
+    if (filters?.search) {
+      values.push(`%${filters.search}%`);
 
-  if (filters?.role && filters.role.length) {
-    values.push(filters.role);
-    where.push(`s.role && $${values.length}::smallint[]`);
-  }
-
-  // Search
-  if (filters?.search) {
-    values.push(`%${filters.search}%`);
-
-    where.push(`(
+      where.push(`(
       s.email ILIKE $${values.length} OR
       s.full_name ILIKE $${values.length} OR
       s.phone_number ILIKE $${values.length} OR
       s.address ILIKE $${values.length}
     )`);
-  }
+    }
 
-  // Company filter
-  values.push(filters.company_id);
-  where.push(`s.company_id = $${values.length}`);
+    // Company filter
+    values.push(filters.company_id);
+    where.push(`s.company_id = $${values.length}`);
 
-  const joinClause = joins.join(" ");
+    const joinClause = joins.join(" ");
 
-  const whereClause = where.length
-    ? `WHERE ${where.join(" AND ")}`
-    : "";
+    const whereClause = where.length
+      ? `WHERE ${where.join(" AND ")}`
+      : "";
 
-  const staffQuery = `
+    const staffQuery = `
     SELECT 
       s.*,
       (
@@ -344,35 +344,35 @@ export default class StaffService {
     OFFSET $${values.length + 2}
   `;
 
-  const countQuery = `
+    const countQuery = `
     SELECT COUNT(*)
     FROM staff s
     ${joinClause}
     ${whereClause}
   `;
 
-  const staff = await query<FetchDbStaff>(
-    staffQuery,
-    [...values, filters.limit, offset]
-  );
+    const staff = await query<FetchDbStaff>(
+      staffQuery,
+      [...values, filters.limit, offset]
+    );
 
-  const total = await query<StaffCountResult>(
-    countQuery,
-    values
-  );
+    const total = await query<StaffCountResult>(
+      countQuery,
+      values
+    );
 
-  return {
-    staff,
-    pagination: {
-      page: filters.page,
-      limit: filters.limit,
-      total: Number(total[0].count),
-      totalPages: Math.ceil(
-        Number(total[0].count) / filters.limit
-      ),
-    },
-  };
-}
+    return {
+      staff,
+      pagination: {
+        page: filters.page,
+        limit: filters.limit,
+        total: Number(total[0].count),
+        totalPages: Math.ceil(
+          Number(total[0].count) / filters.limit
+        ),
+      },
+    };
+  }
 
   async updateStaff(data: EditStaffParams, client: any) {
     const {
@@ -571,7 +571,7 @@ export default class StaffService {
     const result = await transaction(async (client) => {
 
       const query = `
-      SELECT id, password_hash, full_name , role, entity_type
+      SELECT id, password_hash, full_name , role, entity_type , entity_id, company_id
       FROM staff
       WHERE email = $1 AND status != $2
     `;
@@ -585,6 +585,171 @@ export default class StaffService {
       }
 
       return login.rows[0];
+    });
+
+    return result;
+  }
+  async removeTempTransferStaff(data: StaffTransferRemover) {
+    const { company_id, staff_id, transfer_entity_id, } = data;
+
+    const result = await transaction(async (client) => {
+
+      const query = `
+      SELECT * 
+      FROM staff
+      WHERE company_id = $1 AND status != $2 AND id =$3 AND transfer_entity_id
+    `;
+
+      const fetch_value = [company_id, getStatusCode("Deleted"), staff_id, transfer_entity_id];
+
+      const staff = await executeInTransaction(client, query, fetch_value);
+
+      if ((staff.rowCount ?? 0) < 1) {
+        throw new AppError("No data found with this transfer", 404);
+      }
+      const updateQuery = `
+    UPDATE staff
+    SET
+      transferred_entity_id = COALESCE($1, transferred_entity_id),
+      remarks =
+        CASE
+          WHEN remarks IS NULL THEN $2::jsonb
+          WHEN jsonb_typeof(remarks) = 'array'
+            THEN remarks || $2::jsonb
+          ELSE jsonb_build_array(remarks) || $2::jsonb
+        END
+    WHERE id = $3 AND company_id =$4 AND transferred_entity_id =$5
+    RETURNING *;
+  `;
+
+      // ✅ Values
+      const values = [
+        null,
+        JSON.stringify([
+          {
+            action: "Temporary Transfer Removed",
+            transferred_at: new Date().toISOString()
+          }
+        ]),
+        staff_id,
+        company_id,
+        transfer_entity_id
+      ];
+
+      const { rows } = await executeInTransaction(client, updateQuery, values);
+      return rows;
+    });
+
+    return result;
+  }
+  async transferStaff(data: StaffTransfer, entity_table: string) {
+    const { staff_id, branch_id, transfer_entity_type, company_id, entity_id, entity_type, transfer_entity_id, transfer_type } = data
+
+    const result = await transaction(async (client) => {
+      const staff_exist = await executeInTransaction(client,
+        ` SELECT * FROM staff WHERE id = $1 AND company_id = $2 AND entity_id = $3 AND entity_type = $4 AND status !=$5 `,
+        [staff_id, company_id, entity_id, entity_type, getStatusCode('Deleted')]
+      )
+      if (!staff_exist.rows[0]) {
+        throw new AppError("Staff not Found", 404)
+      }
+      if (transfer_type === "temporary") {
+        const updateQuery = `
+    UPDATE staff
+    SET
+      transferred_entity_id = COALESCE($1, transferred_entity_id),
+      remarks =
+        CASE
+          WHEN remarks IS NULL THEN $2::jsonb
+          WHEN jsonb_typeof(remarks) = 'array'
+            THEN remarks || $2::jsonb
+          ELSE jsonb_build_array(remarks) || $2::jsonb
+        END
+    WHERE id = $3 AND company_id =$4 AND entity_type =$5
+    RETURNING *;
+  `;
+
+        // ✅ Values
+        const values = [
+          transfer_entity_id,
+          JSON.stringify([
+            {
+              action: "Temporary Transfer",
+              transferred_at: new Date().toISOString()
+            }
+          ]),
+          staff_id,
+          company_id,
+          entity_type
+        ];
+
+        const { rows } = await executeInTransaction(client, updateQuery, values);
+
+        return rows[0];
+      }
+      if (transfer_type === "permanent") {
+        const column =
+          entity_type === "F"
+            ? "branch_id"
+            : entity_type === "C"
+              ? "id"
+              : "company_id";
+
+        const value =
+          entity_type === "F"
+            ? branch_id
+            : entity_type === "C"
+              ? company_id
+              : company_id;
+
+        const isEntityExist = await getRecord(
+          transfer_entity_id,
+          transfer_entity_type ?? staff_exist.rows[0].entity_type,
+          column,
+          value ?? 0,
+          client
+        );
+
+        if (!isEntityExist) {
+          throw new AppError(`${entity_table} not found`, 404);
+        }
+        const updateQuery = `
+    UPDATE staff
+    SET
+     
+      entity_id = COALESCE($1, entity_id),
+      remarks =
+        CASE
+          WHEN remarks IS NULL THEN $2::jsonb
+          WHEN jsonb_typeof(remarks) = 'array'
+            THEN remarks || $2::jsonb
+          ELSE jsonb_build_array(remarks) || $2::jsonb
+        END,
+      entity_type = COALESCE($3, entity_type)
+    WHERE company_id =$4 AND entity_type =$5 AND id =$6 AND entity_id =$7
+    RETURNING *;
+  `;
+
+        // ✅ Values
+        const values = [
+          transfer_entity_id,
+          JSON.stringify([
+            {
+              action: "Permanent Transfer",
+              transferred_at: new Date().toISOString()
+            }
+          ]),
+          transfer_entity_type ?? staff_exist.rows[0].entity_type,
+          company_id,
+          entity_type,
+          staff_id,
+          entity_id
+        ];
+
+        const { rows } = await executeInTransaction(client, updateQuery, values);
+
+        return rows[0];
+      }
     });
 
     return result;

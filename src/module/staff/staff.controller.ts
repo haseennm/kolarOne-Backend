@@ -3,13 +3,12 @@ import { AppError } from "../../utils/AppError";
 import { generateToken, hashPassword, verifyPassword } from "../../utils/auth.util";
 import { cns, convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText } from "../../utils/extra";
 import StaffService from "./staff.service";
-import { CreateStaffBody, DeleteStaffBody, EditStaffBody, StaffLoginBody } from "./staff.types";
+import { CreateStaffBody, DeleteStaffBody, EditStaffBody, StaffLoginBody, StaffTransfer, StaffTransferRemover } from "./staff.types";
 
 export default class LedgerTransactionController {
 
 
   async createStaff(data: CreateStaffBody) {
-    cns("request.body",data)
     let { created_by, status, entity_type, password, ...rest } = data;
     const validBloodGroups = [
       "A+", "A-",
@@ -172,8 +171,33 @@ export default class LedgerTransactionController {
       role: staff.role,
       id: staff.id,
       entity_type: convertEntityCode(staff.entity_type) ?? staff.entity_type,
+      entity_id: staff.transferred_entity_id || staff.entity_id,
+      company_id: staff.company_id,
       message: `staff ${staff.full_name} Login success`
     }
+  }
+  async removeTempTransferStaff(data: StaffTransferRemover) {
+
+    const service = new StaffService();
+    const staff = await service.removeTempTransferStaff(data);
+
+    return staff
+  }
+  async transferStaff(data: StaffTransfer) {
+    let { transfer_entity_type, ...rest } = data;
+
+    transfer_entity_type = convertEntityType(transfer_entity_type as EntityKey);
+    const service = new StaffService();
+    let entity_table = ""
+    if (transfer_entity_type === "C") entity_table = "company"
+    if (transfer_entity_type === "B") entity_table = "branches"
+    if (transfer_entity_type === "F") entity_table = "firm"
+    const staff_transfer = await service.transferStaff({
+      ...rest,
+      transfer_entity_type,
+    }, entity_table);
+    return `Staff ${staff_transfer.full_name} has been successfully transferred (${rest.transfer_type}).`;
+
   }
 
 }

@@ -4,7 +4,9 @@ import {
   DeleteStaffBody,
   EditStaffBody,
   FetchStaffBody,
-  StaffLoginBody
+  StaffLoginBody,
+  StaffTransfer,
+  StaffTransferRemover
 } from "./staff.types";
 
 import StaffController from "./staff.controller";
@@ -193,7 +195,7 @@ export async function staffRouter(app: FastifyInstance) {
             },
             firm_staff: {
               type: "boolean",
-              default:false
+              default: false
             },
 
             limit: {
@@ -447,5 +449,113 @@ export async function staffRouter(app: FastifyInstance) {
 
     }
   );
+  app.post<{ Body: StaffTransfer }>(
+    "/transfer",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: [
+            "staff_id", // staff id 
+            "transfer_type",
+            "transfer_entity_id",  // entity id of new entity
+            "company_id",
+            "entity_type",// old entity type
+            "entity_id",// old entity type
+            "transfer_entity_type" // new entity type
+          ],
+          properties: {
+            staff_id: {
+              type: "string",
+              format: "uuid"
+            },
+            transfer_type: {
+              type: "string",
+              enum: ["temporary", "permanent"]
+            },
+            transfer_entity_type: {
+              type: "string",
+              enum: ["Company", "Firm", "Branch"]
+            },
+            transfer_entity_id: {
+              type: "number"
+            },
+            company_id: {
+              type: "number"
+            },
+            branch_id: {
+              type: "number"
+            },
+            entity_type: {
+              type: "string",
+              enum: ["C", "B", "F"]
+            },
+            entity_id: {
+              type: "number"
+            }
+          },
+          if: {
+            properties: {
+              transfer_entity_type: {
+                const: "Firm"
+              }
+            }
+          },
+          then: {
+            required: ["branch_id"]
+          }
+        }
+      }
+    },
+    async (request, reply) => {
+      const controller = new StaffController();
 
+      const staff = await controller.transferStaff(request.body);
+
+      return reply.code(200).send({
+        success: true,
+        data: staff
+      });
+    }
+  );
+  app.post<{ Body: StaffTransferRemover }>(
+    "/transfer/remove",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: [
+            "staff_id",
+            "transfer_entity_id",  // entity id of new entity
+            "company_id",
+          ],
+          properties: {
+            staff_id: {
+              type: "string",
+              format: "uuid"
+            },
+            transfer_entity_id: {
+              type: "number"
+            },
+            company_id: {
+              type: "number"
+            },
+            branch_id: {
+              type: "number"
+            }
+          }
+        }
+      }
+    },
+    async (request, reply) => {
+      const controller = new StaffController();
+
+      const staff = await controller.removeTempTransferStaff(request.body);
+
+      return reply.code(200).send({
+        success: true,
+        data: staff
+      });
+    }
+  );
 }

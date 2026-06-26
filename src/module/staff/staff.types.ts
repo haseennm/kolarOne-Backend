@@ -53,7 +53,7 @@ export interface FetchStaffBody {
   search?: string;
   page: number;
   limit: number;
-  firm_staff?:boolean
+  firm_staff?: boolean
 }
 
 export interface FetchStaffParams {
@@ -132,4 +132,19 @@ export interface DeleteStaffParams
 export interface StaffLoginBody {
   email: string;
   password: string;
+}
+export interface StaffTransfer {
+  staff_id:string; //uuid
+  transfer_type: string; //temporary , Permanent
+  transfer_entity_type?: string; //Company, Firm , Branch
+  transfer_entity_id: number;
+  company_id: number;
+  branch_id?: number;
+  entity_type: string; //C, F , B
+  entity_id: number;
+}
+export interface StaffTransferRemover {
+  staff_id:string; //uuid
+  transfer_entity_id: number;
+  company_id: number;
 }
