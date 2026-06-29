@@ -31,7 +31,10 @@ export async function saleRouter(app: FastifyInstance) {
             "final_amount",
             "paid",
             "payments",
-            "items"
+            "items",
+            "price_pool",
+            "is_intrastate",
+            "state_code"
           ],
           properties: {
             firm_id: { type: "number" },
@@ -52,12 +55,18 @@ export async function saleRouter(app: FastifyInstance) {
 
             final_amount: { type: "number" },
             paid: { type: "number" },
+            state_code: { type: "number" },
+            is_intrastate: { type: "boolean" },
 
             notes: { type: ["string", "null"] },
 
             status: {
               type: "string",
               enum: ["Completed", "Confirm", "Cancelled"]
+            },
+            price_pool: {
+              type: "string",
+              enum: [ 'branch_price', 'mrp_price', 'retail_price', 'special_retail_price', 'wholesale_price']
             },
 
             payments: {

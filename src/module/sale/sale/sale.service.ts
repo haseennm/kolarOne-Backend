@@ -34,7 +34,10 @@ export default class SaleService {
       total_sgst,
       notes,
       branch_id,
-      company_id
+      company_id,
+      price_pool,
+      is_intrastate,
+      state_code
     } = data;
 
     // ✅ Firm check
@@ -138,10 +141,13 @@ export default class SaleService {
       remarks,
       firm_id,
       paid,
-      ref_no
+      ref_no,
+      price_pool,
+      is_intrastate,
+      state_code
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
     )
     RETURNING *;
   `;
@@ -163,7 +169,10 @@ export default class SaleService {
       JSON.stringify(remark ?? {}),
       firm_id,
       paid,
-      ref_no
+      ref_no,
+      price_pool,
+      is_intrastate,
+      state_code
     ];
 
     const { rows } = await executeInTransaction(client, query, values);

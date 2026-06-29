@@ -23,6 +23,9 @@ export interface SaleCreateBody {
   company_id: number;
   payments: Payments[]
   items: CreateSaleItemBody[];
+  price_pool:string;
+  state_code:number;
+  is_intrastate:boolean
 }
 export interface SaleCreateParams
   extends Omit<SaleCreateBody, "status" | "created_by" | "items"> {
