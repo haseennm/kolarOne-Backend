@@ -48,6 +48,7 @@ export interface ConfirmSalary {
  entity_type: string;
   entity_id: number;
   final_salary: number;
+  bonus?: number;
   updated_by: string;
   status: string;
   payment_method_id?: number;

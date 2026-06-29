@@ -86,6 +86,9 @@ export async function salaryRouter(app: FastifyInstance) {
             final_salary: {
               type: "number"
             },
+            bonus: {
+              type: "number"
+            },
             payment_method_id: {
               type: "number"
             },

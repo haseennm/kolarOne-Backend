@@ -257,7 +257,7 @@ export default class SalaryService {
   }
   async confirmSalary(data: ConfirmSalaryParams, client: any) {
 
-    const { r_id, entity_id, entity_type, final_salary, remark, statusCode } = data;
+    const { r_id, entity_id, entity_type, final_salary, remark, statusCode, bonus } = data;
 
     const is_salary_exist = await executeInTransaction(
       client,
@@ -302,21 +302,24 @@ export default class SalaryService {
           THEN remarks || $3::jsonb
         ELSE jsonb_build_array(remarks) || $3::jsonb
       END,
-      adjustments = $4
-    WHERE id = $5
-      AND entity_id = $6
-      AND entity_type = $7
+      adjustments = $4,
+      bonus =$5
+    WHERE id = $6
+    AND entity_type = $7
+    AND entity_id = $8
     RETURNING *;
   `;
-
+    const final_salary_amount =
+      Number(final_salary ?? salary.final_salary) + Number(bonus ?? 0);
     const values = [
-      final_salary ?? salary.final_salary,
+      final_salary_amount,
       status,
       JSON.stringify(remark),
       adjustment,
+      bonus,
       r_id,
-      entity_id,
-      entity_type
+      entity_type,
+      entity_id
     ];
 
     const { rows } = await executeInTransaction(client, updateQuery, values);
