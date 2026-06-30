@@ -8,11 +8,12 @@ import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 import { PaymentTransactionService } from "../../paymentTransaction/paymenttransaction.services";
 import SaleItemController from "../saleItems/saleitems.controller";
 import { AppError } from "../../../utils/AppError";
+import QuotationController from "../../quotation/quotation/quotation.controller";
 
 export default class SaleController {
 
   async saleCreate(data: SaleCreateBody) {
-    const { paid, final_amount, company_id, created_by, items, payments, ...rest } = data;
+    const { paid, final_amount, company_id, created_by, items, payments, quotation_id, ...rest } = data;
 
     const remark = {
       action: "Created",
@@ -53,7 +54,7 @@ export default class SaleController {
         await saleItem.createSaleItem({
           sale_id: sale.id,
           firm_id: rest.firm_id,
-          status:  "Completed",
+          status: "Completed",
           product_id: item.product_id,
           stock_id: stock.id,
           saled_qty: item.saled_qty,
@@ -111,7 +112,19 @@ export default class SaleController {
           )
         )
       );
-
+      const quotation = new QuotationController()
+      if (quotation_id) {
+        await quotation.QuotationStatusChange({
+          firm_id: data.firm_id,
+          id: quotation_id,
+          status: getStatusCode("Completed"),
+          remark: {
+            action: "sale done",
+            sale_id: sale.id,
+            updated_at: new Date(),
+          }
+        }, client)
+      }
       return {
         msg: `Sale ${sale.invoice_number} has been created successfully.`,
         id: sale.id
@@ -155,7 +168,7 @@ export default class SaleController {
               sale_id: sale.id,
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
-              status:  "Completed",
+              status: "Completed",
               product_id: item.product_id,
               stock_id: item.stock_id,
               saled_qty: item.saled_qty,
