@@ -37,7 +37,9 @@ export default class SaleService {
       company_id,
       price_pool,
       is_intrastate,
-      state_code
+      state_code,
+      courier_charge,
+      handling_charge, other_charge
     } = data;
 
     // ✅ Firm check
@@ -144,10 +146,13 @@ export default class SaleService {
       ref_no,
       price_pool,
       is_intrastate,
-      state_code
+      state_code,
+      courier_charge,
+      handling_charge,
+      other_charge
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
     )
     RETURNING *;
   `;
@@ -172,7 +177,10 @@ export default class SaleService {
       ref_no,
       price_pool,
       is_intrastate,
-      state_code
+      state_code,
+      courier_charge,
+      handling_charge,
+      other_charge
     ];
 
     const { rows } = await executeInTransaction(client, query, values);
@@ -198,7 +206,9 @@ export default class SaleService {
       notes,
       branch_id,
       company_id,
-      payments
+      payments,
+      courier_charge,
+      handling_charge, other_charge
     } = data;
 
     // ✅ Validation: Check sale existence
@@ -270,9 +280,17 @@ export default class SaleService {
         payments = $10,
         notes = $11,
         status = $12,
-        remarks = COALESCE(remarks, '[]'::jsonb) || $13::jsonb,
-        paid = $14
-      WHERE firm_id = $15 AND id = $16
+        remarks = CASE
+        WHEN remarks IS NULL THEN $13::jsonb
+        WHEN jsonb_typeof(remarks) = 'array'
+          THEN remarks || $13::jsonb
+        ELSE jsonb_build_array(remarks) || $13::jsonb
+      END,
+        paid = $14,
+        courier_charge =$15
+      handling_charge= $16
+      other_charge= $17
+      WHERE firm_id = $18 AND id = $19
       RETURNING *;
     `;
 
@@ -291,6 +309,9 @@ export default class SaleService {
       status,
       JSON.stringify([remark]),
       paid ?? is_sale_exist.paid,
+      courier_charge ?? is_sale_exist.courier_charge,
+      handling_charge ?? is_sale_exist.handling_charge,
+      other_charge ?? is_sale_exist.other_charge,
       firm_id,
       Sale_id
     ];
@@ -793,7 +814,12 @@ OFFSET $${values.length + 2}
     SET 
       payments = COALESCE(payments, '[]'::jsonb) || $1::jsonb,
       paid = $2,
-      remarks = COALESCE(remarks, '[]'::jsonb) || $3::jsonb
+       remarks = CASE
+        WHEN remarks IS NULL THEN $3::jsonb
+        WHEN jsonb_typeof(remarks) = 'array'
+          THEN remarks || $3::jsonb
+        ELSE jsonb_build_array(remarks) || $3::jsonb
+      END,
     WHERE id = $4 AND firm_id = $5
     RETURNING *;
   `;

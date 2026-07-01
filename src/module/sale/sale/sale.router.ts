@@ -53,7 +53,11 @@ export async function saleRouter(app: FastifyInstance) {
             total_sgst: { type: "number" },
             total_igst: { type: "number" },
 
+            courier_charge: { type: "number" },
+            other_charge: { type: "number" },
+            handling_charge: { type: "number" },
             final_amount: { type: "number" },
+            quotation_id: { type: ["number","null"] },
             paid: { type: "number" },
             state_code: { type: "number" },
             is_intrastate: { type: "boolean" },
@@ -116,7 +120,8 @@ export async function saleRouter(app: FastifyInstance) {
                   final_amount: { type: ["number", "null"] }
                 }
               }
-            }
+            },
+
           }
         }
       }
@@ -231,6 +236,9 @@ export async function saleRouter(app: FastifyInstance) {
             total_cgst: { type: "number" },
             total_sgst: { type: "number" },
             total_igst: { type: "number" },
+            courier_charge: { type: "number" },
+            other_charge: { type: "number" },
+            handling_charge: { type: "number" },
             final_amount: { type: "number" },
             paid: { type: "number" },
             notes: { type: ["string", "null"] },

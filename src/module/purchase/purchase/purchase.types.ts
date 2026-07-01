@@ -13,7 +13,6 @@ export interface PurchaseCreateBody {
   final_amount: number;
   payment_amount: number;
   notes?: string | null;
-  status?: string;
   created_by: string;
   firm_id: number;
   branch_id: number
@@ -21,10 +20,12 @@ export interface PurchaseCreateBody {
   transaction_reference?: string | null;
   payment_method_id: number;
   items: CreatePurchaseItemBody[];
+  courier_charge?: number
+  other_charge?: number
+  handling_charge?: number
 }
 export interface PurchaseCreateParams
   extends Omit<PurchaseCreateBody, "status" | "created_by" | "items"> {
-  statusCode: number;
   remark: object
 }
 export interface PurchaseEditBody {
@@ -50,6 +51,9 @@ export interface PurchaseEditBody {
   payment_method_id?: number;
   items?: EditPurchaseItemBody[];
   delete_item_ids?: number[];
+  courier_charge?: number
+  other_charge?: number
+  handling_charge?: number
 }
 export interface PurchaseEditParams
   extends Omit<PurchaseEditBody, "status" | "updated_by" | "items" | "delete_item_ids"> {

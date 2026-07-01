@@ -12,7 +12,7 @@ import { PaymentTransactionService } from "../../paymentTransaction/paymenttrans
 export default class PurchaseController {
 
   async purchaseCreate(data: PurchaseCreateBody) {
-    const { payment_amount, final_amount, status, company_id, created_by, items, transaction_reference, payment_method_id, ...rest } = data;
+    const { payment_amount, final_amount, company_id, created_by, items, transaction_reference, payment_method_id, ...rest } = data;
 
     const remark = {
       action: "Created",
@@ -21,7 +21,6 @@ export default class PurchaseController {
     };
 
     return transaction(async (client: PoolClient) => {
-      const statusCode = getStatusCode(status ?? "Completed");
 
       const service = new PurchaseService();
       const purchase = await service.createPurchase(
@@ -29,7 +28,6 @@ export default class PurchaseController {
           ...rest,
           payment_amount, final_amount,
           remark,
-          statusCode,
           company_id, transaction_reference, payment_method_id
         },
         client
@@ -59,7 +57,7 @@ export default class PurchaseController {
             purchase_id: purchase.id,
             firm_id: rest.firm_id,
             branch_id: rest.branch_id,
-            status: item.status ?? status ?? "Completed",
+            status: item.status ?? "Completed",
             product_id: item.product_id,
             stock_id: stock.id,
             received_qty: item.received_qty,
@@ -81,14 +79,13 @@ export default class PurchaseController {
 
       if (difference !== 0) {
         const isAdvance = difference > 0;
-
         await party_balance_controller.createPartyBalance(
           {
             ref_id: purchase.id,
-            ref_type: "P",
+            ref_type: PaymentTransactionTypeCodeMap["purchase"],
             created_by,
             balance: Math.abs(difference),
-            flow: isAdvance ? "I" : "O",
+            flow: !isAdvance ? "I" : "O",
             firm_id: rest.firm_id,
           },
           client
@@ -105,7 +102,8 @@ export default class PurchaseController {
           transaction_reference: transaction_reference ?? null,
           business_id: rest.firm_id,
           business_ref: convertEntityType("Firm" as EntityKey),
-          company_id
+          company_id,
+          payment_flow:"E"
         },
         client
       );

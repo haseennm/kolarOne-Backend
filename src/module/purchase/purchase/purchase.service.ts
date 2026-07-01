@@ -6,12 +6,20 @@ import { PurchaseCreateParams, PurchaseDeleteParams, PurchaseEditParams, Purchas
 
 export default class PurchaseService {
   private billStatus(final_amount: number, paid_amount: number) {
+    console.log(final_amount,"===",paid_amount)
     if (paid_amount <= 0) {
+      console.log("unpaind")
       return getStatusCode("Unpaid");
     }
 
-    if (paid_amount >= final_amount) {
+    if (paid_amount == final_amount) {
+      console.log("bpaid")
+
       return getStatusCode("Paid");
+    }
+    if (paid_amount > final_amount) {
+      console.log("overdue")
+      return getStatusCode("Overdue");
     }
 
     return getStatusCode("Partial");
@@ -36,7 +44,9 @@ export default class PurchaseService {
       notes,
       transaction_reference,
       branch_id,
-      company_id
+      company_id,
+      courier_charge,
+      handling_charge,other_charge
     } = data;
 
     const is_firm_exist = await getRecord(
@@ -111,15 +121,17 @@ export default class PurchaseService {
       payment_method_id,
       transaction_reference,
       firm_id,
-      ref_no
+      ref_no,
+      courier_charge,
+      handling_charge,other_charge
     )
     VALUES (
       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-      $11,$12,$13,$14,$15,$16,$17,$18
+      $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
     )
     RETURNING *;
   `;
-
+console.log("this.billStatus(final_amount ?? 0, payment_amount ?? 0)",this.billStatus(final_amount ?? 0, payment_amount ?? 0))
     const values = [
       vendor_id,
       bill_number,
@@ -138,7 +150,10 @@ export default class PurchaseService {
       payment_method_id ?? null,
       transaction_reference ?? null,
       firm_id,
-      ref_no
+      ref_no,
+      courier_charge,
+      handling_charge,
+      other_charge
     ];
 
     const { rows } = await executeInTransaction(client, purchaseQuery, values);
@@ -164,7 +179,11 @@ export default class PurchaseService {
       transaction_reference,
       branch_id,
       company_id,
-      purchase_id
+      purchase_id,
+      courier_charge,
+      handling_charge,
+      other_charge,
+
     } = data;
 
     const is_purchase_exist = await getRecord(
@@ -234,11 +253,20 @@ export default class PurchaseService {
     payment_amount = $11,
     notes = $12,
     status = $13,
-    remarks = COALESCE(remarks, '[]'::jsonb) || $14::jsonb,
+     remarks = CASE
+        WHEN remarks IS NULL THEN $14::jsonb
+        WHEN jsonb_typeof(remarks) = 'array'
+          THEN remarks || $14::jsonb
+        ELSE jsonb_build_array(remarks) || $14::jsonb
+      END,
     payment_method_id = $15,
-    transaction_reference = $16 WHERE
-    firm_id = $17 AND
-   id = $18
+    transaction_reference = $16
+    courier_charge =$17,
+      handling_charge =$18,
+      other_charge =$19 
+      WHERE
+    firm_id = $20 AND
+   id = $21
   RETURNING *;
 `;
 
@@ -262,6 +290,9 @@ export default class PurchaseService {
       JSON.stringify([remark]),
       payment_method_id ?? is_purchase_exist.payment_method_id,
       transaction_reference ?? is_purchase_exist.transaction_reference,
+      courier_charge ?? is_purchase_exist.courier_charge,
+      handling_charge ?? is_purchase_exist.handling_charge,
+      other_charge ?? is_purchase_exist.transaction_reference, 
       firm_id,
       purchase_id
     ];
@@ -598,8 +629,13 @@ export default class PurchaseService {
 
     const query = `
     UPDATE purchases
-    SET payment_amount = $1,
-    remarks = COALESCE(remarks, '[]'::jsonb) || $2::jsonb
+    SET payment_amount = payment_amount + $1,
+    remarks = CASE
+        WHEN remarks IS NULL THEN $2::jsonb
+        WHEN jsonb_typeof(remarks) = 'array'
+          THEN remarks || $2::jsonb
+        ELSE jsonb_build_array(remarks) || $2::jsonb
+      END
     WHERE id = $3 AND firm_id = $4
     RETURNING *;
   `;

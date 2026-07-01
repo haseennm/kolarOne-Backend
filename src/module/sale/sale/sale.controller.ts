@@ -84,7 +84,7 @@ export default class SaleController {
         await party_balance_controller.createPartyBalance(
           {
             ref_id: sale.id,
-            ref_type: "S",
+            ref_type: PaymentTransactionTypeCodeMap["sale"],
             created_by,
             balance: Math.abs(difference),
             flow: isAdvance ? "O" : "I",
@@ -107,6 +107,7 @@ export default class SaleController {
               business_id: rest.firm_id,
               business_ref: convertEntityType("Firm" as EntityKey),
               company_id,
+              payment_flow:"I"
             },
             client
           )

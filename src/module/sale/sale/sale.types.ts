@@ -23,9 +23,13 @@ export interface SaleCreateBody {
   company_id: number;
   payments: Payments[]
   items: CreateSaleItemBody[];
-  price_pool:string;
-  state_code:number;
-  is_intrastate:boolean
+  price_pool: string;
+  state_code: number;
+  is_intrastate: boolean,
+  quotation_id?: number,
+  courier_charge?: number
+  other_charge?: number
+  handling_charge?: number
 }
 export interface SaleCreateParams
   extends Omit<SaleCreateBody, "status" | "created_by" | "items"> {
@@ -51,6 +55,9 @@ export interface SaleEditBody {
   status?: string;
   payments?: Payments[];
   items?: EditSaleItemBody[];
+  courier_charge?: number
+  other_charge?: number
+  handling_charge?: number
 }
 export interface SaleEditParams
   extends Omit<SaleEditBody, "status" | "updated_by" | "items"> {
@@ -101,15 +108,15 @@ export interface GetReportSalePurchaseLedger {
   start_date: string;
   end_date: string;
 }
-interface ObjPayment{
-  payment_method_id:number,
-  amount:number;
-  reference_number:string | null
+interface ObjPayment {
+  payment_method_id: number,
+  amount: number;
+  reference_number: string | null
 }
 export interface RepayBalanceSale {
   sale_id: number,
   firm_id: number,
   payments: ObjPayment[],
   remark: any,
-  company_id:number
+  company_id: number
 }

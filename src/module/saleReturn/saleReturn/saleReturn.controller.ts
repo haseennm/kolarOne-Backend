@@ -100,7 +100,8 @@ export default class SaleReturnController {
           transaction_reference: null,
           business_id: rest.firm_id,
           business_ref: convertEntityType("Firm" as EntityKey),
-          company_id
+          company_id,
+          payment_flow:"E"
         },
         client
       );
