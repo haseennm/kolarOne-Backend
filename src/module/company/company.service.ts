@@ -275,5 +275,24 @@ export default class CompanyService {
         const result = await pool.query(query, values);
         return result.rows[0];
     }
+    async checkUsername(username: string): Promise<boolean> {
+        const query = `
+        SELECT EXISTS (
+            SELECT 1
+            WHERE EXISTS (
+                SELECT 1 FROM company WHERE username = $1 AND status != 0
+            )
+            OR EXISTS (
+                SELECT 1 FROM firm WHERE username = $1 AND status != 0
+            )
+            OR EXISTS (
+                SELECT 1 FROM branches WHERE username = $1 AND status != 0
+            )
+        ) AS "exists";
+    `;
+
+        const result = await pool.query(query, [username]);
+        return !result.rows[0].exists;
+    }
 
 }

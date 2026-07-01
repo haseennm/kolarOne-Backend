@@ -116,4 +116,11 @@ export default class CompanyController {
       name: company.company_name
     }
   }
+  async checkUsername(user_name: string) {
+
+    const service = new CompanyService();
+    const company = await service.checkUsername(user_name);
+    return company
+
+  }
 }

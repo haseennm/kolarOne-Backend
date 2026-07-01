@@ -69,7 +69,7 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             message: result
         });
 
-      
+
     });
     app.post<{ Body: GetCompanyBody }>(
         '/get',
@@ -203,6 +203,30 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             cns(request.url, request.body);
             const controller = new CompanyController();
             const firm = await controller.loginCompany(request.body);
+            return reply.code(201).send(firm);
+
+        }
+    );
+    app.post<{
+        Body: {
+            user_name: string;
+        };
+    }>(
+        "/username",
+        {
+            schema: {
+                body: {
+                    type: "object",
+                    required: ["user_name"],
+                    properties: {
+                        user_name: { type: "string" },
+                    },
+                },
+            },
+        },
+        async (request, reply) => {
+            const controller = new CompanyController();
+            const firm = await controller.checkUsername(request.body.user_name);
             return reply.code(201).send(firm);
 
         }
