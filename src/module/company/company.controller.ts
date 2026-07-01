@@ -96,6 +96,9 @@ export default class CompanyController {
     const { password, username } = data
     const service = new CompanyService();
     const company = await service.loginCompany(data);
+    if (!company) {
+      throw new AppError('Company not found', 401)
+    }
     const isValid = await verifyPassword(password, company.password)
 
     if (!isValid) {

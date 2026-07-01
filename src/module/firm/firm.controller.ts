@@ -108,7 +108,9 @@ export default class FirmController {
 
     const service = new FirmService();
     const firm = await service.loginFirm(data);
-
+    if (!firm) {
+      throw new AppError("Firm not found", 401);
+    }
 
     const isValid = await verifyPassword(password, firm.password);
 

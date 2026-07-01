@@ -93,6 +93,9 @@ export default class BranchController {
         const { password, username } = data
         const service = new BranchService();
         const branch = await service.loginBranch(data);
+        if (!branch) {
+            throw new AppError('Branch not found', 401)
+        }
         const isValid = await verifyPassword(password, branch.password)
 
         if (!isValid) {
