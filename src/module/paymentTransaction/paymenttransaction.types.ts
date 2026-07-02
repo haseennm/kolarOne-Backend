@@ -18,13 +18,11 @@ export interface CreatePaymentTransaction {
     transaction_reference?: string | null;
     business_id: number;
     business_ref: string;
-    company_id: number
+    company_id: number;
+    payment_flow:"E"| "I"
 }
 
 export interface EditPaymentTransaction {
-
-    company_id: number;
-
     ref_id?: number;
     amount?: number;
     ref_type?:
@@ -44,6 +42,7 @@ export interface EditPaymentTransaction {
     transaction_reference?: string | null;
     business_id?: number;
     business_ref?: string;
+    company_id: number;
 }
 export interface DeletePaymentTransaction {
     company_id: number;

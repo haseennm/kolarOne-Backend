@@ -42,7 +42,8 @@ export default class LoanController {
         transaction_reference: null,
         business_id: rest.branch_id,
         business_ref: entity_type,
-        company_id: rest.company_id
+        company_id: rest.company_id,
+        payment_flow:"E"
       }, client)
 
 
@@ -94,7 +95,8 @@ export default class LoanController {
         transaction_reference: null,
         business_id: rest.branch_id,
         business_ref: entity_type,
-        company_id: rest.company_id
+        company_id: rest.company_id,
+        payment_flow:"I"
       }, client)
       return `Loan has been deleted successfully.`;
     });

@@ -13,7 +13,7 @@ export default class LedgerTransactionController {
 
   async createTransaction(data: CreateLedgerTransactionBody) {
 
-    let { created_by, status, entity_type, amount, transaction_time = new Date().toLocaleTimeString('en-GB', {
+    let { created_by, status, entry_type,entity_type, amount, transaction_time = new Date().toLocaleTimeString('en-GB', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -52,7 +52,8 @@ export default class LedgerTransactionController {
             transaction_reference: null,
             business_id: entity_id,
             business_ref: entity_type,
-            company_id
+            company_id,
+            payment_flow:entry_type
           },
           client
         );

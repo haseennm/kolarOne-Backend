@@ -9,9 +9,10 @@ export interface CreateLedgerTransactionBody {
   company_id: number;
   status: string;
   created_by: string;
+  entry_type: "I" | "E"
 }
 export interface CreateLedgerTransactionParams
-  extends Omit<CreateLedgerTransactionBody, "created_by" | "status"> {
+  extends Omit<CreateLedgerTransactionBody, "created_by" | "status" |"entry_type"> {
   remark: object;
   statusCode: number;
 }
