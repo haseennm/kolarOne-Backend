@@ -1,11 +1,153 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { getRecord } from "../../../utils/extra";
-import { SaleReturnCreateParams, SaleReturnDeleteParams, SaleReturnEditParams, SaleReturnFetchParams } from "./saleReturn.types";
+import { getRecord, getStatusCode } from "../../../utils/extra";
+import { RepayBalanceSaleReturn, SaleReturnCreateParams, SaleReturnDeleteParams, SaleReturnEditParams, SaleReturnFetchParams } from "./saleReturn.types";
 
 export default class SaleReturnService {
+  private billStatus(final_amount: number, paid_amount: number) {
+    if (paid_amount <= 0) {
+      return getStatusCode("Unpaid");
+    }
+    if (paid_amount == final_amount) {
+      return getStatusCode("Paid");
+    }
+    if (paid_amount > final_amount) {
+      return getStatusCode("Over Pay");
+    }
+    return getStatusCode("Partial");
+  }
 
+  // async createSaleReturn(data: SaleReturnCreateParams, client: PoolClient) {
+  //   const {
+  //     sale_id,
+  //     return_date,
+  //     reason,
+  //     subtotal,
+  //     total_cgst,
+  //     total_igst,
+  //     total_sgst,
+  //     final_amount,
+  //     payment_method_id,
+  //     firm_id,
+  //     transaction_reference,
+  //     branch_id,
+  //     company_id,
+  //     remark,
+  //     paid_amount
+  //   } = data;
+
+  //   // Verify Firm existence
+  //   const is_firm_exist = await getRecord(
+  //     firm_id,
+  //     "firm",
+  //     "branch_id",
+  //     branch_id,
+  //     client
+  //   );
+  //   if (!is_firm_exist) {
+  //     throw new AppError("Firm not found", 404);
+  //   }
+
+  //   // Verify Sales parent reference existence
+  //   const is_sale_exist = await getRecord(
+  //     sale_id,
+  //     "sales",
+  //     "firm_id",
+  //     firm_id,
+  //     client
+  //   );
+  //   if (!is_sale_exist) {
+  //     throw new AppError("Sale reference matching parent order not found", 404);
+  //   }
+
+  //   // Verify Payment method index reference mapping
+  //   if (payment_method_id) {
+  //     const is_payment_method_exist = await getRecord(
+  //       payment_method_id,
+  //       "payment_methods",
+  //       "company_id",
+  //       company_id,
+  //       client
+  //     );
+  //     if (!is_payment_method_exist) {
+  //       throw new AppError("Specified payment method mapping option not found", 404);
+  //     }
+  //   }
+
+  //   // Row locking sequencing generator block
+  //   const result = await executeInTransaction(
+  //     client,
+  //     `
+  //   SELECT return_number
+  //   FROM sale_return
+  //   WHERE firm_id = $1
+  //   ORDER BY id DESC
+  //   LIMIT 1
+  //   FOR UPDATE
+  //   `,
+  //     [firm_id]
+  //   );
+
+  //   let return_number: string;
+
+  //   if (!result.rows.length) {
+  //     return_number = `SLRTN-${firm_id}-0001`;
+  //   } else {
+  //     const lastReturn = result.rows[0];
+  //     const parts = lastReturn.return_number.split("-");
+  //     // Dynamic match against the index element grouping location
+  //     const lastNumber = parseInt(parts[2] || "0", 10);
+  //     const newNumber = lastNumber + 1;
+
+  //     return_number = `SLRTN-${firm_id}-${String(newNumber).padStart(4, "0")}`;
+  //   }
+
+  //   const query = `
+  //   INSERT INTO sale_return (
+  //     sale_id,
+  //     return_number,
+  //     return_date,
+  //     reason,
+  //     sub_total,
+  //     total_cgst,
+  //     total_sgst,
+  //     total_igst,
+  //     status,
+  //     remarks,
+  //     firm_id,
+  //     final_amount,
+  //     payment_method_id,
+  //     reference_number,
+  //     paid_amount
+  //   )
+  //   VALUES (
+  //     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+  //   )
+  //   RETURNING *;
+  // `;
+
+  //   const values = [
+  //     sale_id,
+  //     return_number,
+  //     return_date,
+  //     reason || null,
+  //     subtotal ?? 0,
+  //     total_cgst ?? 0,
+  //     total_sgst ?? 0,
+  //     total_igst ?? 0,
+  //     this.billStatus(final_amount ?? 0, paid_amount ?? 0),
+  //     JSON.stringify(remark ?? {}),
+  //     firm_id,
+  //     final_amount ?? 0,
+  //     payment_method_id ?? null,
+  //     transaction_reference ?? null,
+  //     paid_amount ?? 0
+  //   ];
+
+  //   const { rows } = await executeInTransaction(client, query, values);
+  //   return rows[0];
+  // }
   async createSaleReturn(data: SaleReturnCreateParams, client: PoolClient) {
     const {
       sale_id,
@@ -16,102 +158,66 @@ export default class SaleReturnService {
       total_igst,
       total_sgst,
       final_amount,
-      payment_method_id,
       firm_id,
-      statusCode,
-      transaction_reference,
       branch_id,
       company_id,
       remark,
+      computed_payment_amount,
+      merged_payments_json
     } = data;
 
-    // Check firm existence
-    const is_firm_exist = await getRecord(
-      firm_id,
-      "firm",
-      "branch_id",
-      branch_id,
-      client
-    );
-
+    // Verify Firm reference block
+    const is_firm_exist = await getRecord(firm_id, "firm", "branch_id", branch_id, client);
     if (!is_firm_exist) {
       throw new AppError("Firm not found", 404);
     }
-    const is_sale_exist = await getRecord(
-      sale_id,
-      "sales",
-      "firm_id",
-      firm_id,
-      client
-    );
 
+    // Verify Sales parent identity link
+    const is_sale_exist = await getRecord(sale_id, "sales", "firm_id", firm_id, client);
     if (!is_sale_exist) {
-      throw new AppError("Sale not found", 404);
-    }
-    const is_payment_method_exist = await getRecord(
-      payment_method_id,
-      "payment_methods",
-      "company_id",
-      company_id,
-      client
-    );
-
-    if (!is_payment_method_exist) {
-      throw new AppError("payment method not found", 404);
+      throw new AppError("Sale reference matching parent order not found", 404);
     }
 
+    // Sequence generation row locks
     const result = await executeInTransaction(
       client,
-      `
-  SELECT return_number
-  FROM sale_return
-  WHERE firm_id = $1
-  ORDER BY id DESC
-  LIMIT 1
-  FOR UPDATE
-  `,
+      `SELECT return_number FROM sale_return WHERE firm_id = $1 ORDER BY id DESC LIMIT 1 FOR UPDATE`,
       [firm_id]
     );
 
-    let return_number;
-
+    let return_number: string;
     if (!result.rows.length) {
       return_number = `SLRTN-${firm_id}-0001`;
     } else {
       const lastReturn = result.rows[0];
-
-      const lastNumber = parseInt(
-        lastReturn.return_number.split("-")[2],
-        10
-      );
-
+      const parts = lastReturn.return_number.split("-");
+      const lastNumber = parseInt(parts[2] || "0", 10);
       const newNumber = lastNumber + 1;
-
       return_number = `SLRTN-${firm_id}-${String(newNumber).padStart(4, "0")}`;
     }
+
     const query = `
-  INSERT INTO sale_return
-  (
-    sale_id,
-    return_number,
-    return_date,
-    reason,
-    sub_total,
-    total_cgst,
-    total_sgst,
-    total_igst,
-    status,
-    remarks,
-    firm_id,
-    final_amount,
-    payment_method_id,
-    reference_number
-  )
-  VALUES (
-    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
-  )
-  RETURNING *;
-`;
+    INSERT INTO sale_return (
+      sale_id,
+      return_number,
+      return_date,
+      reason,
+      sub_total,
+      total_cgst,
+      total_sgst,
+      total_igst,
+      status,
+      remarks,
+      firm_id,
+      final_amount,
+      paid_amount,
+      payments
+    )
+    VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+    )
+    RETURNING *;
+  `;
 
     const values = [
       sale_id,
@@ -122,22 +228,121 @@ export default class SaleReturnService {
       total_cgst ?? 0,
       total_sgst ?? 0,
       total_igst ?? 0,
-      statusCode,
-      JSON.stringify(remark),
+      this.billStatus(final_amount ?? 0, computed_payment_amount),
+      JSON.stringify(remark ?? {}),
       firm_id,
-      final_amount,
-      payment_method_id ?? null,
-      transaction_reference ?? null
+      final_amount ?? 0,
+      computed_payment_amount,
+      merged_payments_json
     ];
 
     const { rows } = await executeInTransaction(client, query, values);
     return rows[0];
   }
 
+  // async editSaleReturn(data: SaleReturnEditParams, client: PoolClient) {
+  //   const {
+  //     sale_return_id,
+  //     sale_id,
+  //     return_date,
+  //     reason,
+  //     subtotal,
+  //     total_cgst,
+  //     total_igst,
+  //     total_sgst,
+  //     final_amount,
+  //     payment_method_id,
+  //     firm_id,
+  //     statusCode,
+  //     transaction_reference,
+  //     branch_id,
+  //     company_id,
+  //     remark,
+  //   } = data;
+
+  //   // ✅ Validation: Check sale_return existence
+  //   const is_sale_return_exist = await getRecord(
+  //     sale_return_id,
+  //     "sale_return",
+  //     "firm_id",
+  //     firm_id,
+  //     client
+  //   );
+
+  //   if (!is_sale_return_exist) {
+  //     throw new AppError("Sale return not found", 404);
+  //   }
+
+  //   // ✅ Validation: Check sale existence (if updating sale_id)
+  //   if (sale_id && sale_id !== is_sale_return_exist.sale_id) {
+  //     const is_sale_exist = await getRecord(
+  //       sale_id,
+  //       "sales",
+  //       "firm_id",
+  //       firm_id,
+  //       client
+  //     );
+
+  //     if (!is_sale_exist) {
+  //       throw new AppError("Sale not found", 404);
+  //     }
+  //   }
+
+  //   // ✅ Validation: Check payment method existence (if updating payment_method_id)
+  //   if (payment_method_id && payment_method_id !== is_sale_return_exist.payment_method_id) {
+  //     const is_payment_method_exist = await getRecord(
+  //       payment_method_id,
+  //       "payment_methods",
+  //       "company_id",
+  //       company_id,
+  //       client
+  //     );
+
+  //     if (!is_payment_method_exist) {
+  //       throw new AppError("Payment method not found", 404);
+  //     }
+  //   }
+
+  //   const updateQuery = `
+  //     UPDATE sale_return SET
+  //       sale_id = $1,
+  //       return_date = $2,
+  //       reason = $3,
+  //       sub_total = $4,
+  //       total_cgst = $5,
+  //       total_sgst = $6,
+  //       total_igst = $7,
+  //       final_amount = $8,
+  //       payment_method_id = $9,
+  //       reference_number = $10,
+  //       status = $11,
+  //       remarks = COALESCE(remarks, '[]'::jsonb) || $12::jsonb
+  //     WHERE firm_id = $13 AND id = $14
+  //     RETURNING *;
+  //   `;
+
+  //   const values = [
+  //     sale_id ?? is_sale_return_exist.sale_id,
+  //     return_date ?? is_sale_return_exist.return_date,
+  //     reason ?? is_sale_return_exist.reason,
+  //     subtotal ?? is_sale_return_exist.sub_total,
+  //     total_cgst ?? is_sale_return_exist.total_cgst,
+  //     total_sgst ?? is_sale_return_exist.total_sgst,
+  //     total_igst ?? is_sale_return_exist.total_igst,
+  //     final_amount ?? is_sale_return_exist.final_amount,
+  //     payment_method_id ?? is_sale_return_exist.payment_method_id,
+  //     transaction_reference ?? is_sale_return_exist.reference_number,
+  //     statusCode ?? is_sale_return_exist.status,
+  //     JSON.stringify([remark]),
+  //     firm_id,
+  //     sale_return_id
+  //   ];
+
+  //   const { rows } = await executeInTransaction(client, updateQuery, values);
+  //   return rows[0];
+  // }
   async editSaleReturn(data: SaleReturnEditParams, client: PoolClient) {
     const {
-      sale_return_id,
-      sale_id,
       return_date,
       reason,
       subtotal,
@@ -145,58 +350,29 @@ export default class SaleReturnService {
       total_igst,
       total_sgst,
       final_amount,
-      payment_method_id,
       firm_id,
-      statusCode,
-      transaction_reference,
       branch_id,
       company_id,
+      sale_return_id,
+      sale_id,
       remark,
+      computed_payment_amount,
+      merged_payments_json
     } = data;
 
-    // ✅ Validation: Check sale_return existence
-    const is_sale_return_exist = await getRecord(
-      sale_return_id,
-      "sale_return",
-      "firm_id",
-      firm_id,
-      client
+    // 1. Pessimistic row locking fetch 
+    const queryExisting = await executeInTransaction(
+      client,
+      `SELECT * FROM sale_return WHERE id = $1 AND firm_id = $2 FOR UPDATE;`,
+      [sale_return_id, firm_id]
     );
 
-    if (!is_sale_return_exist) {
-      throw new AppError("Sale return not found", 404);
+    const is_return_exist = queryExisting.rows[0];
+    if (!is_return_exist) {
+      throw new AppError("Sale return document reference not found", 404);
     }
 
-    // ✅ Validation: Check sale existence (if updating sale_id)
-    if (sale_id && sale_id !== is_sale_return_exist.sale_id) {
-      const is_sale_exist = await getRecord(
-        sale_id,
-        "sales",
-        "firm_id",
-        firm_id,
-        client
-      );
-
-      if (!is_sale_exist) {
-        throw new AppError("Sale not found", 404);
-      }
-    }
-
-    // ✅ Validation: Check payment method existence (if updating payment_method_id)
-    if (payment_method_id && payment_method_id !== is_sale_return_exist.payment_method_id) {
-      const is_payment_method_exist = await getRecord(
-        payment_method_id,
-        "payment_methods",
-        "company_id",
-        company_id,
-        client
-      );
-
-      if (!is_payment_method_exist) {
-        throw new AppError("Payment method not found", 404);
-      }
-    }
-
+    // 2. Perform atomic update matching target fields
     const updateQuery = `
       UPDATE sale_return SET
         sale_id = $1,
@@ -207,27 +383,33 @@ export default class SaleReturnService {
         total_sgst = $6,
         total_igst = $7,
         final_amount = $8,
-        payment_method_id = $9,
-        reference_number = $10,
-        status = $11,
-        remarks = COALESCE(remarks, '[]'::jsonb) || $12::jsonb
+        paid_amount = $9, -- Total multi-payments sum calculation
+        payments = $10, -- JSON string payload storage format matrix
+        remarks = CASE
+          WHEN remarks IS NULL THEN $11::jsonb
+          WHEN jsonb_typeof(remarks) = 'array' THEN remarks || $11::jsonb
+          ELSE jsonb_build_array(remarks) || $11::jsonb
+        END,
+        status = $12
       WHERE firm_id = $13 AND id = $14
       RETURNING *;
     `;
 
+    const targetFinalAmount = final_amount ?? is_return_exist.final_amount;
+
     const values = [
-      sale_id ?? is_sale_return_exist.sale_id,
-      return_date ?? is_sale_return_exist.return_date,
-      reason ?? is_sale_return_exist.reason,
-      subtotal ?? is_sale_return_exist.sub_total,
-      total_cgst ?? is_sale_return_exist.total_cgst,
-      total_sgst ?? is_sale_return_exist.total_sgst,
-      total_igst ?? is_sale_return_exist.total_igst,
-      final_amount ?? is_sale_return_exist.final_amount,
-      payment_method_id ?? is_sale_return_exist.payment_method_id,
-      transaction_reference ?? is_sale_return_exist.reference_number,
-      statusCode ?? is_sale_return_exist.status,
+      sale_id ?? is_return_exist.sale_id,
+      return_date ?? is_return_exist.return_date,
+      reason ?? is_return_exist.reason,
+      subtotal ?? is_return_exist.sub_total,
+      total_cgst ?? is_return_exist.total_cgst,
+      total_sgst ?? is_return_exist.total_sgst,
+      total_igst ?? is_return_exist.total_igst,
+      targetFinalAmount,
+      computed_payment_amount,
+      merged_payments_json,
       JSON.stringify([remark]),
+      this.billStatus(Number(targetFinalAmount), computed_payment_amount),
       firm_id,
       sale_return_id
     ];
@@ -235,120 +417,60 @@ export default class SaleReturnService {
     const { rows } = await executeInTransaction(client, updateQuery, values);
     return rows[0];
   }
-//         client,
-//         `SELECT id FROM purchases 
-//    WHERE bill_number = $1 
-//    AND vendor_id = $2 
-//    AND status != 0`,
-//         [bill_number, vendor_id]
-//       );
 
-//       if ((is_bill_exist.rowCount ?? 0) > 0) {
-//         throw new AppError("purchase bill already exist", 400);
-//       }
-//     }
-//     const purchaseQuery = `
-//   UPDATE purchases SET
-//     vendor_id = $1,
-//     bill_number = $2,
-//     bill_date = $3,
-//     subtotal = $4,
-//     discount = $5,
-//     net_amount = $6,
-//     total_cgst = $7,
-//     total_sgst = $8,
-//     total_igst = $9,
-//     final_amount = $10,
-//     payment_amount = $11,
-//     notes = $12,
-//     status = $13,
-//     remarks = COALESCE(remarks, '[]'::jsonb) || $14::jsonb,
-//     payment_method_id = $15,
-//     transaction_reference = $16 WHERE
-//     firm_id = $17
-//    id = $18
-//   RETURNING *;
-// `;
+  async fetchSaleReturn(data: SaleReturnFetchParams) {
+    const { filters, offset } = data;
 
-//     const values = [
-//       vendor_id,
-//       bill_number,
-//       bill_date,
-//       subtotal ?? is_purchase_exist.sub_total,
-//       discount ?? is_purchase_exist.discount,
-//       net_amount ?? is_purchase_exist.net_amount,
-//       total_cgst ?? is_purchase_exist.total_cgst,
-//       total_sgst ?? is_purchase_exist.total_sgst,
-//       total_igst ?? is_purchase_exist.total_igst,
-//       final_amount ?? is_purchase_exist.final_amount,
-//       payment_amount ?? is_purchase_exist.payment_amount,
-//       notes ?? is_purchase_exist.notes,
-//       statusCode,
-//       JSON.stringify([remark]),
+    let where: string[] = [];
+    let values: any[] = [];
 
-//       payment_method_id ?? is_purchase_exist.payment_method_id,
-//       transaction_reference ?? is_purchase_exist.transaction_reference,
-//       firm_id,
-//       purchase_id
-//     ];
+    // status filter
+    where.push(`sr.status != $${values.length + 1}`);
+    values.push(0);
 
-//     const { rows } = await executeInTransaction(client, purchaseQuery, values);
-//     return rows[0];
-//   }
+    if (filters?.id) {
+      values.push(filters.id);
+      where.push(`sr.id = $${values.length}`);
+    }
 
-async fetchSaleReturn(data: SaleReturnFetchParams) {
-  const { filters, offset } = data;
+    if (filters?.company_id) {
+      values.push(filters.company_id);
+      where.push(`b.company_id = $${values.length}`);
+    }
 
-  let where: string[] = [];
-  let values: any[] = [];
+    if (filters?.branch_id) {
+      values.push(filters.branch_id);
+      where.push(`f.branch_id = $${values.length}`);
+    }
 
-  // status filter
-  where.push(`sr.status != $${values.length + 1}`);
-  values.push(0);
+    if (filters?.firm_id) {
+      values.push(filters.firm_id);
+      where.push(`sr.firm_id = $${values.length}`);
+    }
 
-  if (filters?.id) {
-    values.push(filters.id);
-    where.push(`sr.id = $${values.length}`);
-  }
+    if (filters?.start_date) {
+      values.push(filters.start_date);
+      where.push(`sr.return_date >= $${values.length}`);
+    }
 
-  if (filters?.company_id) {
-    values.push(filters.company_id);
-    where.push(`b.company_id = $${values.length}`);
-  }
+    if (filters?.end_date) {
+      values.push(filters.end_date);
+      where.push(`sr.return_date <= $${values.length}`);
+    }
 
-  if (filters?.branch_id) {
-    values.push(filters.branch_id);
-    where.push(`f.branch_id = $${values.length}`);
-  }
-
-  if (filters?.firm_id) {
-    values.push(filters.firm_id);
-    where.push(`sr.firm_id = $${values.length}`);
-  }
-
-  if (filters?.start_date) {
-    values.push(filters.start_date);
-    where.push(`sr.return_date >= $${values.length}`);
-  }
-
-  if (filters?.end_date) {
-    values.push(filters.end_date);
-    where.push(`sr.return_date <= $${values.length}`);
-  }
-
-  if (filters?.search) {
-    values.push(`%${filters.search}%`);
-    where.push(`(
+    if (filters?.search) {
+      values.push(`%${filters.search}%`);
+      where.push(`(
       sr.return_number ILIKE $${values.length}
       OR s.invoice_number ILIKE $${values.length}
       OR c.customer_name ILIKE $${values.length}
     )`);
-  }
+    }
 
-  const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  // 🔥 MAIN QUERY
-  const sale_returnQuery = `
+    // 🔥 MAIN QUERY
+    const sale_returnQuery = `
     SELECT 
       sr.*,
       s.invoice_number,
@@ -366,8 +488,8 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
     OFFSET $${values.length + 2}
   `;
 
-  // 🔥 COUNT QUERY
-  const countQuery = `
+    // 🔥 COUNT QUERY
+    const countQuery = `
     SELECT COUNT(*)
     FROM sale_return sr
     LEFT JOIN sales s ON s.id = sr.sale_id
@@ -377,75 +499,75 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
     ${whereClause}
   `;
 
-  const sale_returns = await query(
-    sale_returnQuery,
-    [...values, filters.limit, offset]
-  );
+    const sale_returns = await query(
+      sale_returnQuery,
+      [...values, filters.limit, offset]
+    );
 
-  const total = await query<{ count: string }>(countQuery, values);
-  return {
-    pagination: {
-      page: filters.page,
-      limit: filters.limit,
-      total: Number(total[0].count),
-      totalPages: Math.ceil(Number(total[0].count) / filters.limit),
-    },
-    sale_returns,
-  };
-}
- async fetchSaleReturnFull(data: SaleReturnFetchParams) {
-  const { filters, offset } = data;
-
-  let where: string[] = [];
-  let values: any[] = [];
-
-  // status filter
-  where.push(`sr.status != $${values.length + 1}`);
-  values.push(0);
-
-  if (filters?.id) {
-    values.push(filters.id);
-    where.push(`sr.id = $${values.length}`);
+    const total = await query<{ count: string }>(countQuery, values);
+    return {
+      pagination: {
+        page: filters.page,
+        limit: filters.limit,
+        total: Number(total[0].count),
+        totalPages: Math.ceil(Number(total[0].count) / filters.limit),
+      },
+      sale_returns,
+    };
   }
+  async fetchSaleReturnFull(data: SaleReturnFetchParams) {
+    const { filters, offset } = data;
 
-  if (filters?.company_id) {
-    values.push(filters.company_id);
-    where.push(`b.company_id = $${values.length}`);
-  }
+    let where: string[] = [];
+    let values: any[] = [];
 
-  if (filters?.branch_id) {
-    values.push(filters.branch_id);
-    where.push(`f.branch_id = $${values.length}`);
-  }
+    // status filter
+    where.push(`sr.status != $${values.length + 1}`);
+    values.push(0);
 
-  if (filters?.firm_id) {
-    values.push(filters.firm_id);
-    where.push(`sr.firm_id = $${values.length}`);
-  }
+    if (filters?.id) {
+      values.push(filters.id);
+      where.push(`sr.id = $${values.length}`);
+    }
 
-  if (filters?.start_date) {
-    values.push(filters.start_date);
-    where.push(`sr.return_date >= $${values.length}`);
-  }
+    if (filters?.company_id) {
+      values.push(filters.company_id);
+      where.push(`b.company_id = $${values.length}`);
+    }
 
-  if (filters?.end_date) {
-    values.push(filters.end_date);
-    where.push(`sr.return_date <= $${values.length}`);
-  }
+    if (filters?.branch_id) {
+      values.push(filters.branch_id);
+      where.push(`f.branch_id = $${values.length}`);
+    }
 
-  if (filters?.search) {
-    values.push(`%${filters.search}%`);
-    where.push(`(
+    if (filters?.firm_id) {
+      values.push(filters.firm_id);
+      where.push(`sr.firm_id = $${values.length}`);
+    }
+
+    if (filters?.start_date) {
+      values.push(filters.start_date);
+      where.push(`sr.return_date >= $${values.length}`);
+    }
+
+    if (filters?.end_date) {
+      values.push(filters.end_date);
+      where.push(`sr.return_date <= $${values.length}`);
+    }
+
+    if (filters?.search) {
+      values.push(`%${filters.search}%`);
+      where.push(`(
       sr.return_number ILIKE $${values.length}
       OR s.invoice_number ILIKE $${values.length}
       OR c.customer_name ILIKE $${values.length}
     )`);
-  }
+    }
 
-  const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  // 🔥 MAIN QUERY
-  const saleReturnQuery = `
+    // 🔥 MAIN QUERY
+    const saleReturnQuery = `
     SELECT 
       sr.*,
       s.invoice_number,
@@ -476,8 +598,29 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
           )
         ) FILTER (WHERE sri.id IS NOT NULL),
         '[]'
-      ) AS items
-
+      ) AS items,
+       (
+              SELECT COALESCE(
+                  JSON_AGG(
+                      JSON_BUILD_OBJECT(
+                          'id', pt.id,
+                          'payment_method_id', pt.payment_method_id,
+                          'payment_method', pm2.method_name,
+                          'amount', pt.amount,
+                          'payment_flow', pt.payment_flow,
+                          'transaction_date', pt.created_at,
+                          'transaction_reference', pt.transaction_reference
+                      )
+                      ORDER BY pt.id
+                  ),
+                  '[]'
+              )
+              FROM payment_transactions pt
+              LEFT JOIN payment_methods pm2
+                  ON pm2.id = pt.payment_method_id
+              WHERE pt.ref_id = sr.id
+                AND pt.ref_type = 'SR'
+          ) AS payments
     FROM sale_return sr
 
     LEFT JOIN sales s ON s.id = sr.sale_id
@@ -507,8 +650,8 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
     OFFSET $${values.length + 2}
   `;
 
-  // 🔥 COUNT QUERY
-  const countQuery = `
+    // 🔥 COUNT QUERY
+    const countQuery = `
     SELECT COUNT(*)
     FROM sale_return sr
     LEFT JOIN sales s ON s.id = sr.sale_id
@@ -518,44 +661,44 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
     ${whereClause}
   `;
 
-  const saleReturns = await query(
-    saleReturnQuery,
-    [...values, filters.limit, offset]
-  );
+    const saleReturns = await query(
+      saleReturnQuery,
+      [...values, filters.limit, offset]
+    );
 
-  const total = await query<{ count: string }>(countQuery, values);
+    const total = await query<{ count: string }>(countQuery, values);
 
-  return {
-    saleReturns,
-    pagination: {
-      page: filters.page,
-      limit: filters.limit,
-      total: Number(total[0].count),
-      totalPages: Math.ceil(Number(total[0].count) / filters.limit),
-    },
-  };
-}
- async deleteSaleReturn(
-  data: SaleReturnDeleteParams,
-  client: PoolClient
-) {
-  const { id, remark, firm_id } = data;
-
-  // ✅ Check existence
-  const getRecordPR = await getRecord(
-    id,
-    "sale_return",
-    "firm_id",
-    firm_id,
-    client
-  );
-
-  if (!getRecordPR) {
-    throw new AppError("sale return not found or already deleted", 404);
+    return {
+      saleReturns,
+      pagination: {
+        page: filters.page,
+        limit: filters.limit,
+        total: Number(total[0].count),
+        totalPages: Math.ceil(Number(total[0].count) / filters.limit),
+      },
+    };
   }
+  async deleteSaleReturn(
+    data: SaleReturnDeleteParams,
+    client: PoolClient
+  ) {
+    const { id, remark, firm_id } = data;
 
-  // ✅ Soft delete فقط
-  const queryText = `
+    // ✅ Check existence
+    const getRecordPR = await getRecord(
+      id,
+      "sale_return",
+      "firm_id",
+      firm_id,
+      client
+    );
+
+    if (!getRecordPR) {
+      throw new AppError("sale return not found or already deleted", 404);
+    }
+
+    // ✅ Soft delete فقط
+    const queryText = `
     UPDATE sale_return pr
     SET
       status = $1,
@@ -574,17 +717,95 @@ async fetchSaleReturn(data: SaleReturnFetchParams) {
     RETURNING pr.id, b.company_id;
   `;
 
-  const values = [
-    0, // deleted status
-    JSON.stringify(remark),
-    id,
-    firm_id
-  ];
+    const values = [
+      0, // deleted status
+      JSON.stringify(remark),
+      id,
+      firm_id
+    ];
 
-  const result = await executeInTransaction(client, queryText, values);
+    const result = await executeInTransaction(client, queryText, values);
 
-  return result.rows[0]; // { id, company_id }
-}
+    return result.rows[0]; // { id, company_id }
+  }
+  async updateSaleReturnPaymentAmount(
+    data: RepayBalanceSaleReturn,
+    client: PoolClient
+  ) {
+    const { firm_id, payments, sale_return_id, remark, company_id } = data;
+
+    const is_sale_return_exist = await getRecord(
+      sale_return_id,
+      "sale_returns",
+      "firm_id",
+      firm_id,
+      client
+    );
+
+    if (!is_sale_return_exist) {
+      throw new AppError("Sales return not found", 404);
+    }
+
+    // Validate payment methods
+    for (const p of payments) {
+      const is_payment_method_exist = await getRecord(
+        p.payment_method_id,
+        "payment_methods",
+        "company_id",
+        company_id,
+        client
+      );
+      if (!is_payment_method_exist) {
+        throw new AppError(`Payment method not found: ${p.payment_method_id}`, 404);
+      }
+    }
+
+    const incomingTotal = payments.reduce((sum, p) => sum + p.payment_amount, 0);
+    const paymentObj = payments.map((p) => ({
+      payment_amount: p.payment_amount,
+      payment_method_id: p.payment_method_id,
+      transaction_reference: p.transaction_reference ?? ""
+    }));
+
+    const query = `
+      UPDATE sale_returns
+      SET 
+        paid_amount = paid_amount + $1,
+        payments = (
+          SELECT jsonb_agg(jsonb_build_object(
+            'payment_amount', summed_data.total_amount,
+            'payment_method_id', summed_data.payment_method_id,
+            'transaction_reference', summed_data.merged_reference
+          ))
+          FROM (
+            SELECT 
+              (elem->>'payment_method_id')::int as payment_method_id,
+              SUM((elem->>'payment_amount')::numeric) as total_amount,
+              STRING_AGG(NULLIF(elem->>'transaction_reference', ''), ', ') as merged_reference
+            FROM jsonb_array_elements(COALESCE(sale_returns.payments, '[]'::jsonb) || $2::jsonb) AS elem
+            GROUP BY (elem->>'payment_method_id')::int
+          ) summed_data
+        ),
+        remarks = CASE
+          WHEN remarks IS NULL THEN $3::jsonb
+          WHEN jsonb_typeof(remarks) = 'array' THEN remarks || $3::jsonb
+          ELSE jsonb_build_array(remarks) || $3::jsonb
+        END
+      WHERE id = $4 AND firm_id = $5
+      RETURNING *;
+    `;
+
+    const values = [
+      incomingTotal,
+      JSON.stringify(paymentObj),
+      JSON.stringify(remark),
+      sale_return_id,
+      firm_id
+    ];
+
+    const { rows } = await executeInTransaction(client, query, values);
+    return rows[0];
+  }
   // async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
   //   const { id, firm_id } = data;
   //   const isPurchaseExist = await getRecord(

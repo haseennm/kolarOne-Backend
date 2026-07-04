@@ -6,15 +6,15 @@ import { GetReportSalePurchaseLedger, RepayBalanceSale, SaleCreateParams, SaleDe
 
 export default class SaleService {
   private billStatus(final_amount: number, paid_amount: number) {
-
     if (paid_amount <= 0) {
       return getStatusCode("Unpaid");
     }
-
-    if (paid_amount >= final_amount) {
+    if (paid_amount == final_amount) {
       return getStatusCode("Paid");
     }
-
+    if (paid_amount > final_amount) {
+      return getStatusCode("Over Pay");
+    }
     return getStatusCode("Partial");
   }
   async createSale(data: SaleCreateParams, client: PoolClient) {
@@ -25,7 +25,7 @@ export default class SaleService {
       final_amount,
       firm_id,
       net_amount,
-      payments,
+      payments, // Incoming stringified JSON string payload from controller
       remark,
       subtotal,
       paid,
@@ -39,10 +39,10 @@ export default class SaleService {
       is_intrastate,
       state_code,
       courier_charge,
-      handling_charge, other_charge
+      handling_charge,
+      other_charge
     } = data;
 
-    // ✅ Firm check
     const is_firm_exist = await getRecord(
       firm_id,
       "firm",
@@ -54,7 +54,6 @@ export default class SaleService {
       throw new AppError("Firm not found", 404);
     }
 
-    // ✅ Customer check
     const is_customer_exist = await getRecord(
       customer_id,
       "customers",
@@ -66,27 +65,31 @@ export default class SaleService {
       throw new AppError("Customer not found", 404);
     }
 
-    // ✅ Validate all payment methods
-    if (payments && payments.length > 0) {
-      for (const p of payments) {
-        const is_payment_method_exist = await getRecord(
-          p.payment_method_id,
-          "payment_methods",
-          "company_id",
-          company_id,
-          client
-        );
+    // ✅ Extract and validate child items before committing stringify serialization arrays
+    const parsedPayments = typeof payments === "string" ? JSON.parse(payments) : payments;
 
-        if (!is_payment_method_exist) {
-          throw new AppError(
-            `Payment method not found: ${p.payment_method_id}`,
-            404
+    if (parsedPayments && parsedPayments.length > 0) {
+      for (const p of parsedPayments) {
+        if (p.payment_method_id) {
+          const is_payment_method_exist = await getRecord(
+            p.payment_method_id,
+            "payment_methods",
+            "company_id",
+            company_id,
+            client
           );
+
+          if (!is_payment_method_exist) {
+            throw new AppError(
+              `Payment method not found: ${p.payment_method_id}`,
+              404
+            );
+          }
         }
       }
     }
 
-    // ✅ Generate invoice number (LOCK)
+    // ✅ Auto-Generate Locking Sequence Invoice IDs
     const lastInvoice = await executeInTransaction(
       client,
       `
@@ -113,18 +116,14 @@ export default class SaleService {
     }
 
     const invoice_number = nextInvoiceNumber;
-
-    const paymentobj = (payments || []).map((p: any) => ({
-      payment_method_id: p.payment_method_id,
-      amount: p.amount,
-      reference: p.reference ?? null
-    }));
     const refResult = await executeInTransaction(
       client,
       `SELECT CONCAT('SL-', nextval('sale_ref_seq')) AS ref`
     );
-    const status = this.billStatus(final_amount, paid)
+
+    const status = this.billStatus(final_amount, paid);
     const ref_no = refResult.rows[0].ref;
+
     const query = `
     INSERT INTO sales (
       customer_id,
@@ -168,12 +167,12 @@ export default class SaleService {
       total_sgst ?? 0,
       total_igst ?? 0,
       final_amount ?? 0,
-      JSON.stringify(paymentobj),
+      typeof payments === "string" ? payments : JSON.stringify(payments), // Inserts safe text payload block mapping array
       notes ?? null,
       status,
       JSON.stringify(remark ?? {}),
       firm_id,
-      paid,
+      paid ?? 0,
       ref_no,
       price_pool,
       is_intrastate,
@@ -184,118 +183,232 @@ export default class SaleService {
     ];
 
     const { rows } = await executeInTransaction(client, query, values);
-
     return rows[0];
   }
 
+  // async editSale(data: SaleEditParams, client: PoolClient) {
+  //   const {
+  //     Sale_id,
+  //     customer_id,
+  //     invoice_date,
+  //     discount,
+  //     final_amount,
+  //     firm_id,
+  //     net_amount,
+  //     paid,
+  //     remark,
+  //     subtotal,
+  //     total_cgst,
+  //     total_igst,
+  //     total_sgst,
+  //     notes,
+  //     branch_id,
+  //     company_id,
+  //     payments,
+  //     courier_charge,
+  //     handling_charge, other_charge
+  //   } = data;
+
+  //   // ✅ Validation: Check sale existence
+  //   const is_sale_exist = await getRecord(
+  //     Sale_id,
+  //     "sales",
+  //     "firm_id",
+  //     firm_id,
+  //     client
+  //   );
+  //   if (!is_sale_exist) {
+  //     throw new AppError("Sale not found", 404);
+  //   }
+
+  //   // ✅ Validation: Check customer existence (if updating customer)
+  //   if (customer_id && customer_id !== is_sale_exist.customer_id) {
+  //     const is_customer_exist = await getRecord(
+  //       customer_id,
+  //       "customers",
+  //       "company_id",
+  //       company_id,
+  //       client
+  //     );
+  //     if (!is_customer_exist) {
+  //       throw new AppError("Customer not found", 404);
+  //     }
+  //   }
+
+  //   // ✅ Validation: Validate all payment methods (if updating payments)
+  //   if (payments && payments.length > 0) {
+  //     for (const p of payments) {
+  //       const is_payment_method_exist = await getRecord(
+  //         p.payment_method_id,
+  //         "payment_methods",
+  //         "company_id",
+  //         company_id,
+  //         client
+  //       );
+  //       if (!is_payment_method_exist) {
+  //         throw new AppError(
+  //           `Payment method not found: ${p.payment_method_id}`,
+  //           404
+  //         );
+  //       }
+  //     }
+  //   }
+
+  //   // ✅ Build payment object if payments provided
+  //   const paymentobj = payments
+  //     ? (payments || []).map((p: any) => ({
+  //       payment_method_id: p.payment_method_id,
+  //       amount: p.amount,
+  //       reference: p.reference ?? null
+  //     }))
+  //     : (is_sale_exist.payments || []);
+  //   const status = this.billStatus((final_amount ?? is_sale_exist.final_amount), (paid ?? is_sale_exist.paid))
+
+  //   const updateQuery = `
+  //     UPDATE sales SET
+  //       customer_id = $1,
+  //       invoice_date = $2,
+  //       subtotal = $3,
+  //       discount = $4,
+  //       net_amount = $5,
+  //       total_cgst = $6,
+  //       total_sgst = $7,
+  //       total_igst = $8,
+  //       final_amount = $9,
+  //       payments = $10,
+  //       notes = $11,
+  //       status = $12,
+  //       remarks = CASE
+  //       WHEN remarks IS NULL THEN $13::jsonb
+  //       WHEN jsonb_typeof(remarks) = 'array'
+  //         THEN remarks || $13::jsonb
+  //       ELSE jsonb_build_array(remarks) || $13::jsonb
+  //     END,
+  //       paid = $14,
+  //       courier_charge =$15
+  //     handling_charge= $16
+  //     other_charge= $17
+  //     WHERE firm_id = $18 AND id = $19
+  //     RETURNING *;
+  //   `;
+
+  //   const values = [
+  //     customer_id ?? is_sale_exist.customer_id,
+  //     invoice_date ?? is_sale_exist.invoice_date,
+  //     subtotal ?? is_sale_exist.subtotal,
+  //     discount ?? is_sale_exist.discount,
+  //     net_amount ?? is_sale_exist.net_amount,
+  //     total_cgst ?? is_sale_exist.total_cgst,
+  //     total_sgst ?? is_sale_exist.total_sgst,
+  //     total_igst ?? is_sale_exist.total_igst,
+  //     final_amount ?? is_sale_exist.final_amount,
+  //     JSON.stringify(paymentobj),
+  //     notes ?? is_sale_exist.notes,
+  //     status,
+  //     JSON.stringify([remark]),
+  //     paid ?? is_sale_exist.paid,
+  //     courier_charge ?? is_sale_exist.courier_charge,
+  //     handling_charge ?? is_sale_exist.handling_charge,
+  //     other_charge ?? is_sale_exist.other_charge,
+  //     firm_id,
+  //     Sale_id
+  //   ];
+
+  //   const { rows } = await executeInTransaction(client, updateQuery, values);
+  //   return rows[0];
+  // }
   async editSale(data: SaleEditParams, client: PoolClient) {
     const {
-      Sale_id,
-      customer_id,
       invoice_date,
+      invoice_number,
       discount,
       final_amount,
       firm_id,
       net_amount,
-      paid,
-      remark,
       subtotal,
       total_cgst,
       total_igst,
       total_sgst,
+      customer_id,
       notes,
       branch_id,
       company_id,
-      payments,
+      sale_id,
       courier_charge,
-      handling_charge, other_charge
+      handling_charge,
+      other_charge,
+      ref_no,
+      price_pool,
+      is_intrastate,
+      state_code,
+      remark,
+      computed_payment_amount,
+      merged_payments_json
     } = data;
 
-    // ✅ Validation: Check sale existence
-    const is_sale_exist = await getRecord(
-      Sale_id,
-      "sales",
-      "firm_id",
-      firm_id,
-      client
+    // 1. Fetch record with Row Lock (Pessimistic Locking)
+    const queryExisting = await executeInTransaction(
+      client,
+      `SELECT * FROM sales WHERE id = $1 AND firm_id = $2 FOR UPDATE;`,
+      [sale_id, firm_id]
     );
+
+    const is_sale_exist = queryExisting.rows[0];
     if (!is_sale_exist) {
-      throw new AppError("Sale not found", 404);
+      throw new AppError("Sale invoice not found", 404);
     }
 
-    // ✅ Validation: Check customer existence (if updating customer)
-    if (customer_id && customer_id !== is_sale_exist.customer_id) {
-      const is_customer_exist = await getRecord(
-        customer_id,
-        "customers",
-        "company_id",
-        company_id,
-        client
+    // 2. Unique Constraints Validation
+    if (invoice_number && invoice_number !== is_sale_exist.invoice_number) {
+      const activeCustomer = customer_id ?? is_sale_exist.customer_id;
+      const is_invoice_exist = await executeInTransaction(
+        client,
+        `SELECT id FROM sales WHERE invoice_number = $1 AND customer_id = $2 AND status != 'Cancelled' AND id != $3`,
+        [invoice_number, activeCustomer, sale_id]
       );
-      if (!is_customer_exist) {
-        throw new AppError("Customer not found", 404);
+      if ((is_invoice_exist.rowCount ?? 0) > 0) {
+        throw new AppError("Invoice number sequence already exists for this client", 400);
       }
     }
 
-    // ✅ Validation: Validate all payment methods (if updating payments)
-    if (payments && payments.length > 0) {
-      for (const p of payments) {
-        const is_payment_method_exist = await getRecord(
-          p.payment_method_id,
-          "payment_methods",
-          "company_id",
-          company_id,
-          client
-        );
-        if (!is_payment_method_exist) {
-          throw new AppError(
-            `Payment method not found: ${p.payment_method_id}`,
-            404
-          );
-        }
-      }
-    }
-
-    // ✅ Build payment object if payments provided
-    const paymentobj = payments
-      ? (payments || []).map((p: any) => ({
-        payment_method_id: p.payment_method_id,
-        amount: p.amount,
-        reference: p.reference ?? null
-      }))
-      : (is_sale_exist.payments || []);
-    const status = this.billStatus((final_amount ?? is_sale_exist.final_amount), (paid ?? is_sale_exist.paid))
-
-    const updateQuery = `
+    // 3. Perform atomic update matching your target schema layout matrix fields
+    const saleQuery = `
       UPDATE sales SET
         customer_id = $1,
-        invoice_date = $2,
-        subtotal = $3,
-        discount = $4,
-        net_amount = $5,
-        total_cgst = $6,
-        total_sgst = $7,
-        total_igst = $8,
-        final_amount = $9,
-        payments = $10,
-        notes = $11,
-        status = $12,
+        invoice_number = $2,
+        invoice_date = $3,
+        subtotal = $4,
+        discount = $5,
+        net_amount = $6,
+        total_cgst = $7,
+        total_sgst = $8,
+        total_igst = $9,
+        final_amount = $10,
+        paid = $11, -- ✅ Maps total computed payments to your custom schema 'paid' column
+        notes = $12,
+        status = $13,
         remarks = CASE
-        WHEN remarks IS NULL THEN $13::jsonb
-        WHEN jsonb_typeof(remarks) = 'array'
-          THEN remarks || $13::jsonb
-        ELSE jsonb_build_array(remarks) || $13::jsonb
-      END,
-        paid = $14,
-        courier_charge =$15
-      handling_charge= $16
-      other_charge= $17
-      WHERE firm_id = $18 AND id = $19
+          WHEN remarks IS NULL THEN $14::jsonb
+          WHEN jsonb_typeof(remarks) = 'array' THEN remarks || $14::jsonb
+          ELSE jsonb_build_array(remarks) || $14::jsonb
+        END,
+        payments = $15,
+        courier_charge = $16,
+        handling_charge = $17,
+        other_charge = $18,
+        ref_no = $19,
+        price_pool = $20,
+        is_intrastate = $21,
+        state_code = $22
+      WHERE firm_id = $23 AND id = $24
       RETURNING *;
     `;
 
+    const targetFinalAmount = final_amount ?? is_sale_exist.final_amount;
+
     const values = [
       customer_id ?? is_sale_exist.customer_id,
+      invoice_number ?? is_sale_exist.invoice_number,
       invoice_date ?? is_sale_exist.invoice_date,
       subtotal ?? is_sale_exist.subtotal,
       discount ?? is_sale_exist.discount,
@@ -303,20 +416,24 @@ export default class SaleService {
       total_cgst ?? is_sale_exist.total_cgst,
       total_sgst ?? is_sale_exist.total_sgst,
       total_igst ?? is_sale_exist.total_igst,
-      final_amount ?? is_sale_exist.final_amount,
-      JSON.stringify(paymentobj),
+      targetFinalAmount,
+      computed_payment_amount,
       notes ?? is_sale_exist.notes,
-      status,
+      status ?? is_sale_exist.status,
       JSON.stringify([remark]),
-      paid ?? is_sale_exist.paid,
+      merged_payments_json,
       courier_charge ?? is_sale_exist.courier_charge,
       handling_charge ?? is_sale_exist.handling_charge,
       other_charge ?? is_sale_exist.other_charge,
+      ref_no ?? is_sale_exist.ref_no,
+      price_pool ?? is_sale_exist.price_pool,
+      is_intrastate ?? is_sale_exist.is_intrastate,
+      state_code ?? is_sale_exist.state_code,
       firm_id,
-      Sale_id
+      sale_id
     ];
 
-    const { rows } = await executeInTransaction(client, updateQuery, values);
+    const { rows } = await executeInTransaction(client, saleQuery, values);
     return rows[0];
   }
 
@@ -511,8 +628,29 @@ SELECT
       )
     ) FILTER (WHERE si.id IS NOT NULL),
     '[]'
-  ) AS items
-
+  ) AS items,
+ (
+              SELECT COALESCE(
+                  JSON_AGG(
+                      JSON_BUILD_OBJECT(
+                          'id', pt.id,
+                          'payment_method_id', pt.payment_method_id,
+                          'payment_method', pm2.method_name,
+                          'amount', pt.amount,
+                          'payment_flow', pt.payment_flow,
+                          'transaction_date', pt.created_at,
+                          'transaction_reference', pt.transaction_reference
+                      )
+                      ORDER BY pt.id
+                  ),
+                  '[]'
+              )
+              FROM payment_transactions pt
+              LEFT JOIN payment_methods pm2
+                  ON pm2.id = pt.payment_method_id
+              WHERE pt.ref_id = s.id
+                AND pt.ref_type = 'SL'
+          ) AS payments
 FROM sales s
 LEFT JOIN customers c ON c.id = s.customer_id
 LEFT JOIN firm f ON f.id = s.firm_id
@@ -768,7 +906,8 @@ OFFSET $${values.length + 2}
     data: RepayBalanceSale,
     client: PoolClient
   ) {
-    const { firm_id, payments, remark, sale_id, company_id } = data
+    const { firm_id, payments, remark, sale_id, company_id } = data;
+
     const is_sale_exist = await getRecord(
       sale_id,
       "sales",
@@ -781,59 +920,64 @@ OFFSET $${values.length + 2}
       throw new AppError("Sale not found", 404);
     }
 
-    // ✅ Validate payment methods
+    // Validate payment methods
     for (const p of payments) {
       const is_payment_method_exist = await getRecord(
         p.payment_method_id,
         "payment_methods",
         "company_id",
-        company_id, // safer
+        company_id,
         client
       );
-
       if (!is_payment_method_exist) {
-        throw new AppError(
-          `Payment method not found: ${p.payment_method_id}`,
-          404
-        );
+        throw new AppError(`Payment method not found: ${p.payment_method_id}`, 404);
       }
     }
 
-    // ✅ Calculate new paid amount
-    const newPaid =
-      (Number(is_sale_exist.paid) || 0) +
-      payments.reduce((sum, p) => sum + p.amount, 0);
+    const incomingTotal = payments.reduce((sum, p) => sum + p.payment_amount, 0);
     const paymentObj = payments.map((p) => ({
+      payment_amount: p.payment_amount,
       payment_method_id: p.payment_method_id,
-      amount: p.amount,
-      reference: p.reference_number ?? null
+      transaction_reference: p.transaction_reference ?? ""
     }));
 
     const query = `
-    UPDATE sales
-    SET 
-      payments = COALESCE(payments, '[]'::jsonb) || $1::jsonb,
-      paid = $2,
-       remarks = CASE
-        WHEN remarks IS NULL THEN $3::jsonb
-        WHEN jsonb_typeof(remarks) = 'array'
-          THEN remarks || $3::jsonb
-        ELSE jsonb_build_array(remarks) || $3::jsonb
-      END,
-    WHERE id = $4 AND firm_id = $5
-    RETURNING *;
-  `;
+      UPDATE sales
+      SET 
+        paid = paid + $1,
+        payments = (
+          SELECT jsonb_agg(jsonb_build_object(
+            'payment_amount', summed_data.total_amount,
+            'payment_method_id', summed_data.payment_method_id,
+            'transaction_reference', summed_data.merged_reference
+          ))
+          FROM (
+            SELECT 
+              (elem->>'payment_method_id')::int as payment_method_id,
+              SUM((elem->>'payment_amount')::numeric) as total_amount,
+              STRING_AGG(NULLIF(elem->>'transaction_reference', ''), ', ') as merged_reference
+            FROM jsonb_array_elements(COALESCE(sales.payments, '[]'::jsonb) || $2::jsonb) AS elem
+            GROUP BY (elem->>'payment_method_id')::int
+          ) summed_data
+        ),
+        remarks = CASE
+          WHEN remarks IS NULL THEN $3::jsonb
+          WHEN jsonb_typeof(remarks) = 'array' THEN remarks || $3::jsonb
+          ELSE jsonb_build_array(remarks) || $3::jsonb
+        END
+      WHERE id = $4 AND firm_id = $5
+      RETURNING *;
+    `;
 
     const values = [
-      JSON.stringify(paymentObj),  // append array
-      newPaid,
-      JSON.stringify([remark]),    // keep consistent with purchase
+      incomingTotal,
+      JSON.stringify(paymentObj),
+      JSON.stringify(remark),
       sale_id,
       firm_id
     ];
 
     const { rows } = await executeInTransaction(client, query, values);
-
     return rows[0];
   }
 }

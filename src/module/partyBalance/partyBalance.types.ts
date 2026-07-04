@@ -2,14 +2,14 @@ import { PoolClient } from "pg";
 
 export interface CreatePartyBalanceBody {
   ref_id: number;
-  ref_type: 'S' | 'P' | 'SR' | 'PR'
+  ref_type: string
   created_by: string;
   balance: number;
   flow: "I" | "O";
   firm_id: number;
 }
 export interface CreatePartyBalanceParams
-extends Omit<CreatePartyBalanceBody, "created_by"> {
+  extends Omit<CreatePartyBalanceBody, "created_by"> {
   statusCode: number;
   remark: object
 }
@@ -48,7 +48,7 @@ export interface EditPartyBalanceBody {
   flow?: "I" | "O";
   firm_id: number;
   status?: string;
-  ref_type: 'S' | 'P' | 'SR' | 'PR';
+  ref_type: string;
   action_by: string;
 }
 
@@ -56,27 +56,25 @@ export interface EditPartyBalanceParams
   extends Omit<EditPartyBalanceBody, "status"> {
   statusCode?: number;
 }
-interface ObjPayment{
-  payment_method_id:number,
-  amount:number;
-  reference_number:string | null
-}
-export interface RepayPartyBalanceBody {
-  payment_amount: number;
-  ref_id: number;
-  ref_type: string;
-  firm_id: number;
-  pay_amount: number
-  updated_by: string;
+interface ObjPayment {
   payment_method_id: number;
-  transaction_reference: string;
-  company_id: number;
-  payments:ObjPayment[]
+  payment_amount: number;
+  transaction_reference: string | null;
 }
-export interface RepayPartyBalanceParams extends Omit<RepayPartyBalanceBody,"payment_amount"| "updated_by" | "payment_method_id" | "transaction_reference" | "company_id"> {
-  remarks: object;
 
+export interface RepayPartyBalanceBody {
+  ref_id: number;
+  ref_type: "PS" | "SL" | "PR" | "SR";
+  firm_id: number;
+  company_id: number;
+  updated_by: string;
+  payments: ObjPayment[];
 }
+export interface RepayPartyBalanceParams extends Omit<RepayPartyBalanceBody, "payment_amount" | "updated_by" | "payments" | "company_id"> {
+  remarks: object;
+  pay_amount: number
+}
+
 export interface DeletePartyBalanceBody {
   purchase_id: number;
   delete_by: string;

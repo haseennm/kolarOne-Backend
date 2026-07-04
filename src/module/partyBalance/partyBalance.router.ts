@@ -72,44 +72,51 @@ export async function partyBalanceRouter(app: FastifyInstance) {
     {
       schema: {
         body: {
-          type: "object",
-          required: [
+          "type": "object",
+          "required": [
             "ref_id",
             "ref_type",
             "firm_id",
-            "pay_amount",
             "updated_by",
             "company_id",
+            "payments"
           ],
-          properties: {
-            payment_amount: {
-              type: "number"
+          "properties": {
+            "ref_id": {
+              "type": "number"
             },
-            ref_id: {
-              type: "number"
+            "company_id": {
+              "type": "number"
             },
-            company_id: {   // ✅ fixed
-              type: "number"
+            "firm_id": {
+              "type": "number"
             },
-            firm_id: {
-              type: "number"
+            "updated_by": {
+              "type": "string"
             },
-            pay_amount: {
-              type: "number",
-              minimum: 1   // ✅ added
+            "ref_type": {
+              "type": "string",
+              "enum": ["PS", "SL", "PR", "SR"]
             },
-            updated_by: {
-              type: "string"
-            },
-            ref_type: {
-              type: "string",
-              enum: ["P", "S"]   // ✅ added
-            },
-            transaction_reference: {
-              type: "string"
-            },
-            payment_method_id: {
-              type: ["number","null"]
+            "payments": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["payment_method_id", "payment_amount"],
+                "properties": {
+                  "payment_method_id": {
+                    "type": ["number", "null"]
+                  },
+                  "payment_amount": {
+                    "type": "number",
+                    "minimum": 1
+                  },
+                  "transaction_reference": {
+                    "type": ["string", "null"]
+                  }
+                }
+              }
             }
           }
         }

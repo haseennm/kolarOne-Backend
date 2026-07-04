@@ -64,8 +64,8 @@ export default class SaleReturnItemController {
       deleted_at: Date.now(),
     };
     const service = new SaleReturnItemService();
-    await service.deleteSaleReturnItem({...data,remark},  client);
+    const deletedItem =await service.deleteSaleReturnItem({...data,remark},  client);
 
-    return `Sale item has been deleted successfully.`;
+    return deletedItem;
   }
 }

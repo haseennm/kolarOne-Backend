@@ -13,7 +13,7 @@ import QuotationController from "../../quotation/quotation/quotation.controller"
 export default class SaleController {
 
   async saleCreate(data: SaleCreateBody) {
-    const { paid, final_amount, company_id, created_by, items, payments, quotation_id, ...rest } = data;
+    const { final_amount, company_id, created_by, items, payments, quotation_id, ...rest } = data;
 
     const remark = {
       action: "Created",
@@ -21,23 +21,28 @@ export default class SaleController {
       created_at: new Date(),
     };
 
-    return transaction(async (client: PoolClient) => {
+    // 1. Compute aggregate paid sum dynamically directly from incoming payment items array
+    const totalPaidAmount = payments.reduce((sum, p) => sum + (p.amount ?? 0), 0);
 
+    return transaction(async (client: PoolClient) => {
       const service = new SaleService();
+
+      // Pass aggregate paid value and stringified array down to data persistence layer
       const sale = await service.createSale(
         {
           ...rest,
-          paid,
           final_amount,
           remark,
           company_id,
-          payments
+          paid: totalPaidAmount,
+          payments: JSON.stringify(payments) // Transformed array sent directly
         },
         client
       );
 
       const stockController = new StockController();
       const saleItem = new SaleItemController();
+
       for (const item of items) {
         const stock = await stockController.reduceStock(
           {
@@ -51,6 +56,7 @@ export default class SaleController {
           },
           client
         );
+
         await saleItem.createSaleItem({
           sale_id: sale.id,
           firm_id: rest.firm_id,
@@ -71,12 +77,13 @@ export default class SaleController {
               - (item.discount ?? 0)
               + (item.total_igst ?? 0)
               + (item.total_sgst ?? 0)
-              + (item.total_cgst ?? 0)) // added
+              + (item.total_cgst ?? 0))
         }, client);
       }
-      const party_balance_controller = new PartyBalanceController();
 
-      const difference = paid - final_amount;
+      // 2. Adjust Ledger party balances against total calculated payment allocation
+      const party_balance_controller = new PartyBalanceController();
+      const difference = totalPaidAmount - final_amount;
 
       if (difference !== 0) {
         const isAdvance = difference > 0;
@@ -93,10 +100,14 @@ export default class SaleController {
           client
         );
       }
-      const payment_transactions_service = new PaymentTransactionService()
+
+      // 3. Process item history records into transactional breakdown tables
+      const payment_transactions_service = new PaymentTransactionService();
       await Promise.all(
-        payments.map((p) =>
-          payment_transactions_service.insertPaymentTransaction(
+        payments.map((p) => {
+          if ((p.amount ?? 0) <= 0) return Promise.resolve(); // Safe skip for zero values
+
+          return payment_transactions_service.insertPaymentTransaction(
             {
               ref_id: sale.id,
               amount: p.amount,
@@ -107,13 +118,14 @@ export default class SaleController {
               business_id: rest.firm_id,
               business_ref: convertEntityType("Firm" as EntityKey),
               company_id,
-              payment_flow:"I"
+              payment_flow: "I"
             },
             client
-          )
-        )
+          );
+        })
       );
-      const quotation = new QuotationController()
+
+      const quotation = new QuotationController();
       if (quotation_id) {
         await quotation.QuotationStatusChange({
           firm_id: data.firm_id,
@@ -124,46 +136,139 @@ export default class SaleController {
             sale_id: sale.id,
             updated_at: new Date(),
           }
-        }, client)
+        }, client);
       }
+
       return {
         msg: `Sale ${sale.invoice_number} has been created successfully.`,
         id: sale.id
       };
     });
   }
-
   async saleEdit(data: SaleEditBody) {
-    const { paid, final_amount, company_id, updated_by, items, payments, ...rest } = data;
+    const {
+      final_amount,
+      status,
+      company_id,
+      updated_by,
+      items,
+      delete_item_ids,
+      payments = [],
+      ...rest
+    } = data;
 
     const remark = {
       action: "Updated",
       updated_by,
-      updated_at: new Date(),
+      created_at: new Date(),
     };
 
     return transaction(async (client: PoolClient) => {
+      const statusCode = getStatusCode(status ?? "Completed");
 
+      // 1. Calculate transaction sums and payment array payloads
+      const computedPaymentAmount = payments.reduce((sum, item) => sum + (item.amount ?? 0), 0);
+      const paymentsJsonStorage = payments.map(p => ({
+        payment_amount: p.amount,
+        payment_method_id: p.payment_method_id,
+        transaction_reference: p.transaction_reference ?? ""
+      }));
+
+      // 2. Call Service to handle core sales table updates
       const service = new SaleService();
       const sale = await service.editSale(
         {
           ...rest,
-          paid,
           final_amount,
           remark,
           company_id,
-          payments
+          computed_payment_amount: computedPaymentAmount,
+          merged_payments_json: JSON.stringify(paymentsJsonStorage)
         },
         client
       );
 
+      // 3. Handle Child Line Items & Stock Deductions
       const stockController = new StockController();
-      const saleItem = new SaleItemController();
+      const saleItemController = new SaleItemController(); // Adjust name to your exact sale item class
+      const deletedItemIds = new Set(delete_item_ids ?? []);
 
-      // ✅ Edit existing items
-      if (items && items.length > 0) {
+      if (items?.some((item) => item.item_id && deletedItemIds.has(item.item_id))) {
+        throw new AppError("Cannot edit and delete the same sale item line", 400);
+      }
+
+      // Process line item deletions
+      if (delete_item_ids?.length) {
+        for (const item_id of delete_item_ids) {
+          const deletedItem = await saleItemController.deleteSaleItem(
+            {
+              sale_id: sale.id,
+              firm_id: rest.firm_id,
+            },
+            client
+          );
+          // Return item back to stock since sale was deleted
+          await stockController.reduceStock(
+            {
+              stock_id: deletedItem.stock_id,
+              branch_id: rest.branch_id,
+              firm_id: rest.firm_id,
+              qty: deletedItem.saled_qty,
+              movement_type: 'I',
+              reason: getTransactionCode("sale"),
+              is_relate_purchase: false
+            },
+            client
+          );
+        }
+      }
+
+      // Process new and modified line items
+      if (items) {
         for (const item of items) {
-          const saleItemData = await saleItem.editSaleItem(
+          const isNewItem = item.is_new === true || !item.item_id;
+          if (isNewItem) {
+            // Deduct stock for outgoing sales items
+            const stock = await stockController.reduceStock(
+              {
+                stock_id: item.stock_id,
+                branch_id: rest.branch_id,
+                firm_id: rest.firm_id,
+                qty: item.saled_qty,
+                movement_type: 'O',
+                reason: getTransactionCode("sale"),
+                is_relate_purchase: false
+
+              }, client);
+
+            await saleItemController.createSaleItem({
+              sale_id: sale.id,
+              firm_id: rest.firm_id,
+              status: "Completed",
+              product_id: item.product_id,
+              stock_id: stock.id,
+              saled_qty: item.saled_qty,
+              unit: item.unit,
+              unit_price: item.unit_price,
+              sub_total: item.sub_total,
+              discount: item.discount ?? 0,
+              total_igst: item.total_igst ?? 0,
+              total_sgst: item.total_sgst ?? 0,
+              total_cgst: item.total_cgst ?? 0,
+              net_amount: item.net_amount,
+              final_amount: item.final_amount
+                ?? (item.net_amount
+                  - (item.discount ?? 0)
+                  + (item.total_igst ?? 0)
+                  + (item.total_sgst ?? 0)
+                  + (item.total_cgst ?? 0))
+            }, client);
+
+            continue;
+          }
+
+          // Existing Item logic modification
+          const sale_item = await saleItemController.editSaleItem(
             {
               item_id: item.item_id,
               sale_id: sale.id,
@@ -187,17 +292,16 @@ export default class SaleController {
                   + (item.total_igst ?? 0)
                   + (item.total_sgst ?? 0)
                   + (item.total_cgst ?? 0))
-            },
-            client
-          );
-          if (Number(item.saled_qty) !== Number(saleItemData.old_row.saled_qty)) {
+            }, client);
+
+          if (Number(item.saled_qty) !== Number(sale_item.old_row.saled_qty)) {
             await stockController.reduceStock(
               {
-                stock_id: item.stock_id ?? saleItemData.new_row.stock_id,
+                stock_id: item.stock_id ?? sale_item.new_row.stock_id,
                 branch_id: rest.branch_id,
                 firm_id: rest.firm_id,
-                qty: Math.abs(item.saled_qty - saleItemData.old_row.saled_qty),
-                movement_type: item.saled_qty < saleItemData.old_row.saled_qty ? 'I' : 'O',
+                qty: Math.abs(item.saled_qty - sale_item.old_row.saled_qty),
+                movement_type: item.saled_qty < sale_item.old_row.saled_qty ? 'I' : 'O',
                 reason: getTransactionCode("sale"),
                 is_relate_purchase: false
               },
@@ -207,53 +311,177 @@ export default class SaleController {
         }
       }
 
-      // ✅ Update party balance if payment difference changed
-      const party_balance_controller = new PartyBalanceController();
-      const difference = (paid ?? sale.paid) - (final_amount ?? sale.final_amount);
-      const payment_status = difference === paid ? "Unpaid" : "Partial"
-      if (difference !== 0) {
-        const isAdvance = difference > 0;
-
-        await party_balance_controller.editPartyBalance(
-          {
-            ref_id: sale.id,
-            ref_type: "S",
-            action_by: updated_by,
-            status: payment_status,
-            balance: Math.abs(difference),
-            flow: isAdvance ? "O" : "I",
-            firm_id: rest.firm_id,
-          },
-          client
-        );
-      }
-
-      // ✅ Update payment transactions
+      // 4. Invoke your Refactored Generic Payment System
+      const entity_type = convertEntityType("Firm" as EntityKey);
       const payment_transactions_service = new PaymentTransactionService();
-      if (payments && payments.length > 0) {
-        await Promise.all(
-          payments.map((p) =>
-            payment_transactions_service.editPaymentTransaction(
-              {
-                ref_id: sale.id,
-                amount: p.amount,
-                ref_type: PaymentTransactionTypeCodeMap["sale"],
-                status: getStatusCode("Paid"),
-                payment_method_id: p.payment_method_id ?? null,
-                transaction_reference: p.reference ?? null,
-                business_id: rest.firm_id,
-                business_ref: convertEntityType("Firm" as EntityKey),
-                company_id,
-              },
-              client
-            )
-          )
-        );
+
+      await payment_transactions_service.syncPaymentTransactions({
+        ref_id: sale.id,
+        ref_type: PaymentTransactionTypeCodeMap["sale"], // E.g. 'S' or equivalent map value
+        company_id,
+        firm_id: rest.firm_id,
+        statusCode: getStatusCode("Paid"),
+        entity_type,
+        payments
+      }, client);
+
+      // 5. Party Balance Processing (Sales bring incoming money 'I')
+      const actualPaidAmount = Number(sale.paid ?? 0);
+      const actualFinalAmount = Number(sale.final_amount ?? 0);
+      const difference = actualPaidAmount - actualFinalAmount;
+
+      const party_balance_controller = new PartyBalanceController();
+
+      const isAdvance = difference > 0;
+      let part_status: string;
+
+      if (difference === 0) {
+        part_status = "Paid";
+      } else if (difference > 0) {
+        part_status = "Advance";
+      } else if (difference < 0 && actualPaidAmount > 0) {
+        part_status = "Partial";
+      } else {
+        part_status = "Unpaid";
       }
 
-      return `Sale ${sale.invoice_number} has been updated successfully.`;
+      await party_balance_controller.editPartyBalance(
+        {
+          ref_id: sale.id,
+          ref_type: PaymentTransactionTypeCodeMap["sale"],
+          action_by: updated_by,
+          balance: Math.abs(difference),
+          status: part_status,
+          flow: isAdvance ? "I" : "O", // Advance collection on sales is Incoming 'I' to your balances
+          firm_id: rest.firm_id,
+        },
+        client
+      );
+
+      return `Invoice ${sale.invoice_number} has been updated successfully.`;
     });
   }
+  // async saleEdit(data: SaleEditBody) {
+  //   const { paid, final_amount, company_id, updated_by, items, payments, ...rest } = data;
+
+  //   const remark = {
+  //     action: "Updated",
+  //     updated_by,
+  //     updated_at: new Date(),
+  //   };
+
+  //   return transaction(async (client: PoolClient) => {
+
+  //     const service = new SaleService();
+  //     const sale = await service.editSale(
+  //       {
+  //         ...rest,
+  //         paid,
+  //         final_amount,
+  //         remark,
+  //         company_id,
+  //         payments
+  //       },
+  //       client
+  //     );
+
+  //     const stockController = new StockController();
+  //     const saleItem = new SaleItemController();
+
+  //     // ✅ Edit existing items
+  //     if (items && items.length > 0) {
+  //       for (const item of items) {
+  //         const saleItemData = await saleItem.editSaleItem(
+  //           {
+  //             item_id: item.item_id,
+  //             sale_id: sale.id,
+  //             firm_id: rest.firm_id,
+  //             branch_id: rest.branch_id,
+  //             status: "Completed",
+  //             product_id: item.product_id,
+  //             stock_id: item.stock_id,
+  //             saled_qty: item.saled_qty,
+  //             unit: item.unit,
+  //             unit_price: item.unit_price,
+  //             sub_total: item.sub_total,
+  //             discount: item.discount ?? 0,
+  //             total_igst: item.total_igst ?? 0,
+  //             total_sgst: item.total_sgst ?? 0,
+  //             total_cgst: item.total_cgst ?? 0,
+  //             net_amount: item.net_amount,
+  //             final_amount: item.final_amount
+  //               ?? (item.net_amount ?? 0
+  //                 - (item.discount ?? 0)
+  //                 + (item.total_igst ?? 0)
+  //                 + (item.total_sgst ?? 0)
+  //                 + (item.total_cgst ?? 0))
+  //           },
+  //           client
+  //         );
+  //         if (Number(item.saled_qty) !== Number(saleItemData.old_row.saled_qty)) {
+  //           await stockController.reduceStock(
+  //             {
+  //               stock_id: item.stock_id ?? saleItemData.new_row.stock_id,
+  //               branch_id: rest.branch_id,
+  //               firm_id: rest.firm_id,
+  //               qty: Math.abs(item.saled_qty - saleItemData.old_row.saled_qty),
+  //               movement_type: item.saled_qty < saleItemData.old_row.saled_qty ? 'I' : 'O',
+  //               reason: getTransactionCode("sale"),
+  //               is_relate_purchase: false
+  //             },
+  //             client
+  //           );
+  //         }
+  //       }
+  //     }
+
+  //     // ✅ Update party balance if payment difference changed
+  //     const party_balance_controller = new PartyBalanceController();
+  //     const difference = (paid ?? sale.paid) - (final_amount ?? sale.final_amount);
+  //     const payment_status = difference === paid ? "Unpaid" : "Partial"
+  //     if (difference !== 0) {
+  //       const isAdvance = difference > 0;
+
+  //       await party_balance_controller.editPartyBalance(
+  //         {
+  //           ref_id: sale.id,
+  //           ref_type: "S",
+  //           action_by: updated_by,
+  //           status: payment_status,
+  //           balance: Math.abs(difference),
+  //           flow: isAdvance ? "O" : "I",
+  //           firm_id: rest.firm_id,
+  //         },
+  //         client
+  //       );
+  //     }
+
+  //     // ✅ Update payment transactions
+  //     const payment_transactions_service = new PaymentTransactionService();
+  //     if (payments && payments.length > 0) {
+  //       await Promise.all(
+  //         payments.map((p) =>
+  //           payment_transactions_service.editPaymentTransaction(
+  //             {
+  //               ref_id: sale.id,
+  //               amount: p.amount,
+  //               ref_type: PaymentTransactionTypeCodeMap["sale"],
+  //               status: getStatusCode("Paid"),
+  //               payment_method_id: p.payment_method_id ?? null,
+  //               transaction_reference: p.reference ?? null,
+  //               business_id: rest.firm_id,
+  //               business_ref: convertEntityType("Firm" as EntityKey),
+  //               company_id,
+  //             },
+  //             client
+  //           )
+  //         )
+  //       );
+  //     }
+
+  //     return `Sale ${sale.invoice_number} has been updated successfully.`;
+  //   });
+  // }
 
   async saleFetch(data: SaleFetchParams) {
 

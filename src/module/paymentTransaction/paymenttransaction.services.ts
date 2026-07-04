@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { executeInTransaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { getRecord } from "../../utils/extra";
+import { getRecord, PaymentTransactionTypeCodeMap } from "../../utils/extra";
 import { CreatePaymentTransaction, DeletePaymentTransaction, EditPaymentTransaction } from "./paymenttransaction.types";
 
 export class PaymentTransactionService {
@@ -56,7 +56,95 @@ export class PaymentTransactionService {
 
     return result.rows[0];
   }
+ async syncPaymentTransactions(
+    params: {
+      ref_id: number;
+      company_id: number;
+      firm_id: number;
+      statusCode: number;
+      entity_type: string;
+      payments: { id?: number | null; payment_method_id: number; amount: number; transaction_reference?: string | null }[];
+      ref_type:string
+    },
+    client: PoolClient
+  ) {
+    const { ref_id, company_id, firm_id, statusCode, entity_type, payments ,ref_type} = params;
 
+    // 1. Validate active target payment methods layout linkage records
+    for (const p of payments) {
+      if (p.payment_method_id) {
+        const isPaymentMethodExist = await getRecord(
+          p.payment_method_id,
+          "payment_methods",
+          "company_id",
+          company_id,
+          client
+        );
+        if (!isPaymentMethodExist) {
+          throw new AppError(`Payment method ${p.payment_method_id} not found`, 404);
+        }
+      }
+    }
+
+    // 2. Filter explicit transactional tracking identities
+    const incomingTxIds = payments.map((p) => p.id).filter((id): id is number => !!id);
+
+    // 3. Soft Delete Removed Rows: Set status to 0 instead of running a hard table purge block
+    if (incomingTxIds.length > 0) {
+      await executeInTransaction(
+        client,
+        `UPDATE payment_transactions 
+         SET status = 0 
+         WHERE ref_id = $1 
+           AND ref_type = $2 
+           AND company_id = $3 
+           AND id NOT IN (${incomingTxIds.map((_, i) => `$${i + 4}`).join(",")})`,
+        [ref_id, ref_type, company_id, ...incomingTxIds]
+      );
+    } else {
+      // Set status to 0 across all past records if no specific transactional mappings were assigned
+      await executeInTransaction(
+        client,
+        `UPDATE payment_transactions 
+         SET status = 0 
+         WHERE ref_id = $1 AND ref_type = $2 AND company_id = $3`,
+        [ref_id, PaymentTransactionTypeCodeMap["purchase"], company_id]
+      );
+    }
+
+    // 4. Update remaining lines or create fresh ledger balance nodes
+    for (const p of payments) {
+      if (p.id) {
+        await executeInTransaction(
+          client,
+          `UPDATE payment_transactions 
+           SET amount = $1, payment_method_id = $2, transaction_reference = $3, status = $4
+           WHERE id = $5 AND company_id = $6 AND ref_id = $7`,
+          [p.amount, p.payment_method_id, p.transaction_reference ?? null, statusCode, p.id, company_id, ref_id]
+        );
+      } else if (p.amount > 0) {
+        await executeInTransaction(
+          client,
+          `INSERT INTO payment_transactions (
+            ref_id, amount, ref_type, status, payment_method_id, 
+            transaction_reference, business_id, business_ref, company_id, payment_flow
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            ref_id,
+            p.amount,
+            PaymentTransactionTypeCodeMap["purchase"],
+            statusCode,
+            p.payment_method_id,
+            p.transaction_reference ?? null,
+            firm_id,
+            entity_type,
+            company_id,
+            "E"
+          ]
+        );
+      }
+    }
+  }
   async editPaymentTransaction(data: EditPaymentTransaction, client: PoolClient) {
     const {
       company_id,
@@ -122,27 +210,27 @@ export class PaymentTransactionService {
       );
     }
   }
- async upsertPaymentTransaction(
-  data: CreatePaymentTransaction ,
-  client: PoolClient
-) {
-  if (data.payment_method_id) {
-    const paymentMethod = await getRecord(
-      data.payment_method_id,
-      "payment_methods",
-      "company_id",
-      data.company_id,
-      client
-    );
+  async upsertPaymentTransaction(
+    data: CreatePaymentTransaction,
+    client: PoolClient
+  ) {
+    if (data.payment_method_id) {
+      const paymentMethod = await getRecord(
+        data.payment_method_id,
+        "payment_methods",
+        "company_id",
+        data.company_id,
+        client
+      );
 
-    if (!paymentMethod) {
-      throw new AppError("Payment method not found", 404);
+      if (!paymentMethod) {
+        throw new AppError("Payment method not found", 404);
+      }
     }
-  }
 
-  const existing = await executeInTransaction(
-    client,
-    `
+    const existing = await executeInTransaction(
+      client,
+      `
     SELECT id
     FROM payment_transactions
     WHERE company_id = $1
@@ -153,20 +241,20 @@ export class PaymentTransactionService {
       AND payment_flow = $6
     LIMIT 1
     `,
-    [
-      data.company_id,
-      data.ref_id,
-      data.ref_type,
-      data.business_id,
-      data.business_ref,
-      data.payment_flow
-    ]
-  );
-
- if (existing.rows[0].payment_method_id === data.payment_method_id) {
-    const result = await executeInTransaction(
-      client,
-      `
+      [
+        data.company_id,
+        data.ref_id,
+        data.ref_type,
+        data.business_id,
+        data.business_ref,
+        data.payment_flow
+      ]
+    );
+    if ((existing.rowCount ?? 0) > 0) {
+      if (existing.rows[0].payment_method_id === data.payment_method_id) {
+        const result = await executeInTransaction(
+          client,
+          `
       UPDATE payment_transactions
       SET
         amount = amount+$1,
@@ -175,20 +263,21 @@ export class PaymentTransactionService {
       WHERE id = $4
       RETURNING *;
       `,
-      [
-        data.amount,
-        data.payment_method_id ?? null,
-        data.transaction_reference ?? null,
-        existing.rows[0].id,
-      ]
-    );
+          [
+            data.amount,
+            data.payment_method_id ?? null,
+            data.transaction_reference ?? null,
+            existing.rows[0].id,
+          ]
+        );
 
-    return result.rows[0];
-  }
+        return result.rows[0];
+      }
+    }
 
-  const result = await executeInTransaction(
-    client,
-    `
+    const result = await executeInTransaction(
+      client,
+      `
     INSERT INTO payment_transactions (
       ref_id,
       amount,
@@ -204,22 +293,22 @@ export class PaymentTransactionService {
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
     RETURNING *;
     `,
-    [
-      data.ref_id,
-      data.amount,
-      data.ref_type,
-      data.status ?? 5,
-      data.payment_method_id ?? null,
-      data.transaction_reference ?? null,
-      data.business_id,
-      data.business_ref,
-      data.company_id,
-      data.payment_flow,
-    ]
-  );
+      [
+        data.ref_id,
+        data.amount,
+        data.ref_type,
+        data.status ?? 5,
+        data.payment_method_id ?? null,
+        data.transaction_reference ?? null,
+        data.business_id,
+        data.business_ref,
+        data.company_id,
+        data.payment_flow,
+      ]
+    );
 
-  return result.rows[0];
-}
+    return result.rows[0];
+  }
   async deletePaymentTransaction(data: DeletePaymentTransaction, client: PoolClient) {
     const { company_id, ref_id, ref_type } = data;
 

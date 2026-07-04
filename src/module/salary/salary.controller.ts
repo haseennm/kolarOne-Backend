@@ -73,7 +73,8 @@ export default class SalaryController {
           transaction_reference: transaction_reference ?? null,
           business_id: rest.entity_id,
           business_ref: entity_type,
-          company_id: company_id
+          company_id: company_id,
+          payment_flow:"E"
         }, client)
       }
 

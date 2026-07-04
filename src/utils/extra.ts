@@ -35,7 +35,8 @@ export const STATUS_MAP = {
   18: 'Returned',
   19: 'Hold',
   20: 'Denied',
-  21: 'Accepted'
+  21: 'Accepted',
+  22: "Over Pay"
 } as const
 export const STATUS_REVERSE_MAP = Object.fromEntries(
   Object.entries(STATUS_MAP).map(([key, value]) => [
@@ -309,4 +310,80 @@ export function isValidDateFormat(date: string): boolean {
     d.getMonth() === month - 1 &&
     d.getDate() === day
   );
+}
+
+
+// 
+// TABLE
+// 
+const TABLE_MAP: Record<string, string> = {
+  attendance: "ATTN",
+  branches: "BRCH",
+  brand: "BRND",
+  company: "COMP",
+  company_branding: "CBRN",
+  customers: "CUST",
+  financial_year: "FYER",
+  firm: "FIRM",
+  hiring_staff: "HSTF",
+  journals: "JRNL",
+  ledger_categories: "LCAT",
+  ledger_transactions: "LTRN",
+  loss_stocks: "LSTK",
+  partner_capital_ledger: "PCLG",
+  partner_profit_shares: "PPFS",
+  partners_info: "PINF",
+  party_balance: "PTBL",
+  payment_methods: "PMTH",
+  payment_transactions: "PTRN",
+  product_categories: "PCAT",
+  products: "PROD",
+  purchases: "PURC",
+  purchase_items: "PUIT",
+  purchase_return: "PRTN",
+  purchase_return_items: "PRIT",
+  quotations: "QUOT",
+  quotation_items: "QITM",
+  rent_bill_items: "RBIT",
+  rent_bills: "RBIL",
+  rent_customer_ledger: "RCLG",
+  rent_payments: "RPAY",
+  rental_stocks: "RSTK",
+  role: "ROLE",
+  salary_generations: "SALG",
+  sales: "SALE",
+  sales_items: "SLIT",
+  sale_return: "SRTN",
+  sale_return_items: "SRIT",
+  sale_returns: "SRET",
+  staff: "STAF",
+  staff_loans: "STLN",
+  stock: "STCK",
+  stock_adjustments: "SADJ",
+  stock_movements: "SMOV",
+  vendors: "VEND",
+};
+
+const SHORT_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(TABLE_MAP).map(([full, short]) => [short, full])
+);
+
+export function toShortTableName(tableName: string): string {
+  const shortName = TABLE_MAP[tableName];
+
+  if (!shortName) {
+    throw new AppError(`Invalid table name: ${tableName}`, 400);
+  }
+
+  return shortName;
+}
+
+export function toFullTableName(shortName: string): string {
+  const fullName = SHORT_MAP[shortName.toUpperCase()];
+
+  if (!fullName) {
+    throw new AppError(`Invalid table code: ${shortName}`, 400);
+  }
+
+  return fullName;
 }

@@ -30,8 +30,7 @@ export async function purchaseRouter(app: FastifyInstance) {
             "total_sgst",
             "total_igst",
             "final_amount",
-            "payment_method_id",
-            "payment_amount",
+            "payments", // Updated key name to match your code logic
             "items"
           ],
           properties: {
@@ -42,7 +41,6 @@ export async function purchaseRouter(app: FastifyInstance) {
             vendor_id: { type: "string" },
             bill_number: { type: "string" },
             bill_date: { type: "string", format: "date" },
-            transaction_reference: { type: ["string", "null"] },
             subtotal: { type: "number" },
             discount: { type: "number" },
             net_amount: { type: "number" },
@@ -53,8 +51,21 @@ export async function purchaseRouter(app: FastifyInstance) {
             other_charge: { type: "number" },
             handling_charge: { type: "number" },
             final_amount: { type: "number" },
-            payment_method_id: { type: "number" },
-            payment_amount: { type: "number" },
+            payments: {
+              type: "array",
+              items: {
+                type: "object", // Fixed capitalization error
+                required: [ // Fixed the "require" spelling error
+                  "payment_method_id",
+                  "payment_amount"
+                ],
+                properties: {
+                  payment_method_id: { type: "number" },
+                  payment_amount: { type: "number" },
+                  transaction_reference: { type: ["string", "null"] }
+                }
+              }
+            },
             notes: { type: ["string", "null"] },
             status: {
               type: "string",
@@ -180,6 +191,98 @@ export async function purchaseRouter(app: FastifyInstance) {
     }
   );
 
+  // app.post<{ Body: PurchaseEditBody }>(
+  //   "/edit",
+  //   {
+  //     schema: {
+  //       body: {
+  //         type: "object",
+  //         required: ["purchase_id", "firm_id", "updated_by"],
+  //         properties: {
+  //           purchase_id: { type: "number" },
+  //           company_id: { type: "number" },
+  //           updated_by: { type: "string", minLength: 1 },
+  //           firm_id: { type: "number" },
+  //           branch_id: { type: "number" },
+  //           vendor_id: { type: "string" },
+  //           bill_number: { type: "string" },
+  //           bill_date: { type: "string", format: "date" },
+  //           transaction_reference: { type: ["string", "null"] },
+  //           subtotal: { type: "number" },
+  //           discount: { type: "number" },
+  //           net_amount: { type: "number" },
+  //           total_cgst: { type: "number" },
+  //           total_sgst: { type: "number" },
+  //           total_igst: { type: "number" },
+  //           courier_charge: { type: "number" },
+  //           other_charge: { type: "number" },
+  //           handling_charge: { type: "number" },
+  //           final_amount: { type: "number" },
+  //           payment_method_id: { type: "number" },
+  //           payment_amount: { type: "number" },
+  //           notes: { type: ["string", "null"] },
+  //           status: {
+  //             type: ["string", "null"],
+  //             enum: ["Completed", "Confirm", "Cancelled", null]
+  //           },
+  //           items: {
+  //             type: "array",
+  //             items: {
+  //               type: "object",
+  //               required: [
+  //                 "product_id",
+  //                 "received_qty",
+  //                 "purchased_qty",
+  //                 "unit",
+  //                 "unit_price",
+  //                 "sub_total",
+  //                 "total_igst",
+  //                 "total_sgst",
+  //                 "total_cgst",
+  //                 "net_amount"
+  //               ],
+  //               properties: {
+  //                 item_id: { type: "number" },
+  //                 is_new: { type: "boolean" },
+  //                 batches: { type: "array" },
+  //                 status: {
+  //                   type: "string",
+  //                   enum: ["Completed", "Confirm", "Cancelled"]
+  //                 },
+  //                 product_id: { type: "number" },
+  //                 received_qty: { type: "number" },
+  //                 purchased_qty: { type: "number" },
+  //                 unit: { type: "string" },
+  //                 unit_price: { type: "number" },
+  //                 sub_total: { type: "number" },
+  //                 total_igst: { type: "number" },
+  //                 total_sgst: { type: "number" },
+  //                 total_cgst: { type: "number" },
+  //                 net_amount: { type: "number" }
+  //               }
+  //             }
+  //           },
+  //           delete_item_ids: {
+  //             type: "array",
+  //             items: { type: "number" }
+  //           }
+  //         }
+  //       }
+  //     }
+  //   },
+  //   async (
+  //     request: FastifyRequest<{ Body: PurchaseEditBody }>,
+  //     reply: FastifyReply
+  //   ) => {
+  //     const controller = new PurchaseController();
+  //     const data = await controller.purchaseEdit(request.body);
+
+  //     return reply.code(200).send({
+  //       status: "Success",
+  //       message: data
+  //     });
+  //   }
+  // );
   app.post<{ Body: PurchaseEditBody }>(
     "/edit",
     {
@@ -188,36 +291,46 @@ export async function purchaseRouter(app: FastifyInstance) {
           type: "object",
           required: ["purchase_id", "firm_id", "updated_by"],
           properties: {
-            purchase_id: { type: "number" },
-            company_id: { type: "number" },
-            updated_by: { type: "string", minLength: 1 },
-            firm_id: { type: "number" },
-            branch_id: { type: "number" },
-            vendor_id: { type: "string" },
-            bill_number: { type: "string" },
-            bill_date: { type: "string", format: "date" },
-            transaction_reference: { type: ["string", "null"] },
-            subtotal: { type: "number" },
-            discount: { type: "number" },
-            net_amount: { type: "number" },
-            total_cgst: { type: "number" },
-            total_sgst: { type: "number" },
-            total_igst: { type: "number" },
-            courier_charge: { type: "number" },
-            other_charge: { type: "number" },
-            handling_charge: { type: "number" },
-            final_amount: { type: "number" },
-            payment_method_id: { type: "number" },
-            payment_amount: { type: "number" },
-            notes: { type: ["string", "null"] },
+            purchase_id: { "type": "number" },
+            company_id: { "type": "number" },
+            updated_by: { "type": "string", "minLength": 1 },
+            firm_id: { "type": "number" },
+            branch_id: { "type": "number" },
+            vendor_id: { "type": "string" },
+            bill_number: { "type": "string" },
+            bill_date: { "type": "string", "format": "date" },
+            subtotal: { "type": "number" },
+            discount: { "type": "number" },
+            net_amount: { "type": "number" },
+            total_cgst: { "type": "number" },
+            total_sgst: { "type": "number" },
+            total_igst: { "type": "number" },
+            courier_charge: { "type": "number" },
+            other_charge: { "type": "number" },
+            handling_charge: { "type": "number" },
+            final_amount: { "type": "number" },
+            notes: { "type": ["string", "null"] },
             status: {
-              type: ["string", "null"],
-              enum: ["Completed", "Confirm", "Cancelled", null]
+              "type": ["string", "null"],
+              "enum": ["Completed", "Confirm", "Cancelled", null]
+            },
+            payments: {
+              "type": "array",
+              items: {
+                "type": "object",
+                "required": ["payment_method_id", "amount"],
+                properties: {
+                  id: { "type": ["number", "null"] },
+                  payment_method_id: { "type": "number" },
+                  amount: { "type": "number", "minimum": 0 },
+                  transaction_reference: { "type": ["string", "null"] }
+                }
+              }
             },
             items: {
-              type: "array",
+              "type": "array",
               items: {
-                type: "object",
+                "type": "object",
                 required: [
                   "product_id",
                   "received_qty",
@@ -231,29 +344,29 @@ export async function purchaseRouter(app: FastifyInstance) {
                   "net_amount"
                 ],
                 properties: {
-                  item_id: { type: "number" },
-                  is_new: { type: "boolean" },
-                  batches: { type: "array" },
+                  item_id: { "type": "number" },
+                  is_new: { "type": "boolean" },
+                  batches: { "type": "array" },
                   status: {
-                    type: "string",
-                    enum: ["Completed", "Confirm", "Cancelled"]
+                    "type": "string",
+                    "enum": ["Completed", "Confirm", "Cancelled"]
                   },
-                  product_id: { type: "number" },
-                  received_qty: { type: "number" },
-                  purchased_qty: { type: "number" },
-                  unit: { type: "string" },
-                  unit_price: { type: "number" },
-                  sub_total: { type: "number" },
-                  total_igst: { type: "number" },
-                  total_sgst: { type: "number" },
-                  total_cgst: { type: "number" },
-                  net_amount: { type: "number" }
+                  product_id: { "type": "number" },
+                  received_qty: { "type": "number" },
+                  purchased_qty: { "type": "number" },
+                  unit: { "type": "string" },
+                  unit_price: { "type": "number" },
+                  sub_total: { "type": "number" },
+                  total_igst: { "type": "number" },
+                  total_sgst: { "type": "number" },
+                  total_cgst: { "type": "number" },
+                  net_amount: { "type": "number" }
                 }
               }
             },
             delete_item_ids: {
-              type: "array",
-              items: { type: "number" }
+              "type": "array",
+              items: { "type": "number" }
             }
           }
         }
