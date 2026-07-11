@@ -324,38 +324,38 @@ export async function hiringStaffRouter(app: FastifyInstance) {
 
     }
   );
-type DecryptBody = {
-  url: string;
-};
+  type DecryptBody = {
+    url: string;
+  };
 
-app.post<{ Body: DecryptBody }>(
-  "/decryption",
-  {
-    schema: {
-      body: {
-        type: "object",
-        required: ["url"],
-        properties: {
-          url: { type: "string" }
+  app.post<{ Body: DecryptBody }>(
+    "/decryption",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["url"],
+          properties: {
+            url: { type: "string" }
+          }
         }
       }
+    },
+    async (
+      request: FastifyRequest<{ Body: DecryptBody }>,
+      reply: FastifyReply
+    ) => {
+
+      const controller = new HiringStaffController();
+
+
+      const data = await controller.decryptUrl(request.body.url);
+
+      return reply.code(200).send({
+        status: "Success",
+        url: data
+      });
     }
-  },
-  async (
-    request: FastifyRequest<{ Body: DecryptBody }>,
-    reply: FastifyReply
-  ) => {
-
-    const controller = new HiringStaffController();
-
-    
-    const data = await controller.decryptUrl(request.body.url);
-
-    return reply.code(200).send({
-      status: "Success",
-      url: data
-    });
-  }
-);
+  );
 
 }

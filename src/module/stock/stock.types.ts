@@ -136,6 +136,7 @@ export interface StockAdditionalParams extends Omit<StockAdditionalBody, "status
 export interface StockQtyChangeBody {
   r_id: number;
   branch_id: number;
+  company_id: number;
   available_qty: number;
   note: string;
 }

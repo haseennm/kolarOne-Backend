@@ -1,6 +1,7 @@
 import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
+import { emitAuditJournal } from "../journal/journal.utils";
 import { PaymentTransactionService } from "../paymentTransaction/paymenttransaction.services";
 import SalaryService from "./salary.service";
 import { ConfirmSalary, GenerateSalaryBody, GetSalaryBody } from "./salary.types";
@@ -31,6 +32,20 @@ export default class SalaryController {
     return transaction(async (client) => {
       const service = new SalaryService();
       const generated = await service.generateSalary({ ...rest, remark, from_date, to_date, salaryMonthStr }, client);
+
+      for (const row of generated) {
+        await emitAuditJournal({
+          client,
+          entityId: rest.entity_id,
+          entityType: rest.entity_type,
+          companyId: rest.entity_id,
+          tableName: "salary_generations",
+          tableRowId: row.staff_id,
+          action: "create",
+          record: row,
+        });
+      }
+
       return { data: generated };
     });
   }
@@ -60,6 +75,17 @@ export default class SalaryController {
         },
         client
       );
+
+      await emitAuditJournal({
+        client,
+        entityId: rest.entity_id,
+        entityType: rest.entity_type,
+        companyId: company_id ?? rest.entity_id,
+        tableName: "salary_generations",
+        tableRowId: salary.data.staff_id,
+        action: "confirm",
+        record: salary.data,
+      });
       if (status === "Paid") {
         const entity_type = convertEntityType("Branch" as EntityKey);
 

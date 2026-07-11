@@ -3,6 +3,7 @@ import { executeInTransaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord, PaymentTransactionTypeCodeMap } from "../../utils/extra";
 import { CreatePaymentTransaction, DeletePaymentTransaction, EditPaymentTransaction } from "./paymenttransaction.types";
+import { buildAuditChanges } from "../journal/journal.utils";
 
 export class PaymentTransactionService {
 
@@ -56,7 +57,7 @@ export class PaymentTransactionService {
 
     return result.rows[0];
   }
- async syncPaymentTransactions(
+  async syncPaymentTransactions(
     params: {
       ref_id: number;
       company_id: number;
@@ -64,11 +65,11 @@ export class PaymentTransactionService {
       statusCode: number;
       entity_type: string;
       payments: { id?: number | null; payment_method_id: number; amount: number; transaction_reference?: string | null }[];
-      ref_type:string
+      ref_type: string
     },
     client: PoolClient
   ) {
-    const { ref_id, company_id, firm_id, statusCode, entity_type, payments ,ref_type} = params;
+    const { ref_id, company_id, firm_id, statusCode, entity_type, payments, ref_type } = params;
 
     // 1. Validate active target payment methods layout linkage records
     for (const p of payments) {
@@ -306,8 +307,8 @@ export class PaymentTransactionService {
         data.payment_flow,
       ]
     );
-
-    return result.rows[0];
+    const changes = buildAuditChanges(existing, result.rows[0]);
+    return { data: result.rows[0], changes };
   }
   async deletePaymentTransaction(data: DeletePaymentTransaction, client: PoolClient) {
     const { company_id, ref_id, ref_type } = data;

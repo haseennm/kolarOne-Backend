@@ -260,7 +260,7 @@ export default class TodaySnapdealService {
       JOIN ledger_transactions lt
         ON lt.id = pt.ref_id
       JOIN ledger_categories lc
-        ON lc.id = lt.category_id
+        ON lc.id = lt.ledger_category_id
       WHERE pt.ref_type = 'LT'
         AND pt.status = 5
         AND DATE(pt.created_at) = CURRENT_DATE

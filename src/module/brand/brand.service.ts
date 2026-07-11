@@ -4,17 +4,16 @@ import {
   Brand,
   CountResult,
   CreateBrandParams,
-  DeleteBrandBody,
   DeleteBrandParams,
   EditBrandParams,
   FetchBrandParams,
 } from "./brand.types";
 import { AppError } from "../../utils/AppError";
-import { DeleteBranchParams } from "../branch/branch.types";
+import { buildAuditChanges } from "../journal/journal.utils";
 
 export default class BrandService {
 
-  async createBrand(data: CreateBrandParams) {
+  async createBrand(data: CreateBrandParams): Promise<any> {
     const { name, statusCode, remark, company_id, note } = data;
     const result = transaction(async (client) => {
 
@@ -47,7 +46,7 @@ export default class BrandService {
       ];
       const { rows } = await executeInTransaction(client, queryText, values);
 
-      return `Brand ${rows[0].name} created successfully`;
+      return rows[0];
     });
 
     return result;
@@ -144,8 +143,10 @@ export default class BrandService {
       ];
 
       const { rows } = await executeInTransaction(client, queryText, values);
+      const updatedBrand = rows[0];
+      const changes = buildAuditChanges(existing, updatedBrand);
 
-      return rows[0];
+      return { data: updatedBrand, changes };
     });
 
     return result;
@@ -182,9 +183,9 @@ export default class BrandService {
         id,
       ];
 
-      await executeInTransaction(client, queryText, values);
+      const { rows } = await executeInTransaction(client, queryText, values);
 
-      return `Brand ${existing.name} deleted successfully`;
+      return rows[0];
     });
 
     return result;

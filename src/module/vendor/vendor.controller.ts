@@ -1,5 +1,7 @@
+import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getStatusCode, getStatusText, isValidDateFormat } from "../../utils/extra";
+import { emitAuditJournal } from "../journal/journal.utils";
 import VendorService from "./vendor.service";
 import {
   AddNewFirm,
@@ -13,11 +15,8 @@ import {
 export default class VendorController {
 
   async fetchVendor(data: FetchVendorParams) {
-
     const service = new VendorService();
-
     const result = await service.fetchVendor(data);
-
     const vendors = result.vendors.map(v => ({
       ...v,
       status: getStatusText(v.status)
@@ -34,99 +33,139 @@ export default class VendorController {
   }
 
   async addnewFirm(data: AddNewFirm) {
+    return transaction(async (client) => {
 
-    const { firm_name, ...rest } = data;
-
-    const remark = {
-      action: "Add new Firm",
-      firm_name,
-      added_at: Date.now()
-    };
-
-    const service = new VendorService();
-
-    return service.addVendorNewFirm({
-      ...rest, firm_name
-    }, remark);
+      const { firm_name, ...rest } = data;
+      const remark = {
+        action: "Add new Firm",
+        firm_name,
+        added_at: Date.now()
+      };
+      const service = new VendorService();
+      return service.addVendorNewFirm({
+        ...rest, firm_name
+      },
+        remark,
+        client);
+    })
   }
   async createVendor(data: CreateVendorBody) {
+    return transaction(async (client) => {
+      const { created_by, status, ...rest } = data;
+      const remark = {
+        action: "Created",
+        created_by,
+        created_at: Date.now()
+      };
 
-    const { created_by, status, ...rest } = data;
+      const statusCode = getStatusCode(status);
 
-    const remark = {
-      action: "Created",
-      created_by,
-      created_at: Date.now()
-    };
+      const service = new VendorService();
 
-    const statusCode = getStatusCode(status);
-
-    const service = new VendorService();
-
-    return service.createVendor({
-      ...rest,
-      remark,
-      statusCode
-    });
+      const vendor = await service.createVendor({
+        ...rest,
+        remark,
+        statusCode
+      }, client);
+      await emitAuditJournal({
+        client,
+        entityId: rest.company_id,
+        entityType: "C",
+        companyId: rest.company_id,
+        tableName: "vendors",
+        tableRowId: vendor.data.id,
+        action: "create",
+        record: vendor.data,
+      });
+      return vendor.message
+    })
   }
 
   async editVendor(data: EditVendorBody) {
+    return transaction(async (client) => {
 
-    const { updated_by, status, ...rest } = data;
+      const { updated_by, status, ...rest } = data;
 
-    const remark = {
-      action: "Updated",
-      updated_by,
-      updated_at: Date.now()
-    };
+      const remark = {
+        action: "Updated",
+        updated_by,
+        updated_at: Date.now()
+      };
 
-    let statusCode;
+      let statusCode;
 
-    if (typeof status === "string") {
-      statusCode = getStatusCode(status);
-    }
+      if (typeof status === "string") {
+        statusCode = getStatusCode(status);
+      }
 
-    const service = new VendorService();
+      const service = new VendorService();
 
-    return service.updateVendor({
-      ...rest,
-      remark,
-      statusCode
-    });
+      const vendor = await service.updateVendor({
+        ...rest,
+        remark,
+        statusCode
+      }, client);
+      await emitAuditJournal({
+        client,
+        entityId: rest.company_id,
+        entityType: "C",
+        companyId: rest.company_id,
+        tableName: "vendors",
+        tableRowId: vendor.data.id,
+        action: "update",
+        record: vendor.data,
+        changes: {
+          "vendor": vendor.changes
+        },
+      });
+      return vendor.data
+    })
   }
 
   async deleteVendor(data: DeleteVendorBody) {
+    return transaction(async (client) => {
 
-    const { deleted_by, ...rest } = data;
+      const { deleted_by, ...rest } = data;
 
-    const remark = {
-      action: "Deleted",
-      deleted_by,
-      updated_at: Date.now()
-    };
+      const remark = {
+        action: "Deleted",
+        deleted_by,
+        updated_at: Date.now()
+      };
 
-    const service = new VendorService();
+      const service = new VendorService();
 
-    return service.deleteVendor({
-      ...rest,
-      remark
-    });
+      const vendor = await service.deleteVendor({
+        ...rest,
+        remark
+      }, client);
+      await emitAuditJournal({
+        client,
+        entityId: vendor.data.company_id,
+        entityType: "C",
+        companyId: vendor.data.company_id,
+        tableName: "vendors",
+        tableRowId: vendor.data.id,
+        action: "delete",
+        record: vendor.data,
+      });
+    })
   }
   async removeFirmVendor(data: RemoveFirmVendor) {
+    return transaction(async (client) => {
+      const remark = {
+        action: "Removed firm",
+        firm_name: data.firm_name,
+        updated_at: Date.now()
+      };
 
+      const service = new VendorService();
 
-    const remark = {
-      action: "Removed firm",
-      firm_name: data.firm_name,
-      updated_at: Date.now()
-    };
-
-    const service = new VendorService();
-
-    return service.removeFirmVendor({
-      ...data,
-      remark
-    });
+      return service.removeFirmVendor({
+        ...data,
+        remark
+      }, client);
+    })
   }
   async getVendorReport(data: {
     level: "firm" | "branch" | "company";

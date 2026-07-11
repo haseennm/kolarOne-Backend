@@ -10,10 +10,11 @@ import {
   GetCustomerReport,
 } from "./customer.types";
 import { AppError } from "../../utils/AppError";
+import { buildAuditChanges } from "../journal/journal.utils";
 
 export default class CustomerService {
 
-  async createCustomer(data: CreateCustomerParams) {
+  async createCustomer(data: CreateCustomerParams): Promise<any> {
 
     const {
       company_id,
@@ -113,7 +114,7 @@ export default class CustomerService {
 
       const { rows } = await executeInTransaction(client, queryText, values);
 
-      return `User ${rows[0].customer_name} created`;
+      return rows[0];
     });
 
     return result;
@@ -385,8 +386,10 @@ export default class CustomerService {
       ];
 
       const { rows } = await executeInTransaction(client, queryText, values);
+      const updatedCustomer = rows[0];
+      const changes = buildAuditChanges(isCustomerExist, updatedCustomer);
 
-      return rows[0];
+      return { data: updatedCustomer, changes };
     });
 
     return result;
@@ -430,9 +433,9 @@ export default class CustomerService {
         r_id
       ];
 
-      await executeInTransaction(client, queryText, values);
+      const { rows } = await executeInTransaction(client, queryText, values);
 
-      return `Customer ${isCustomerExist.customer_name} deleted successfully`;
+      return rows[0];
     });
 
     return result;

@@ -3,12 +3,14 @@ import { transaction } from "../../config/db";
 import { convertEntityType, EntityKey, getStatusCode, getStatusText, PaymentTransactionTypeCodeMap } from "../../utils/extra";
 import { PaymentTransactionService } from "../paymentTransaction/paymenttransaction.services";
 import PartyBalanceService from "./partyBalance.service";
-import { CreatePartyBalanceBody, DeletePartyBalanceBody, EditPartyBalanceBody, FetchPartyBalanceParams, RepayPartyBalanceBody } from "./partyBalance.types";
+import { AuditRecord, CreatePartyBalanceBody, DeletePartyBalanceBody, EditPartyBalanceBody, FetchPartyBalanceParams, RepayPartyBalanceBody } from "./partyBalance.types";
 import PurchaseController from "../purchase/purchase/purchase.controller";
 import PurchaseService from "../purchase/purchase/purchase.service";
 import SaleService from "../sale/sale/sale.service";
 import PurchaseReturnService from "../purchaseReturn/purchaseReturn/purchaseReturn.service";
 import SaleReturnService from "../saleReturn/saleReturn/saleReturn.service";
+import { emitAuditJournal } from "../journal/journal.utils";
+import { table } from "node:console";
 
 export default class PartyBalanceController {
 
@@ -213,14 +215,14 @@ export default class PartyBalanceController {
         updated_at: Date.now(),
       };
 
-      // ==========================================
-      // 3. Route & Append To Parent Document Modules
-      // ==========================================
-
-      // Purchases ("PS")
+      let record: AuditRecord = {
+        data: null,
+        changes: null,
+        table_name: ""
+      };
       if (rest.ref_type === "PS") {
         const purchase_service = new PurchaseService();
-        await purchase_service.updatePurchasePaymentAmount({
+        record = await purchase_service.updatePurchasePaymentAmount({
           purchase_id: rest.ref_id,
           firm_id: rest.firm_id,
           remark: base_update_remark,
@@ -233,7 +235,7 @@ export default class PartyBalanceController {
       // Sales ("SL")
       if (rest.ref_type === "SL") {
         const sale_service = new SaleService();
-        await sale_service.updateSalePayment({
+        record = await sale_service.updateSalePayment({
           sale_id: rest.ref_id,
           firm_id: rest.firm_id,
           payments: payments, // ✅ Matches exact uniform data structure
@@ -245,7 +247,7 @@ export default class PartyBalanceController {
       // Purchase Returns ("PR")
       if (rest.ref_type === "PR") {
         const purchase_return = new PurchaseReturnService();
-        await purchase_return.updatePurchaseReturnPaymentAmount({
+        record = await purchase_return.updatePurchaseReturnPaymentAmount({
           purchase_return_id: rest.ref_id,
           firm_id: rest.firm_id,
           payments: payments, // ✅ Passes array payload downstream
@@ -257,7 +259,7 @@ export default class PartyBalanceController {
       // Sales Returns ("SR")
       if (rest.ref_type === "SR") {
         const sale_return = new SaleReturnService();
-        await sale_return.updateSaleReturnPaymentAmount({
+        record = await sale_return.updateSaleReturnPaymentAmount({
           sale_return_id: rest.ref_id,
           firm_id: rest.firm_id,
           payments: payments, // ✅ Clean integration mapping for Sales Return payments
@@ -272,12 +274,12 @@ export default class PartyBalanceController {
       const payment_transactions_service = new PaymentTransactionService();
 
       // Iterate across individual payments to build independent atomic audit trails
-      await Promise.all(
+      const payment_record = await Promise.all(
         payments.map((p) => {
           if ((p.payment_amount ?? 0) <= 0) return Promise.resolve(); // Safety trace exit boundary Check
 
           return payment_transactions_service.upsertPaymentTransaction({
-            ref_id: Number(party_balance.id),
+            ref_id: Number(party_balance.ref_id),
             amount: p.payment_amount, // ✅ Real split threshold balance tracked atomically
             ref_type: party_balance.ref_type,
             status: getStatusCode("Paid"),
@@ -290,7 +292,28 @@ export default class PartyBalanceController {
           }, client);
         })
       );
-
+      const paymentChanges = Object.fromEntries(
+        payment_record
+          .filter((p): p is NonNullable<typeof p> => !!p)
+          .map((p, index) => [
+            `payment_${index + 1}`,
+            p.changes
+          ])
+      );
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: entity_type,
+        companyId: company_id,
+        tableName: record?.table_name,
+        tableRowId: rest.ref_id,
+        action: "repay",
+        record: record?.data,
+        changes: {
+          record: record?.changes ?? {},
+          payment: paymentChanges
+        }
+      });
       return `party balance has been paid successfully, Balance: '${party_balance.balance}'`;
     });
   }

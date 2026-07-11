@@ -80,7 +80,7 @@ export interface DeleteHireStaffBody {
   r_id: string;
   company_id: number;
   entity_id: number;
-  entity_type: number;
+  entity_type: string;
   deleted_by: string;
 }
 export interface EncryptHireStaffBody {

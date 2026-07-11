@@ -1,7 +1,7 @@
 import { json } from "node:stream/consumers";
 import { executeInTransaction, query } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { cns, getRecord } from "../../../utils/extra";
+import { cns, getRecord, getStatusCode } from "../../../utils/extra";
 import { ChangeQuotationItemStatus, CreateQuotationItemParams, DeleteQuotationItemBody, DeleteQuotationItemParams, EditQuotationItemParams, FetchDbQuotationItem, FetchQuotationItemParams, QuotationItemCountResult, UpdateQuotationItemParams } from "./quotationItems.types";
 import { PoolClient } from "pg";
 
@@ -299,4 +299,12 @@ export default class QuotationItemService {
 
     return rows[0];
   }
+   async fetchItemsOnly(client: PoolClient, firm_id: number, quotation_id: number) {
+      const { rows } = await executeInTransaction(client,
+        `SELECT * FROM quotation_items WHERE quotation_id = $1 AND
+        firm_id =$2 AND status !=$3`,
+        [quotation_id, firm_id, getStatusCode("Deleted")]
+      )
+      return rows[0]
+    }
 }

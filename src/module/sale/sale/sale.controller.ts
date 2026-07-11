@@ -9,6 +9,7 @@ import { PaymentTransactionService } from "../../paymentTransaction/paymenttrans
 import SaleItemController from "../saleItems/saleitems.controller";
 import { AppError } from "../../../utils/AppError";
 import QuotationController from "../../quotation/quotation/quotation.controller";
+import { buildAuditChanges, emitAuditJournal } from "../../journal/journal.utils";
 
 export default class SaleController {
 
@@ -124,9 +125,18 @@ export default class SaleController {
           );
         })
       );
-
-      const quotation = new QuotationController();
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: "F",
+        companyId: company_id,
+        tableName: "hiring_staff",
+        tableRowId: sale.id,
+        action: "create",
+        record: sale,
+      });
       if (quotation_id) {
+        const quotation = new QuotationController();
         await quotation.QuotationStatusChange({
           firm_id: data.firm_id,
           id: quotation_id,
@@ -202,7 +212,7 @@ export default class SaleController {
         for (const item_id of delete_item_ids) {
           const deletedItem = await saleItemController.deleteSaleItem(
             {
-              sale_id: sale.id,
+              sale_id: sale.data.id,
               firm_id: rest.firm_id,
             },
             client
@@ -226,6 +236,7 @@ export default class SaleController {
       // Process new and modified line items
       if (items) {
         for (const item of items) {
+          const old_items = await saleItemController.fetchItemsOnly(client, rest.firm_id, rest.sale_id)
           const isNewItem = item.is_new === true || !item.item_id;
           if (isNewItem) {
             // Deduct stock for outgoing sales items
@@ -242,7 +253,7 @@ export default class SaleController {
               }, client);
 
             await saleItemController.createSaleItem({
-              sale_id: sale.id,
+              sale_id: sale.data.id,
               firm_id: rest.firm_id,
               status: "Completed",
               product_id: item.product_id,
@@ -266,12 +277,10 @@ export default class SaleController {
 
             continue;
           }
-
-          // Existing Item logic modification
           const sale_item = await saleItemController.editSaleItem(
             {
               item_id: item.item_id,
-              sale_id: sale.id,
+              sale_id: sale.data.id,
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
               status: "Completed",
@@ -308,6 +317,22 @@ export default class SaleController {
               client
             );
           }
+          const updated_items = await saleItemController.fetchItemsOnly(client, rest.firm_id, rest.sale_id)
+          const item_changes = buildAuditChanges(old_items, updated_items);
+          await emitAuditJournal({
+            client,
+            entityId: rest.firm_id,
+            entityType: "F",
+            companyId: company_id,
+            tableName: "sales",
+            tableRowId: sale.data.id,
+            action: "update",
+            record: sale.data,
+            changes: {
+              "sale": sale.changes,
+              "sale items": item_changes
+            },
+          });
         }
       }
 
@@ -316,7 +341,7 @@ export default class SaleController {
       const payment_transactions_service = new PaymentTransactionService();
 
       await payment_transactions_service.syncPaymentTransactions({
-        ref_id: sale.id,
+        ref_id: sale.data.id,
         ref_type: PaymentTransactionTypeCodeMap["sale"], // E.g. 'S' or equivalent map value
         company_id,
         firm_id: rest.firm_id,
@@ -326,8 +351,8 @@ export default class SaleController {
       }, client);
 
       // 5. Party Balance Processing (Sales bring incoming money 'I')
-      const actualPaidAmount = Number(sale.paid ?? 0);
-      const actualFinalAmount = Number(sale.final_amount ?? 0);
+      const actualPaidAmount = Number(sale.data.paid ?? 0);
+      const actualFinalAmount = Number(sale.data.final_amount ?? 0);
       const difference = actualPaidAmount - actualFinalAmount;
 
       const party_balance_controller = new PartyBalanceController();
@@ -347,7 +372,7 @@ export default class SaleController {
 
       await party_balance_controller.editPartyBalance(
         {
-          ref_id: sale.id,
+          ref_id: sale.data.id,
           ref_type: PaymentTransactionTypeCodeMap["sale"],
           action_by: updated_by,
           balance: Math.abs(difference),
@@ -358,7 +383,7 @@ export default class SaleController {
         client
       );
 
-      return `Invoice ${sale.invoice_number} has been updated successfully.`;
+      return `Invoice ${sale.data.invoice_number} has been updated successfully.`;
     });
   }
   // async saleEdit(data: SaleEditBody) {
@@ -585,7 +610,16 @@ export default class SaleController {
         ref_id: rest.id,
         ref_type: PaymentTransactionTypeCodeMap["sale"],
       }, client)
-
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: "F",
+        companyId: sale.company_id,
+        tableName: "sales",
+        tableRowId: sale.id,
+        action: "delete",
+        record: sale,
+      });
       return "Sale deleted successfully"
     })
   }

@@ -1,8 +1,9 @@
-import { PoolClient } from "pg";
+import { PoolClient, QueryResult } from "pg";
 import { CreateAdvanceBody, CreateRentItem, CreateRentParams, CreateRentPaymentParams, ReturnRentParams, ReturnAdvanceBody, PayBillBody, FetchRentParams, FetchAdvanceLedgerParams, ReturnBillAmountBody, UpdateRentParams } from "./rent.types";
 import { executeInTransaction, pool } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord, getStatusCode } from "../../utils/extra";
+import { buildAuditChanges } from "../journal/journal.utils";
 
 export class RentService {
   private async generateBillNumber(
@@ -736,7 +737,7 @@ export class RentService {
           note: note || `Knocked down via multi-ledger refund.`
         }
       );
-
+      const oldData = { ...ledger };
       // Update the individual ledger entry
       const updatedLedgerRow = await executeInTransaction(
         client,
@@ -775,8 +776,14 @@ export class RentService {
         },
         client
       );
+      const newData = updatedLedgerRow.rows[0];
 
-      updatedLedgers.push(updatedLedgerRow.rows[0]);
+      // Track changes
+      const changes = buildAuditChanges(oldData, newData);
+      updatedLedgers.push({
+        ...updatedLedgerRow.rows[0],
+        changes,
+      });
       amountToRefund -= deduction; // Reduce the remaining amount left to clear
     }
 
@@ -845,9 +852,9 @@ export class RentService {
         note: note || `Refunded to customer.`
       }
     );
-
+    let data: QueryResult;
     if (discount === false) {
-      await executeInTransaction(
+      data = await executeInTransaction(
         client,
         `
       UPDATE rent_bills
@@ -866,7 +873,7 @@ export class RentService {
         ]
       );
     } else {
-      await executeInTransaction(
+      data = await executeInTransaction(
         client,
         `
       UPDATE rent_bills
@@ -905,10 +912,12 @@ export class RentService {
       },
       client
     );
-
+    const changes = buildAuditChanges(rent_bill, data.rows[0]);
 
     return {
       message: "balances refunded and processed successfully",
+      changes,
+      data: data.rows[0]
     };
   }
 
@@ -1471,7 +1480,7 @@ export class RentService {
         )
       );
 
-    await executeInTransaction(
+    const { rows } = await executeInTransaction(
       client,
       `
   UPDATE rent_bills
@@ -1494,7 +1503,8 @@ export class RentService {
 
     return {
       message:
-        "Payment processed successfully"
+        "Payment processed successfully",
+      data: rows[0]
     };
   }
 
@@ -2314,7 +2324,7 @@ export class RentService {
         Number(updatedBill.total_amount)
       );
 
-    await executeInTransaction(
+    const add_actual_close = await executeInTransaction(
       client,
       `
     UPDATE rent_bills
@@ -2345,8 +2355,10 @@ export class RentService {
         client
       );
     }
+    const changes = buildAuditChanges(bill, add_actual_close);
     return {
-      message: "Rent updated successfully"
+      data: add_actual_close.rows[0],
+      changes
     };
   }
 
@@ -2906,7 +2918,7 @@ export class RentService {
     );
 
     // Soft delete bill payments only
-    await executeInTransaction(
+    const { rows } = await executeInTransaction(
       client,
       `
     UPDATE rent_payments
@@ -2925,7 +2937,8 @@ export class RentService {
 
     return {
       message:
-        "Rent bill deleted successfully"
+        "Rent bill deleted successfully",
+      data: rows[0]
     };
   }
 

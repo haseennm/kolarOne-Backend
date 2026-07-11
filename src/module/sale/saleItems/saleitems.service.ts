@@ -1,4 +1,4 @@
-import { getRecord } from "../../../utils/extra";
+import { getRecord, getStatusCode } from "../../../utils/extra";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { CreateSaleItemParams, DeleteSaleItemBody, DeleteSaleItemParams, EditSaleItemParams, FetchDbSaleItem, FetchSaleItemParams, SaleItemCountResult, UpdateSaleItemParams } from "./saleitems.types";
@@ -150,7 +150,14 @@ export default class SaleItemService {
       },
     };
   }
-
+  async fetchItemsOnly(client: PoolClient, firm_id: number, sale_id: number) {
+    const { rows } = await executeInTransaction(client,
+      `SELECT * FROM sale_items WHERE sale_id = $1 AND
+      firm_id =$2 AND status !=$3`,
+      [sale_id, firm_id, getStatusCode("Deleted")]
+    )
+    return rows[0]
+  }
   async updateSaleItem(data: EditSaleItemParams, client: PoolClient) {
     const {
       branch_id,

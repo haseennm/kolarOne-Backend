@@ -1,10 +1,12 @@
+import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord } from "../../utils/extra";
+import { buildAuditChanges } from "../journal/journal.utils";
 import { CreateLedgerCategoryParams, DeleteLedgerCategoryParams, CountResult, EditLedgerCategoryParams, FetchLedgerCategoryParams, FetchDbLedgerCategory } from "./ledgerCategory.types";
 export default class LedgerCategoryService {
 
-  async createLedgerCategory(data: CreateLedgerCategoryParams) {
+  async createLedgerCategory(data: CreateLedgerCategoryParams, client: PoolClient) {
 
     const {
       category_type,
@@ -14,21 +16,20 @@ export default class LedgerCategoryService {
       remark
     } = data;
 
-    const result = transaction(async (client) => {
 
-      const isCompanyExist = await getRecord(
-        company_id,
-        "company",
-        "id",
-        company_id,
-        client
-      );
+    const isCompanyExist = await getRecord(
+      company_id,
+      "company",
+      "id",
+      company_id,
+      client
+    );
 
-      if (!isCompanyExist) {
-        throw new AppError("Company not found", 404);
-      }
+    if (!isCompanyExist) {
+      throw new AppError("Company not found", 404);
+    }
 
-      const queryText = `
+    const queryText = `
       INSERT INTO ledger_categories (
         category_type,
         name,
@@ -40,19 +41,17 @@ export default class LedgerCategoryService {
       RETURNING *;
       `;
 
-      const values = [
-        category_type,
-        name,
-        company_id,
-        statusCode,
-        JSON.stringify(remark)
-      ];
-      const { rows } = await executeInTransaction(client, queryText, values);
+    const values = [
+      category_type,
+      name,
+      company_id,
+      statusCode,
+      JSON.stringify(remark)
+    ];
+    const { rows } = await executeInTransaction(client, queryText, values);
 
-      return `Ledger Category ${rows[0].name} created`;
-    });
+    return rows[0];
 
-    return result;
   }
 
 
@@ -125,7 +124,7 @@ export default class LedgerCategoryService {
   }
 
 
-  async updateLedgerCategory(data: EditLedgerCategoryParams) {
+  async updateLedgerCategory(data: EditLedgerCategoryParams, client: PoolClient) {
 
     const {
       id,
@@ -136,21 +135,20 @@ export default class LedgerCategoryService {
       remark
     } = data;
 
-    const result = transaction(async (client) => {
 
-      const isLedgerCategoryExist = await getRecord(
-        id,
-        "ledger_categories",
-        "company_id",
-        company_id,
-        client
-      );
+    const isLedgerCategoryExist = await getRecord(
+      id,
+      "ledger_categories",
+      "company_id",
+      company_id,
+      client
+    );
 
-      if (!isLedgerCategoryExist) {
-        throw new AppError("Ledger category not found", 404);
-      }
+    if (!isLedgerCategoryExist) {
+      throw new AppError("Ledger category not found", 404);
+    }
 
-      const queryText = `
+    const queryText = `
       UPDATE ledger_categories
       SET
         category_type = $1,
@@ -166,44 +164,42 @@ export default class LedgerCategoryService {
       WHERE id = $5
       RETURNING *;
       `;
-      const status = statusCode === 99
-        ? isLedgerCategoryExist.status
-        : statusCode;
-      const values = [
-        category_type ?? isLedgerCategoryExist.category_type,
-        name ?? isLedgerCategoryExist.name,
-        status,
-        JSON.stringify(remark),
-        id
-      ];
+    const status = statusCode === 99
+      ? isLedgerCategoryExist.status
+      : statusCode;
+    const values = [
+      category_type ?? isLedgerCategoryExist.category_type,
+      name ?? isLedgerCategoryExist.name,
+      status,
+      JSON.stringify(remark),
+      id
+    ];
 
-      const { rows } = await executeInTransaction(client, queryText, values);
-      return `Ledger category ${rows[0].name} Updated`;
-    });
+    const { rows } = await executeInTransaction(client, queryText, values);
+    const changes = buildAuditChanges(isLedgerCategoryExist, rows[0]);
+    return { data: rows[0], changes };
 
-    return result;
   }
 
 
-  async deleteLedgerCategory(data: DeleteLedgerCategoryParams) {
+  async deleteLedgerCategory(data: DeleteLedgerCategoryParams, client: PoolClient) {
 
     const { r_id, remark, company_id } = data;
 
-    const result = transaction(async (client) => {
 
-      const isLedgerCategoryExist = await getRecord(
-        r_id,
-        "ledger_categories",
-        "company_id",
-        company_id,
-        client
-      );
+    const isLedgerCategoryExist = await getRecord(
+      r_id,
+      "ledger_categories",
+      "company_id",
+      company_id,
+      client
+    );
 
-      if (!isLedgerCategoryExist) {
-        throw new AppError("Ledger category not found or already deleted", 404);
-      }
+    if (!isLedgerCategoryExist) {
+      throw new AppError("Ledger category not found or already deleted", 404);
+    }
 
-      const queryText = `
+    const queryText = `
       UPDATE ledger_categories
       SET
         status = $1,
@@ -217,18 +213,15 @@ export default class LedgerCategoryService {
       RETURNING *;
       `;
 
-      const values = [
-        0,
-        JSON.stringify(remark),
-        r_id
-      ];
+    const values = [
+      0,
+      JSON.stringify(remark),
+      r_id
+    ];
+    const row = await executeInTransaction(client, queryText, values);
 
-      await executeInTransaction(client, queryText, values);
+    return row.rows[0];
 
-      return `Ledger Category ${isLedgerCategoryExist.name} deleted successfully`;
-    });
-
-    return result;
   }
 
 }

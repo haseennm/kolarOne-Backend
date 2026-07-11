@@ -148,7 +148,7 @@ export class RentLossService {
 
     if (stockResult.rows.length > 0) {
       const { total_units } = stockResult.rows[0];
-      
+
       // If adding this transaction's quantity fills the missing gap entirely
       if (Number(total_units) === totalMissing + Number(quantity)) {
         const remark = [{ action: `change status to ${reason}`, at: new Date() }];
@@ -232,7 +232,7 @@ export class RentLossService {
     }
 
     await this.validateStockAvailability(rent_stock_id, quantity, branch_id, client);
-    
+
     // Check and close empty stock BEFORE the update to calculate pre-save total values correctly
     await this.checkAndCloseEmptyStock(client, rent_stock_id, branch_id, reason, product_id, quantity);
 
@@ -272,7 +272,7 @@ export class RentLossService {
       if (!payment_method_id) {
         throw new AppError("Payment method is required", 400);
       }
-      
+
       if (paid > amount && customer_id && isbyCustomer) {
         await this.createAdvance(
           { customer_id, branch_id, amount: Number(paid) - Number(amount), payment_method_id, company_id },
@@ -282,7 +282,7 @@ export class RentLossService {
         const updatedRemarks = this.appendRemark(lost_stock.remarks, "advance_received", { amount: Number(paid) - Number(amount) });
         await executeInTransaction(client, `UPDATE loss_stocks SET remarks = $1 WHERE id = $2`, [JSON.stringify(updatedRemarks), lost_stock.id]);
       }
-      
+
       // Changed logic to ensure a payment row maps to exact collected revenue limits
       const paymentAmount = paid > amount ? amount : paid;
       await this.createRentPayment(
@@ -302,7 +302,7 @@ export class RentLossService {
 
     return {
       message: "lost stock created successfully",
-      data: { lost_stock_id: lost_stock.id }
+      data: lost_stock
     };
   }
 
@@ -394,10 +394,10 @@ export class RentLossService {
     }
 
     if (billPayment > 0) {
-        await this.createRentPayment(
+      await this.createRentPayment(
         {
           branch_id,
-          amount:billPayment,
+          amount: billPayment,
           payment_method_id,
           row_type: "loss",
           row_id: lost_row_id,
@@ -436,7 +436,7 @@ export class RentLossService {
     const updatedBill = updatedlost_row.rows[0];
     const payment_status = await this.generatePaymentStatus(updatedBill.amount, updatedBill.paid);
 
-    await executeInTransaction(
+    const { rows } = await executeInTransaction(
       client,
       `
       UPDATE loss_stocks
@@ -446,7 +446,7 @@ export class RentLossService {
       [payment_status, lost_row_id, branch_id]
     );
 
-    return { message: "Payment processed successfully" };
+    return { message: "Payment processed successfully", data: rows[0] };
   }
 
   async fetchLossRent(params: FetchLossRentParams) {
@@ -474,13 +474,13 @@ export class RentLossService {
       values.push(product_id);
       paramIndex++;
     }
-    
+
     if (customer_id) {
       conditions.push(`ls.customer_id = $${paramIndex} AND ls.responsible_type = 'customer'`);
       values.push(customer_id);
       paramIndex++;
     }
-    
+
     if (by_branch) {
       conditions.push(`ls.responsible_type = 'branch'`);
     }
@@ -531,7 +531,7 @@ export class RentLossService {
   ) {
     const { branch_id, deleted_by, id } = data;
     const loss_stock_id = id;
-    
+
     const lossStockResult = await executeInTransaction(
       client,
       `
@@ -557,8 +557,8 @@ export class RentLossService {
       `,
       [Number(lossStock.quantity), JSON.stringify(lossStockRemarks), lossStock.rent_stock_id]
     );
-    
-    await executeInTransaction(
+
+    const { rows } = await executeInTransaction(
       client,
       `
       UPDATE loss_stocks
@@ -579,7 +579,7 @@ export class RentLossService {
         [getStatusCode("Deleted"), loss_stock_id, branch_id]
       );
     }
-    
-    return { message: "Rent bill deleted successfully" };
+
+    return { message: "Rent bill deleted successfully", data: rows[0] };
   }
 }

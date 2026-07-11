@@ -2,6 +2,7 @@ import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { Cryption } from "../../utils/cryption";
 import { convertEntityType, EntityKey, getStatusText } from "../../utils/extra";
+import { emitAuditJournal } from "../journal/journal.utils";
 import StaffService from "./hiringstaff.service";
 import { CreateHireStaffBody, DeleteHireStaffBody, EditStatusHireStaffBody, EncryptHireStaffBody } from "./hiringstaff.types";
 
@@ -10,78 +11,85 @@ export default class HiringStaffController {
 
   async createHireStaff(data: CreateHireStaffBody) {
 
-  let { entity_type, ...rest } = data;
+    let { entity_type, ...rest } = data;
 
-  const requiredFields = [
-    "full_name",
-    "phone_number",
-    "email",
-    "date_of_birth",
-    "expected_salary",
-    "working_from",
-    "working_to",
-    "entity_type",
-    "entity_id",
-    "company_id"
-  ];
+    const requiredFields = [
+      "full_name",
+      "phone_number",
+      "email",
+      "date_of_birth",
+      "expected_salary",
+      "working_from",
+      "working_to",
+      "entity_type",
+      "entity_id",
+      "company_id"
+    ];
 
-  for (const field of requiredFields) {
+    for (const field of requiredFields) {
 
-    const value = data[field as keyof CreateHireStaffBody];
+      const value = data[field as keyof CreateHireStaffBody];
 
-    if (
-      value === undefined ||
-      value === null ||
-      value === ""
-    ) {
-      throw new AppError(`${field} is required`, 400);
+      if (
+        value === undefined ||
+        value === null ||
+        value === ""
+      ) {
+        throw new AppError(`${field} is required`, 400);
+      }
     }
+
+
+    const validBloodGroups = [
+      "A+", "A-",
+      "B+", "B-",
+      "AB+", "AB-",
+      "O+", "O-"
+    ];
+
+    if (data.blood_group && !validBloodGroups.includes(data.blood_group)) {
+      throw new AppError("Invalid blood group", 400);
+    }
+
+    const remark = {
+      action: "Created",
+      created_at: Date.now(),
+    };
+
+    return transaction(async (client) => {
+
+      entity_type = convertEntityType(entity_type as EntityKey);
+
+      const service = new StaffService();
+
+      let entity_table = "";
+
+      if (entity_type === "C") entity_table = "company";
+      if (entity_type === "B") entity_table = "branches";
+      if (entity_type === "F") entity_table = "firm";
+
+      const staff_created = await service.createHireStaff({
+        ...rest,
+        remark,
+        entity_type,
+        entity_table,
+      }, client);
+      await emitAuditJournal({
+        client,
+        entityId: rest.entity_id,
+        entityType: entity_type,
+        companyId: rest.company_id,
+        tableName: "hiring_staff",
+        tableRowId: staff_created.id,
+        action: "create",
+        record: staff_created,
+      });
+      return `Staff ${staff_created.full_name} has been created successfully.`;
+    });
   }
-
-
-  const validBloodGroups = [
-    "A+", "A-",
-    "B+", "B-",
-    "AB+", "AB-",
-    "O+", "O-"
-  ];
-
-  if (data.blood_group && !validBloodGroups.includes(data.blood_group)) {
-    throw new AppError("Invalid blood group", 400);
-  }
-
-  const remark = {
-    action: "Created",
-    created_at: Date.now(),
-  };
-
-  return transaction(async (client) => {
-
-    entity_type = convertEntityType(entity_type as EntityKey);
-
-    const service = new StaffService();
-
-    let entity_table = "";
-
-    if (entity_type === "C") entity_table = "company";
-    if (entity_type === "B") entity_table = "branches";
-    if (entity_type === "F") entity_table = "firm";
-
-    const staff_created = await service.createHireStaff({
-      ...rest,
-      remark,
-      entity_type,
-      entity_table,
-    }, client);
-
-    return `Staff ${staff_created.full_name} has been created successfully.`;
-  });
-}
 
   async fetchHireStaff(data: any) {
-
     const service = new StaffService();
-
     const staff_with_code = await service.fetchHireStaff(data);
     const staff = staff_with_code.staff.map(({ ...rest }) => ({
       ...rest,
@@ -117,7 +125,7 @@ export default class HiringStaffController {
 
       const service = new StaffService();
 
-      await service.updateHireStaffStatus(
+      const updated_hiring_staff = await service.updateHireStaffStatus(
         {
           ...rest,
           id,
@@ -127,7 +135,17 @@ export default class HiringStaffController {
         },
         client
       );
-
+      await emitAuditJournal({
+        client,
+        entityId: rest.entity_id,
+        entityType: entity_type,
+        companyId: updated_hiring_staff.data.company_id,
+        tableName: "hiring_staff",
+        tableRowId: id,
+        action: "create",
+        record: updated_hiring_staff.data,
+        changes: { "hiring staff": updated_hiring_staff.changes }
+      });
       return `Staff has been updated successfully.`;
     });
   }
@@ -136,7 +154,6 @@ export default class HiringStaffController {
   async deleteHireStaff(data: DeleteHireStaffBody) {
 
     const { deleted_by, ...rest } = data;
-
     return transaction(async (client) => {
 
       const remark = {
@@ -154,7 +171,16 @@ export default class HiringStaffController {
         },
         client
       );
-
+      await emitAuditJournal({
+        client,
+        entityId: rest.entity_id,
+        entityType: staff.entity_type,
+        companyId: staff.company_id,
+        tableName: "hiring_staff",
+        tableRowId: staff.id,
+        action: "delete",
+        record: staff,
+      });
       return `Staff ${staff.full_name} has been deleted successfully.`;
     });
   }

@@ -7,13 +7,14 @@ import LedgerTransactionService from "./ledgertransaction.service";
 import { CreateLedgerTransactionBody, DeleteLedgerTransactionBody, EditLedgerTransactionBody } from "./ledgertransaction.types";
 import SaleController from "../sale/sale/sale.controller";
 import { AppError } from "../../utils/AppError";
+import { emitAuditJournal } from "../journal/journal.utils";
 
 export default class LedgerTransactionController {
 
 
   async createTransaction(data: CreateLedgerTransactionBody) {
 
-    let { created_by, status, entry_type,entity_type, amount, transaction_time = new Date().toLocaleTimeString('en-GB', {
+    let { created_by, status, entry_type, entity_type, amount, transaction_time = new Date().toLocaleTimeString('en-GB', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -53,10 +54,20 @@ export default class LedgerTransactionController {
             business_id: entity_id,
             business_ref: entity_type,
             company_id,
-            payment_flow:entry_type
+            payment_flow: entry_type
           },
           client
         );
+        await emitAuditJournal({
+          client,
+          entityId: entity_id,
+          entityType: entity_type,
+          companyId: company_id,
+          tableName: "ledger_transactions",
+          tableRowId: ledger_transaction.id,
+          action: "create",
+          record: ledger_transaction,
+        });
       }
       return `Ledger transaction for amount ${ledger_transaction.amount} has been created successfully.`;
     })
@@ -79,7 +90,7 @@ export default class LedgerTransactionController {
 
       const service = new LedgerTransactionService();
 
-      const transaction = await service.updateLedgerTransaction({
+      const ledger_transaction = await service.updateLedgerTransaction({
         ...rest,
         company_id,
         id,
@@ -99,6 +110,17 @@ export default class LedgerTransactionController {
         business_id: entity_id,
         business_ref: convertEntityType(entity_type as EntityKey)
       }, client)
+      await emitAuditJournal({
+        client,
+        entityId: entity_id,
+        entityType: entity_type,
+        companyId: data.company_id,
+        tableName: "ledger_transactions",
+        tableRowId: id,
+        action: "update",
+        record: ledger_transaction,
+        changes:{ledger_transaction :ledger_transaction.changes},
+      });
       return `Ledger transaction has been updated successfully.`;
     })
   }

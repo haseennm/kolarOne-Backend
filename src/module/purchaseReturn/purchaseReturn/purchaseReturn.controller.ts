@@ -9,6 +9,7 @@ import PurchaseReturnService from "./purchaseReturn.service";
 import PurchaseReturnItemController from "../purchaseReturnItems/purchaseReturnItems.controller";
 import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 import { AppError } from "../../../utils/AppError";
+import { buildAuditChanges, emitAuditJournal } from "../../journal/journal.utils";
 
 export default class PurchaseReturnController {
 
@@ -225,7 +226,16 @@ export default class PurchaseReturnController {
           );
         })
       );
-
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: "F",
+        companyId: company_id,
+        tableName: "purchase_return",
+        tableRowId: purchase_return.id,
+        action: "create",
+        record: purchase_return,
+      });
       return {
         msg: `purchase return ${purchase_return.return_number} has been created successfully.`,
         id: purchase_return.id
@@ -377,7 +387,7 @@ export default class PurchaseReturnController {
       const stockController = new StockController();
       const prItemController = new PurchaseReturnItemController(); // Adjust name to your exact item class
       const deletedItemIds = new Set(delete_item_ids ?? []);
-
+      const oldItems = await prItemController.fetchItemsOnly(client, rest.firm_id, rest.purchase_return_id)
       if (items?.some((item) => item.item_id && deletedItemIds.has(item.item_id))) {
         throw new AppError("Cannot edit and delete the same return item line", 400);
       }
@@ -387,7 +397,7 @@ export default class PurchaseReturnController {
         for (const item_id of delete_item_ids) {
           const deletedItem = await prItemController.deletePurchaseItem(
             {
-              purchase_id: prRecord.id,
+              purchase_id: prRecord.data.id,
               firm_id: rest.firm_id,
             },
             client
@@ -395,7 +405,7 @@ export default class PurchaseReturnController {
           // Reverse stock removal since line was deleted
           await stockController.deleteStock(
             {
-              purchase_id: prRecord.id,
+              purchase_id: prRecord.data.id,
               firm_id: rest.firm_id,
             },
             client
@@ -412,7 +422,7 @@ export default class PurchaseReturnController {
             const stock = await stockController.createStock({
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
-              purchase_id: prRecord.purchase_id,
+              purchase_id: prRecord.data.purchase_id,
               product_id: item.product_id,
               available_qty: -item.return_qty!, // Negative because stock is leaving due to return
               purchased_qty: item.return_qty!,
@@ -423,7 +433,7 @@ export default class PurchaseReturnController {
             }, client);
 
             await prItemController.createPurchaseReturnItem({
-              purchase_return_id: prRecord.id,
+              purchase_return_id: prRecord.data.id,
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
               status: status ?? "Completed",
@@ -471,7 +481,7 @@ export default class PurchaseReturnController {
             firm_id: rest.firm_id,
             branch_id: rest.branch_id,
             company_id,
-            purchase_id: prRecord.purchase_id,
+            purchase_id: prRecord.data.purchase_id,
             product_id: item.product_id,
             available_qty: -item.return_qty!, // Adjust delta bounds safely
             purchased_qty: item.return_qty,
@@ -481,13 +491,14 @@ export default class PurchaseReturnController {
           }, client);
         }
       }
+      const updatedItems = await prItemController.fetchItemsOnly(client, rest.firm_id, rest.purchase_return_id)
 
       // 4. Invoke your Refactored Generic Payment System
       const entity_type = convertEntityType("Firm" as EntityKey);
       const payment_transactions_service = new PaymentTransactionService();
 
       await payment_transactions_service.syncPaymentTransactions({
-        ref_id: prRecord.id,
+        ref_id: prRecord.data.id,
         ref_type: PaymentTransactionTypeCodeMap["purchase_return"], // Ensure this map key exists (e.g., 'PR')
         company_id,
         firm_id: rest.firm_id,
@@ -497,8 +508,8 @@ export default class PurchaseReturnController {
       }, client);
 
       // 5. Party Balance Reconciliation (Returns usually bring incoming cash 'I')
-      const actualRefundAmount = Number(prRecord.refund_amount ?? 0);
-      const actualFinalAmount = Number(prRecord.final_amount ?? 0);
+      const actualRefundAmount = Number(prRecord.data.refund_amount ?? 0);
+      const actualFinalAmount = Number(prRecord.data.final_amount ?? 0);
       const difference = actualRefundAmount - actualFinalAmount;
 
       const party_balance_controller = new PartyBalanceController();
@@ -518,7 +529,7 @@ export default class PurchaseReturnController {
 
       await party_balance_controller.editPartyBalance(
         {
-          ref_id: prRecord.id,
+          ref_id: prRecord.data.id,
           ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
           action_by: updated_by,
           balance: Math.abs(difference),
@@ -528,8 +539,22 @@ export default class PurchaseReturnController {
         },
         client
       );
-
-      return `Purchase return document ${prRecord.return_number} has been updated successfully.`;
+      const item_changes = buildAuditChanges(oldItems, updatedItems);
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: "F",
+        companyId: company_id,
+        tableName: "purchase_return",
+        tableRowId: prRecord.data.id,
+        action: "update",
+        record: prRecord.data,
+        changes: {
+          "purchase return": prRecord.changes,
+          "purchase items": item_changes
+        },
+      });
+      return `Purchase return document ${prRecord.data.return_number} has been updated successfully.`;
     });
   }
   async purchaseReturnFetch(data: PurchaseReturnFetchParams) {
@@ -604,11 +629,21 @@ export default class PurchaseReturnController {
       //   },
       //   client
       // );
-      payment_transactions_service.deletePaymentTransaction({
-        company_id: purchase_return.company_id,
-        ref_id: rest.id,
-        ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
-      }, client)
+      // payment_transactions_service.deletePaymentTransaction({
+      //   company_id: purchase_return.company_id,
+      //   ref_id: rest.id,
+      //   ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
+      // }, client)
+      await emitAuditJournal({
+        client,
+        entityId: purchase_return.id,
+        entityType: "F",
+        companyId:purchase_return.company_id,
+        tableName: "purchase_return",
+        tableRowId: purchase_return.id,
+        action: "delete",
+        record: purchase_return,
+      });
 
       return "purchase return deleted successfully"
     })

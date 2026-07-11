@@ -1,3 +1,5 @@
+import { PoolClient } from "pg";
+import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getStatusCode, getStatusText, isValidDateFormat } from "../../utils/extra";
 import ProductService from "./product.service";
@@ -8,6 +10,7 @@ import {
   FetchProductParams,
   GetProductReport,
 } from "./product.types";
+import { emitAuditJournal } from "../journal/journal.utils";
 
 export default class ProductController {
   async fetchProducts(data: FetchProductParams) {
@@ -36,70 +39,103 @@ export default class ProductController {
 
   async createProduct(data: CreateProductBody) {
     const { created_by, status, image, ...rest } = data;
+    return transaction(async (client: PoolClient) => {
 
-    const remarks = {
-      action: "Created",
-      created_by,
-      created_at: Date.now(),
-    };
-
-    const statusCode = getStatusCode(status);
-
-    const service = new ProductService();
-
-    const product = await service.createProduct({
-      ...rest,
-      remarks,
-      statusCode,
-      image,
-    });
-
-    return product;
+      const remarks = {
+        action: "Created",
+        created_by,
+        created_at: Date.now(),
+      };
+      const statusCode = getStatusCode(status);
+      const service = new ProductService();
+      const product = await service.createProduct({
+        ...rest,
+        remarks,
+        statusCode,
+        image,
+      }, client);
+      await emitAuditJournal({
+        client,
+        entityId: rest.company_id,
+        entityType: "C",
+        companyId: rest.company_id,
+        tableName: "products",
+        tableRowId: product.id,
+        action: "create",
+        record: product,
+      });
+      return product;
+    })
   }
 
   async editProduct(data: EditProductBody) {
-    const { updated_by, status, ...rest } = data;
+    return transaction(async (client: PoolClient) => {
 
-    const remarks = {
-      action: "Updated",
-      updated_by,
-      updated_at: Date.now(),
-    };
+      const { updated_by, status, ...rest } = data;
 
-    let statusCode;
+      const remarks = {
+        action: "Updated",
+        updated_by,
+        updated_at: Date.now(),
+      };
 
-    if (typeof status === "string") {
-      statusCode = getStatusCode(status);
-    }
+      let statusCode;
 
-    const service = new ProductService();
+      if (typeof status === "string") {
+        statusCode = getStatusCode(status);
+      }
 
-    const product = await service.updateProduct({
-      ...rest,
-      remarks,
-      statusCode,
-    });
+      const service = new ProductService();
 
-    return product;
+      const product = await service.updateProduct({
+        ...rest,
+        remarks,
+        statusCode,
+      }, client);
+      await emitAuditJournal({
+        client,
+        entityId: rest.company_id,
+        entityType: "C",
+        companyId: rest.company_id,
+        tableName: "products",
+        tableRowId: rest.id,
+        action: "update",
+        record: product.data,
+        changes: { product: product.changes },
+      });
+      return product;
+    })
   }
 
   async deleteProduct(data: DeleteProductBody) {
-    const { deleted_by, ...rest } = data;
+    return transaction(async (client: PoolClient) => {
 
-    const remarks = {
-      action: "Deleted",
-      deleted_by,
-      deleted_at: Date.now(),
-    };
+      const { deleted_by, ...rest } = data;
 
-    const service = new ProductService();
+      const remarks = {
+        action: "Deleted",
+        deleted_by,
+        deleted_at: Date.now(),
+      };
 
-    const product = await service.deleteProduct({
-      ...rest,
-      remarks,
-    });
+      const service = new ProductService();
 
-    return product;
+      const product = await service.deleteProduct({
+        ...rest,
+        remarks,
+      }, client);
+      await emitAuditJournal({
+        client,
+        entityId: rest.company_id,
+        entityType: "C",
+        companyId: rest.company_id,
+        tableName: "products",
+        tableRowId: rest.r_id,
+        action: "delete",
+        record: product,
+      });
+      return product;
+    })
   }
   async getProductReport(data: GetProductReport) {
 

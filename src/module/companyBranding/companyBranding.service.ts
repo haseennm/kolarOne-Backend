@@ -1,12 +1,12 @@
-import { Result } from "pg";
+import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
-import { cns, getRecord } from "../../utils/extra";
 import { AppError } from "../../utils/AppError";
+import { buildAuditChanges } from "../journal/journal.utils";
 import { CreateCompanyBrandingParams, DeleteCompanyBrandingParams, EditCompanyBrandingParams } from "./companyBranding.types";
 
 export default class CompanyBrandingService {
 
-  async createCompanyBranding(data: CreateCompanyBrandingParams) {
+  async createCompanyBranding(data: CreateCompanyBrandingParams, client?: PoolClient) {
     const {
       company_id,
       accent_color,
@@ -27,11 +27,10 @@ export default class CompanyBrandingService {
       statusCode,
       remark
     } = data;
-    cns("datato insert", data)
-    const result = await transaction(async (client) => {
 
+    const runCreate = async (txClient: PoolClient) => {
       const is_branding_exist_for_company = await executeInTransaction(
-        client,
+        txClient,
         `SELECT id FROM company_branding WHERE company_id = $1 AND status != $2`,
         [company_id, 0]
       );
@@ -89,12 +88,12 @@ export default class CompanyBrandingService {
         JSON.stringify(remark)
       ];
 
-      await executeInTransaction(client, queryText, values);
+      const { rows } = await executeInTransaction(txClient, queryText, values);
+      return rows[0];
+    };
 
-      return "New branding has been created";
-    });
-
-    return result;
+    if (client) return runCreate(client);
+    return transaction(runCreate);
   }
   async fetchCompanyBranding(company_id: number) {
     const branding = await query(
@@ -115,7 +114,7 @@ export default class CompanyBrandingService {
     };
   }
 
-  async updateCompany_branding(data: EditCompanyBrandingParams) {
+  async updateCompany_branding(data: EditCompanyBrandingParams, client?: any) {
     const {
       id,
       company_id,
@@ -138,10 +137,10 @@ export default class CompanyBrandingService {
       tagline
     } = data;
 
-    const result = await transaction(async (client) => {
+    const runUpdate = async (txClient: PoolClient) => {
 
       const isBrandingExist = await executeInTransaction(
-        client,
+        txClient,
         `SELECT * FROM company_branding WHERE id = $1 AND status != 0 AND company_id =$2`,
         [id, company_id]
       );
@@ -201,18 +200,20 @@ export default class CompanyBrandingService {
         id
       ];
 
-      const { rows } = await executeInTransaction(client, queryText, values);
+      const { rows } = await executeInTransaction(txClient, queryText, values);
+      const updatedBranding = rows[0];
+      const changes = buildAuditChanges(existing, updatedBranding);
+      return { data: updatedBranding, changes };
+    };
 
-      return `Branding for company ${rows[0].company_id} updated successfully`;
-    });
-
-    return result;
+    if (client) return runUpdate(client);
+    return transaction(runUpdate);
   }
 
-  async deleteCompanyBranding(data: DeleteCompanyBrandingParams) {
+  async deleteCompanyBranding(data: DeleteCompanyBrandingParams, client?: PoolClient) {
     const { company_id, remark } = data;
-    const result = transaction(async (client) => {
-      const is_row_exist = await executeInTransaction(client,
+    const runDelete = async (txClient: PoolClient) => {
+      const is_row_exist = await executeInTransaction(txClient,
         `SELECT id FROM company_branding WHERE company_id = $1 AND status != $2`,
         [company_id, 0]);
 
@@ -241,11 +242,12 @@ export default class CompanyBrandingService {
         0
       ];
 
-      await executeInTransaction(client, queryText, values);
+      const { rows } = await executeInTransaction(txClient, queryText, values);
 
-      return `Branding For the company Deleted Successfully`;
-    })
-    return result
+      return rows[0];
+    };
+    if (client) return runDelete(client);
+    return transaction(runDelete);
   }
 
 }

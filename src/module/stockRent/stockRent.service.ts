@@ -10,10 +10,12 @@ import {
   FetchStockRentParams,
 } from "./stockRent.types";
 import { AppError } from "../../utils/AppError";
+import { PoolClient } from "pg";
+import { buildAuditChanges } from "../journal/journal.utils";
 
 export default class StockRentalService {
 
-  async createStockRental(data: CreateStockRentParams) {
+  async createStockRental(data: CreateStockRentParams, client: PoolClient) {
     const {
       company_id,
       branch_id,
@@ -30,39 +32,37 @@ export default class StockRentalService {
       remark,
     } = data;
 
-    return transaction(async (client) => {
+    const isCompanyExist = await getRecord(company_id,
+      "company",
+      "id",
+      company_id,
+      client);
+    if (!isCompanyExist) { throw new AppError("Company not found", 404); }
 
-      const isCompanyExist = await getRecord(company_id,
-        "company",
-        "id",
-        company_id,
-        client);
-      if (!isCompanyExist) { throw new AppError("Company not found", 404); }
+    const isbranchExist = await getRecord(branch_id,
+      "branches",
+      "company_id",
+      company_id,
+      client);
+    if (!isbranchExist) { throw new AppError("Branch not found", 404); }
 
-      const isbranchExist = await getRecord(branch_id,
-        "branches",
-        "company_id",
-        company_id,
-        client);
-      if (!isbranchExist) { throw new AppError("Branch not found", 404); }
+    const isproductExist = await getRecord(product_id,
+      "products",
+      "company_id",
+      company_id,
+      client);
+    if (!isproductExist) { throw new AppError("Product not found", 404); }
 
-      const isproductExist = await getRecord(product_id,
-        "products",
-        "company_id",
-        company_id,
-        client);
-      if (!isproductExist) { throw new AppError("Product not found", 404); }
+    /**
+     * INDIVIDUAL STOCK
+     */
+    if (stock_type === "I") {
+      const insertedRows = [];
 
-      /**
-       * INDIVIDUAL STOCK
-       */
-      if (stock_type === "I") {
-        const insertedRows = [];
-
-        for (const name of unique_name) {
-          const { rows } = await executeInTransaction(
-            client,
-            `
+      for (const name of unique_name) {
+        const { rows } = await executeInTransaction(
+          client,
+          `
           INSERT INTO rental_stocks (
             company_id,
             branch_id,
@@ -85,40 +85,40 @@ export default class StockRentalService {
           )
           RETURNING *;
           `,
-            [
-              company_id,
-              branch_id,
-              product_id,
-              "I",
-              1,
-              1,
-              name,
-              price_hour,
-              price_day,
-              price_week,
-              price_month,
-              default_return_date,
-              statusCode,
-              JSON.stringify(remark ?? {}),
-            ]
-          );
+          [
+            company_id,
+            branch_id,
+            product_id,
+            "I",
+            1,
+            1,
+            name,
+            price_hour,
+            price_day,
+            price_week,
+            price_month,
+            default_return_date,
+            statusCode,
+            JSON.stringify(remark ?? {}),
+          ]
+        );
 
-          insertedRows.push(rows[0]);
-        }
-
-        return {
-          message: `${insertedRows.length} individual stocks created`,
-          count: insertedRows.length,
-          data: insertedRows,
-        };
+        insertedRows.push(rows[0]);
       }
 
-      /**
-       * GROUP STOCK
-       */
-      const { rows } = await executeInTransaction(
-        client,
-        `
+      return {
+        message: `${insertedRows.length} individual stocks created`,
+        count: insertedRows.length,
+        data: insertedRows,
+      };
+    }
+
+    /**
+     * GROUP STOCK
+     */
+    const { rows } = await executeInTransaction(
+      client,
+      `
       INSERT INTO rental_stocks (
         company_id,
         branch_id,
@@ -140,28 +140,27 @@ export default class StockRentalService {
       )
       RETURNING *;
       `,
-        [
-          company_id,
-          branch_id,
-          product_id,
-          "G",
-          total_units,
-          total_units,
-          price_hour,
-          price_day,
-          price_week,
-          price_month,
-          default_return_date,
-          statusCode,
-          JSON.stringify(remark ?? {}),
-        ]
-      );
+      [
+        company_id,
+        branch_id,
+        product_id,
+        "G",
+        total_units,
+        total_units,
+        price_hour,
+        price_day,
+        price_week,
+        price_month,
+        default_return_date,
+        statusCode,
+        JSON.stringify(remark ?? {}),
+      ]
+    );
 
-      return {
-        message: "Group stock created",
-        data: rows[0],
-      };
-    });
+    return {
+      message: "Group stock created",
+      data: rows[0],
+    };
   }
 
   async fetchStockRental(data: FetchStockRentParams) {
@@ -280,53 +279,52 @@ OFFSET $${values.length + 2}
     };
   }
 
-  async updateStockRental(data: EditStockRentParams) {
+  async updateStockRental(data: EditStockRentParams, client: PoolClient) {
 
     const {
       id,
-       company_id,
-          branch_id,
-          default_return_date,
-          price_day,
-          price_hour,
-          price_month,
-          price_week,
-          product_id,
-          statusCode,
-          total_units,
-          unique_name,
-          remark
+      company_id,
+      branch_id,
+      default_return_date,
+      price_day,
+      price_hour,
+      price_month,
+      price_week,
+      product_id,
+      statusCode,
+      total_units,
+      unique_name,
+      remark
     } = data;
 
-    const result = transaction(async (client) => {
 
-      const isRentStockExist = await getRecord(
-        id,
-        "customers",
+    const isRentStockExist = await getRecord(
+      id,
+      "customers",
+      "company_id",
+      company_id,
+      client
+    );
+
+    if (!isRentStockExist) {
+      throw new AppError("Stock not found For rent", 404);
+    }
+    if (product_id) {
+
+      const isProductExist = await getRecord(
+        product_id,
+        "products",
         "company_id",
         company_id,
         client
       );
 
-      if (!isRentStockExist) {
-        throw new AppError("Stock not found For rent", 404);
+      if (!isProductExist) {
+        throw new AppError("Product not found", 404);
       }
-      if(product_id){
+    }
 
-        const isProductExist = await getRecord(
-          product_id,
-          "products",
-          "company_id",
-          company_id,
-          client
-        );
-  
-        if (!isProductExist) {
-          throw new AppError("Product not found", 404);
-        }
-      }
-
-      const queryText = `
+    const queryText = `
       UPDATE rental_stocks
       SET
           default_return_date = $2,
@@ -349,48 +347,44 @@ OFFSET $${values.length + 2}
       RETURNING *;
       `;
 
-      const values = [
-        default_return_date ?? isRentStockExist.default_return_date,
-        price_day ?? isRentStockExist.price_day,
-        price_hour ?? isRentStockExist.price_hour,
-        price_month ?? isRentStockExist.price_month,
-        price_week ?? isRentStockExist.price_week,
-        product_id ?? isRentStockExist.product_id,
-        statusCode ?? isRentStockExist.status,
-        total_units ?? isRentStockExist.total_units,
-        unique_name ?? isRentStockExist.unique_name,
-        JSON.stringify(remark),
-        id,
-        branch_id
-      ];
+    const values = [
+      default_return_date ?? isRentStockExist.default_return_date,
+      price_day ?? isRentStockExist.price_day,
+      price_hour ?? isRentStockExist.price_hour,
+      price_month ?? isRentStockExist.price_month,
+      price_week ?? isRentStockExist.price_week,
+      product_id ?? isRentStockExist.product_id,
+      statusCode ?? isRentStockExist.status,
+      total_units ?? isRentStockExist.total_units,
+      unique_name ?? isRentStockExist.unique_name,
+      JSON.stringify(remark),
+      id,
+      branch_id
+    ];
 
-      const { rows } = await executeInTransaction(client, queryText, values);
-
-      return rows[0];
-    });
-
-    return result;
+    const { rows } = await executeInTransaction(client, queryText, values);
+    const changes = buildAuditChanges(isRentStockExist, rows[0]);
+    return { changes, data: rows[0] };
   }
 
-  async deleteStockRental(data: DeleteStockRentParams) {
+  async deleteStockRental(data: DeleteStockRentParams, client: PoolClient) {
 
     const { r_id, remark, branch_id } = data;
 
-    const result = transaction(async (client) => {
 
-      const isStockRentExist = await getRecord(
-        r_id,
-        "rental_stocks",
-        "branch_id",
-        branch_id,
-        client
-      );
+    const isStockRentExist = await getRecord(
+      r_id,
+      "rental_stocks",
+      "branch_id",
+      branch_id,
+      client
+    );
 
-      if (!isStockRentExist) {
-        throw new AppError("stock for rental not found or already deleted", 404);
-      }
+    if (!isStockRentExist) {
+      throw new AppError("stock for rental not found or already deleted", 404);
+    }
 
-      const queryText = `
+    const queryText = `
       UPDATE rental_stocks
       SET
         status = $1,
@@ -404,18 +398,15 @@ OFFSET $${values.length + 2}
       RETURNING *;
       `;
 
-      const values = [
-        0,
-        JSON.stringify(remark),
-        r_id
-      ];
+    const values = [
+      0,
+      JSON.stringify(remark),
+      r_id
+    ];
 
-      await executeInTransaction(client, queryText, values);
+    const { rows } = await executeInTransaction(client, queryText, values);
 
-      return `Rental ${isStockRentExist.unique_name} deleted successfully`;
-    });
-
-    return result;
+    return rows[0]
   }
   // async getStockRentalReportSummary(data: GetCustomerReport) {
 

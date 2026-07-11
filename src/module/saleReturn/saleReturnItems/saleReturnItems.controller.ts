@@ -54,7 +54,11 @@ export default class SaleReturnItemController {
     return sale_return_item;
   }
 
-
+  async fetchItemsOnly(client: PoolClient, firm_id: number, sale_return_id: number) {
+    const service = new SaleReturnItemService();
+    const items = service.fetchItemsOnly(client, firm_id, sale_return_id)
+    return items
+  }
 
 
   async deleteSaleItem(data: DeleteSaleReturnItemBody, client: PoolClient) {

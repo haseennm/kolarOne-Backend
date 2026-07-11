@@ -1,6 +1,7 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord } from "../../utils/extra";
+import { buildAuditChanges } from "../journal/journal.utils";
 
 import {
   CreatePaymentMethodParams,
@@ -13,7 +14,7 @@ import {
 
 export default class PaymentMethodService {
 
-  async createPaymentMethod(data: CreatePaymentMethodParams) {
+  async createPaymentMethod(data: CreatePaymentMethodParams, client?: any) {
 
     const {
       name,
@@ -23,14 +24,14 @@ export default class PaymentMethodService {
       note
     } = data;
 
-    const result = transaction(async (client) => {
+    const runCreate = async (txClient: any) => {
 
       const isCompanyExist = await getRecord(
         company_id,
         "company",
         "id",
         company_id,
-        client
+        txClient
       );
 
       if (!isCompanyExist) {
@@ -55,12 +56,13 @@ export default class PaymentMethodService {
         note ?? null
       ];
 
-      const { rows } = await executeInTransaction(client, queryText, values);
+      const { rows } = await executeInTransaction(txClient, queryText, values);
 
-      return `Payment Method ${rows[0].method_name} created`;
-    });
+      return rows[0];
+    };
 
-    return result;
+    if (client) return runCreate(client);
+    return transaction(runCreate);
   }
 
   async fetchPaymentMethod(data: FetchPaymentMethodParams) {
@@ -126,7 +128,7 @@ export default class PaymentMethodService {
     };
   }
 
-  async updatePaymentMethod(data: EditPaymentMethodParams) {
+  async updatePaymentMethod(data: EditPaymentMethodParams, client?: any) {
 
     const {
       id,
@@ -137,14 +139,14 @@ export default class PaymentMethodService {
       updated_by
     } = data;
 
-    const result = transaction(async (client) => {
+    const runUpdate = async (txClient: any) => {
 
       const isPaymentMethodExist = await getRecord(
         id,
         "payment_methods",
         "company_id",
         company_id,
-        client
+        txClient
       );
 
       if (!isPaymentMethodExist) {
@@ -173,26 +175,28 @@ export default class PaymentMethodService {
         id
       ];
 
-      const { rows } = await executeInTransaction(client, queryText, values);
+      const { rows } = await executeInTransaction(txClient, queryText, values);
+      const updatedPaymentMethod = rows[0];
+      const changes = buildAuditChanges(isPaymentMethodExist, updatedPaymentMethod);
+      return { data: updatedPaymentMethod, changes };
+    };
 
-      return `Payment Method ${rows[0].method_name} Updated`;
-    });
-
-    return result;
+    if (client) return runUpdate(client);
+    return transaction(runUpdate);
   }
 
-  async deletePaymentMethod(data: DeletePaymentMethodBody) {
+  async deletePaymentMethod(data: DeletePaymentMethodBody, client?: any) {
 
     const { r_id, company_id, deleted_by } = data;
 
-    const result = transaction(async (client) => {
+    const runDelete = async (txClient: any) => {
 
       const isPaymentMethodExist = await getRecord(
         r_id,
         "payment_methods",
         "company_id",
         company_id,
-        client
+        txClient
       );
 
       if (!isPaymentMethodExist) {
@@ -213,12 +217,12 @@ export default class PaymentMethodService {
         company_id
       ];
 
-      await executeInTransaction(client, queryText, values);
+      const { rows } = await executeInTransaction(txClient, queryText, values);
+      return rows[0];
+    };
 
-      return `Payment Method ${isPaymentMethodExist.method_name} deleted successfully`;
-    });
-
-    return result;
+    if (client) return runDelete(client);
+    return transaction(runDelete);
   }
 
 }

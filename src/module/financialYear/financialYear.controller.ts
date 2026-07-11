@@ -1,6 +1,7 @@
 import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { convertEntityType, EntityKey, getStatusCode, getStatusText } from "../../utils/extra";
+import { getStatusCode, getStatusText } from "../../utils/extra";
+import { emitAuditJournal } from "../journal/journal.utils";
 import FinancialYearService from "./financialYear.service";
 import {
   CreateFinancialYearBody,
@@ -42,7 +43,18 @@ export default class FinancialYearController {
         client
       );
 
-      return `FinancialYear ${financialYear.FinancialYear} has been created successfully.`;
+      await emitAuditJournal({
+        client,
+        entityId: data.company_id,
+        entityType: "C",
+        companyId: data.company_id,
+        tableName: "financial_year",
+        tableRowId: financialYear.id,
+        action: "create",
+        record: financialYear,
+      });
+
+      return financialYear;
     });
   }
 
@@ -65,7 +77,7 @@ export default class FinancialYearController {
 
       const service = new FinancialYearService();
 
-      await service.updateFinancialYear(
+      const result = await service.updateFinancialYear(
         {
           ...rest,
           statusCode,
@@ -74,7 +86,19 @@ export default class FinancialYearController {
         client
       );
 
-      return `FinancialYear has been updated successfully.`;
+      await emitAuditJournal({
+        client,
+        entityId: data.company_id,
+        entityType: "C",
+        companyId: data.company_id,
+        tableName: "financial_year",
+        tableRowId: result.id,
+        action: "update",
+        record: result,
+        changes: result.changes,
+      });
+
+      return result;
     });
   }
 
@@ -98,13 +122,24 @@ export default class FinancialYearController {
 
   async deleteFinancialYear(data: DeleteFinancialYearBody) {
 
-    return transaction(async () => {
+    return transaction(async (client) => {
 
       const service = new FinancialYearService();
 
-      const FinancialYear = await service.deleteFinancialYear(data);
+      const financialYear = await service.deleteFinancialYear(data, client);
 
-      return `Financial year  has been deleted successfully.`;
+      await emitAuditJournal({
+        client,
+        entityId: data.company_id,
+        entityType: "C",
+        companyId: data.company_id,
+        tableName: "financial_year",
+        tableRowId: financialYear.id,
+        action: "delete",
+        record: financialYear,
+      });
+
+      return financialYear;
     });
   }
 }

@@ -3,6 +3,7 @@ import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { getRecord, getStatusCode } from "../../../utils/extra";
 import { PurchaseReturnCreateParams, PurchaseReturnDeleteParams, PurchaseReturnFetchParams, PurchaseReturnReturnParams, RepayBalancePurchaseReturn } from "./purchaseReturn.types";
+import { buildAuditChanges } from "../../journal/journal.utils";
 
 export default class PurchaseReturnService {
 
@@ -440,7 +441,7 @@ RETURNING *;
       total_igst ?? is_return_exist.total_igst,
       targetFinalAmount,
       computed_payment_amount,
-      this.billStatus(targetFinalAmount,computed_payment_amount),
+      this.billStatus(targetFinalAmount, computed_payment_amount),
       JSON.stringify([remark]),
       merged_payments_json,
       firm_id,
@@ -448,7 +449,8 @@ RETURNING *;
     ];
 
     const { rows } = await executeInTransaction(client, prQuery, values);
-    return rows[0];
+    const changes = buildAuditChanges(is_return_exist, rows[0]);
+    return {data:rows[0],changes};
   }
 
 
@@ -622,7 +624,7 @@ RETURNING *;
                       'total_igst', pri.total_igst,
                       'final_amount', pri.net_amount,
                       'max_return_qty', pi.purchased_qty,
-                      'purchase_item_id', pi.purchase_item_id,
+                      'purchase_item_id', pri.purchase_item_id,
                       'status', pri.status
                   )
               ) FILTER (WHERE pri.id IS NOT NULL),
@@ -846,7 +848,9 @@ RETURNING *;
     ];
 
     const { rows } = await executeInTransaction(client, query, values);
-    return rows[0];
+    const changes = buildAuditChanges(is_purchase_return_exist, rows[0]);
+    return { data: rows[0], changes, table_name: "purchase_return" };
+
   }
   // async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
   //   const { id, firm_id } = data;

@@ -3,6 +3,7 @@ import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { getRecord, getStatusCode } from "../../../utils/extra";
 import { GetReportSalePurchaseLedger, RepayBalanceSale, SaleCreateParams, SaleDeleteParams, SaleEditParams, SaleFetchParams } from "./sale.types";
+import { buildAuditChanges } from "../../journal/journal.utils";
 
 export default class SaleService {
   private billStatus(final_amount: number, paid_amount: number) {
@@ -177,9 +178,9 @@ export default class SaleService {
       price_pool,
       is_intrastate,
       state_code,
-      courier_charge,
-      handling_charge,
-      other_charge
+      courier_charge ?? 0,
+      handling_charge ?? 0,
+      other_charge ?? 0
     ];
 
     const { rows } = await executeInTransaction(client, query, values);
@@ -434,7 +435,11 @@ export default class SaleService {
     ];
 
     const { rows } = await executeInTransaction(client, saleQuery, values);
-    return rows[0];
+    const changes = buildAuditChanges(is_sale_exist, rows[0]);
+    return {
+      changes,
+      data: rows[0]
+    };
   }
 
   async fetchSale(data: SaleFetchParams) {
@@ -976,8 +981,9 @@ OFFSET $${values.length + 2}
       sale_id,
       firm_id
     ];
-
     const { rows } = await executeInTransaction(client, query, values);
-    return rows[0];
+    const changes = buildAuditChanges(is_sale_exist, rows[0]);
+    return { data: rows[0], changes, table_name: "sales" };
+
   }
 }

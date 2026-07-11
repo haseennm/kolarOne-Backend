@@ -3,6 +3,7 @@ import { ChangeQuotationStatus, QuotationCreateParams, QuotationDeleteParams, Qu
 import { getRecord, getStatusCode } from "../../../utils/extra";
 import { AppError } from "../../../utils/AppError";
 import { executeInTransaction, query } from "../../../config/db";
+import { buildAuditChanges } from "../../journal/journal.utils";
 
 export default class QuotationService {
   async createQuotation(data: QuotationCreateParams, client: PoolClient) {
@@ -279,7 +280,8 @@ export default class QuotationService {
     ];
 
     const { rows } = await executeInTransaction(client, updateQuery, values);
-    return rows[0];
+    const changes = buildAuditChanges(is_quotation_exist, rows[0]);
+    return {data:rows[0],changes};
   }
 
   async fetchQuotations(data: QuotationFetchParams) {

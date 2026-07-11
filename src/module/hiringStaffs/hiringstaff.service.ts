@@ -1,6 +1,7 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { cns, getRecord, getStatusCode } from "../../utils/extra";
+import { buildAuditChanges } from "../journal/journal.utils";
 import { CreateHireStaffParams, DeleteHireStaffParams, EditStatusHireStaffParams, FetchDbHireStaff, FetchHireStaffParams, HireStaffCountResult } from "./hiringstaff.types";
 
 
@@ -52,30 +53,30 @@ export default class StaffService {
     if (!isEntityExist) {
       throw new AppError(`${entity_table} not found`, 404);
     }
- const already_exist = await executeInTransaction(
-  client,
-  `SELECT id
+    const already_exist = await executeInTransaction(
+      client,
+      `SELECT id
    FROM hiring_staff
    WHERE entity_id = $1
      AND entity_type = $2
      AND phone_number = $3
      AND date_of_birth = $4
      AND status = $5`,
-  [
-    entity_id,
-    entity_type,
-    phone_number,
-    date_of_birth,
-    getStatusCode("Pending")
-  ]
-);
+      [
+        entity_id,
+        entity_type,
+        phone_number,
+        date_of_birth,
+        getStatusCode("Pending")
+      ]
+    );
 
-if ((already_exist.rowCount ?? 0) > 0) {
-  throw new AppError(
-    "You have a pending application already exists there",
-    400
-  );
-}
+    if ((already_exist.rowCount ?? 0) > 0) {
+      throw new AppError(
+        "You have a pending application already exists there",
+        400
+      );
+    }
     const queryText = `
   INSERT INTO hiring_staff (
     company_id,
@@ -286,8 +287,9 @@ if ((already_exist.rowCount ?? 0) > 0) {
       updateQuery,
       values
     );
+    const changes = buildAuditChanges(isStaffExistResult, rows[0]);
 
-    return rows[0];
+    return {data:rows[0],changes};
   }
 
   async deleteHireStaff(data: DeleteHireStaffParams, client: any) {

@@ -4,6 +4,7 @@ import { cns, getStatusCode, getStatusText, getTransactionCode } from "../../uti
 import StockService from "./stock.service";
 import { FetchPopup, StockAdditionalBody, StockAdjustFetchParams, StockChangeBody, StockCreateBody, StockDelete, StockEditBody, StockFetchParams, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
 import { AppError } from "../../utils/AppError";
+import { emitAuditJournal } from "../journal/journal.utils";
 
 export default class StockController {
 
@@ -72,7 +73,7 @@ export default class StockController {
     const statusCode = getStatusCode("Good");
     return transaction(async (client: PoolClient) => {
 
-      await service.createManualStock(
+      const stock = await service.createManualStock(
         {
           statusCode,
           reason: getTransactionCode("addition"),
@@ -81,6 +82,16 @@ export default class StockController {
         ,
         client
       );
+      await emitAuditJournal({
+        client,
+        entityId: data.firm_id,
+        entityType: "F",
+        companyId: data.company_id,
+        tableName: "stock",
+        tableRowId: stock.id,
+        action: "create",
+        record: stock,
+      });
     })
   }
   async setPrice(data: StockPriceSet) {
@@ -100,13 +111,26 @@ export default class StockController {
     const service = new StockService();
     return transaction(async (client: PoolClient) => {
 
-      await service.changeQty(
+      const stock = await service.changeQty(
         {
           ...data
         }
         ,
         client
       );
+      await emitAuditJournal({
+        client,
+        entityId: stock.data.firm_id,
+        entityType: "F",
+        companyId: data.company_id,
+        tableName: "purchase_return",
+        tableRowId: stock.data.id,
+        action: "update",
+        record: stock.data,
+        changes: {
+          "stock": stock.changes
+        },
+      });
     })
   }
 
@@ -131,9 +155,9 @@ export default class StockController {
     const service = new StockService();
 
     return await service.popupStock(data);
-    
 
- 
+
+
   }
   async fetchStockAdjust(data: StockAdjustFetchParams) {
 

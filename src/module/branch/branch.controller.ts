@@ -1,6 +1,8 @@
+import { transaction } from '../../config/db'
 import { AppError } from '../../utils/AppError'
 import { generateToken, hashPassword, verifyPassword } from '../../utils/auth.util'
 import { getStatusCode, getStatusText } from '../../utils/extra'
+import { emitAuditJournal } from '../journal/journal.utils'
 import BranchService from './branch.service'
 import { BranchLoginBody, CreateBranchBody, DeleteBranchBody, EditBranchBody, FetchBranchParams } from './branch.types'
 
@@ -26,67 +28,108 @@ export default class BranchController {
         }
     }
     async createBranch(data: CreateBranchBody) {
-        const { created_by, status, password, ...rest } = data;
-        const hashed = await hashPassword(password)
+        return transaction(async (client) => {
+            const { created_by, status, password, ...rest } = data;
+            const hashed = await hashPassword(password)
 
-        const remark = {
-            action: "Created",
-            created_by,
-            created_at: Date.now(),
-        };
-        const statusCode = getStatusCode(status)
-        const service = new BranchService();
+            const remark = {
+                action: "Created",
+                created_by,
+                created_at: Date.now(),
+            };
+            const statusCode = getStatusCode(status)
+            const service = new BranchService();
 
-        const branch = await service.createBranch({
-            ...rest,
-            remark,
-            statusCode,
-            hashed
+            const branch = await service.createBranch({
+                ...rest,
+                remark,
+                statusCode,
+                hashed
+            });
+
+            await emitAuditJournal({
+                client,
+                entityId: branch.id,
+                entityType: "B",
+                companyId: data.company_id,
+                tableName: "branches",
+                tableRowId: branch.id,
+                action: "create",
+                record: branch,
+            });
+
+            return branch;
         });
-
-        return branch;
     }
     async editBranch(data: EditBranchBody) {
-        const { id, updated_by, status, ...rest } = data;
+        return transaction(async (client) => {
+            const { id, updated_by, status, ...rest } = data;
 
-        const remark = {
-            action: "Updated",
-            updated_by,
-            updated_at: Date.now(),
-        };
+            const remark = {
+                action: "Updated",
+                updated_by,
+                updated_at: Date.now(),
+            };
 
-        let statusCode;
+            let statusCode;
 
-        if (typeof status === "string") {
-            statusCode = getStatusCode(status);
-        }
+            if (typeof status === "string") {
+                statusCode = getStatusCode(status);
+            }
 
-        const service = new BranchService();
+            const service = new BranchService();
 
-        const branch = await service.updateBranch({
-            id,
-            ...rest,
-            remark,
-            statusCode,
+            const { data: branch, changes } = await service.updateBranch({
+                id,
+                ...rest,
+                remark,
+                statusCode,
+            });
+
+            await emitAuditJournal({
+                client,
+                entityId: branch.id,
+                entityType: "B",
+                companyId: data.company_id,
+                tableName: "branches",
+                tableRowId: branch.id,
+                action: "update",
+                record: branch,
+                changes:{branch:changes},
+            });
+
+            return { data: branch, changes };
         });
-
-        return branch;
     }
     async deleteBranch(data: DeleteBranchBody) {
-        const { deleted_by, ...rest } = data;
+        return transaction(async (client) => {
+            const { deleted_by, ...rest } = data;
 
-        const remark = {
-            action: "Deleted",
-            deleted_by,
-            updated_at: Date.now(),
-        };
+            const remark = {
+                action: "Deleted",
+                deleted_by,
+                updated_at: Date.now(),
+            };
 
-        const service = new BranchService();
-        const branch = await service.deleteBranch({
-            ...rest,
-            remark,
+            const service = new BranchService();
+            const branch = await service.deleteBranch({
+                ...rest,
+                remark,
+            });
+
+            await emitAuditJournal({
+                client,
+                entityId: branch.id,
+                entityType: "B",
+                companyId: data.company_id,
+                tableName: "branches",
+                tableRowId: branch.id,
+                action: "delete",
+                record: branch,
+            });
+
+            return branch;
         });
-        return branch;
     }
 
     async loginBranch(data: BranchLoginBody) {

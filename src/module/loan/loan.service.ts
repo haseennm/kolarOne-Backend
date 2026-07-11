@@ -48,7 +48,21 @@ export default class LoanService {
     ];
 
     const { rows } = await executeInTransaction(client, loanQuery, values);
-    return rows[0];
+    const createdLoan = rows[0];
+
+    const staffQuery = `
+      SELECT s.full_name AS staff_name
+      FROM staff s
+      WHERE s.id = $1
+    `;
+
+    const staffResult = await executeInTransaction(client, staffQuery, [createdLoan.staff_id]);
+    const staffName = staffResult.rows[0]?.staff_name ?? null;
+
+    return {
+      ...createdLoan,
+      staff_name: staffName,
+    };
   }
 
   async fetchLoan(data: FetchLoanParams) {
@@ -209,14 +223,23 @@ export default class LoanService {
       status,
       loan_id,
     ]);
+    const staffQuery = `
+      SELECT s.full_name AS staff_name
+      FROM staff s
+      WHERE s.id = $1
+    `;
 
-    return rows[0];
+    const staffResult = await executeInTransaction(client, staffQuery, [rows[0].staff_id]);
+    const staffName = staffResult.rows[0]?.staff_name ?? null;
+
+    return {
+      ...rows[0],
+      staff_name: staffName,
+    };
   }
   async deleteLoan(data: DeleteLoanParams, client: PoolClient) {
 
     const { id, branch_id } = data;
-
-
     const isLoan_exist = await getRecord(
       id,
       "staff_loans",

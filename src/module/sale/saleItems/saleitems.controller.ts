@@ -1,8 +1,6 @@
 import { PoolClient } from "pg";
 import { cns, getStatusCode, getStatusText } from "../../../utils/extra";
 import { CreateSaleItemBody, DeleteSaleItemBody, EditSaleItemBody, FetchSaleItemParams } from "./saleitems.types";
-import PurchaseItemService from "./saleitems.service";
-import { AppError } from "../../../utils/AppError";
 import SaleItemService from "./saleitems.service";
 
 export default class SaleItemController {
@@ -17,7 +15,7 @@ export default class SaleItemController {
       action: "Created",
       created_at: Date.now(),
     }
-   
+
     const service = new SaleItemService();
 
     await service.createSaleItems(
@@ -72,6 +70,11 @@ export default class SaleItemController {
     };
   }
 
+  async fetchItemsOnly(client: PoolClient, firm_id: number, sale_id: number) {
+    const service = new SaleItemService();
+    const items = service.fetchItemsOnly(client, firm_id, sale_id)
+    return items
+  }
 
 
 
@@ -82,7 +85,7 @@ export default class SaleItemController {
       deleted_at: Date.now(),
     };
     const service = new SaleItemService();
-   const sale_item = await service.deleteSaleItem({...data,remark},  client);
+    const sale_item = await service.deleteSaleItem({ ...data, remark }, client);
 
     return sale_item;
   }

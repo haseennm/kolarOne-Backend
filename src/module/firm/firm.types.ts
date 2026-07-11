@@ -77,6 +77,7 @@ export interface EditFirmParams
 export interface DeleteFirmBody {
   r_id: number;
   branch_id: number;
+  company_id?: number;
   deleted_by: string;
 }
 

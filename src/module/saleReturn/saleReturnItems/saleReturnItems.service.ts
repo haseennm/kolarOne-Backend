@@ -1,4 +1,4 @@
-import { getRecord } from "../../../utils/extra";
+import { getRecord, getStatusCode } from "../../../utils/extra";
 import { executeInTransaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { PoolClient } from "pg";
@@ -115,7 +115,14 @@ export default class SaleReturnItemService {
     const { rows } = await executeInTransaction(client, saleReturnItemQuery, values);
     return rows[0];
   }
-
+  async fetchItemsOnly(client: PoolClient, firm_id: number, sale_return_id: number) {
+    const { rows } = await executeInTransaction(client,
+      `SELECT * FROM sale_return_items WHERE sale_return_id = $1 AND
+      firm_id =$2 AND status !=$3`,
+      [sale_return_id, firm_id, getStatusCode("Deleted")]
+    )
+    return rows[0]
+  }
   async updateSaleReturnItem(data: EditSaleReturnItemParams, client: PoolClient) {
     const {
       firm_id,

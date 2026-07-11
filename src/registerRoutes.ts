@@ -39,6 +39,7 @@ import { rentLostRouter } from './module/rent loss/rentLoss.router'
 import { rentReportRouter } from './module/rent Report/rentReport.router'
 import { hiringStaffRouter } from './module/hiringStaffs/hiringstaff.router'
 import { quotationRouter } from './module/quotation/quotation/quotation.router'
+import { journalRouter } from './module/journal/journal.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -80,4 +81,5 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(rentLostRouter, { prefix: '/rent/loss' })
   app.register(hiringStaffRouter, { prefix: '/hire/application' })
   app.register(quotationRouter, { prefix: '/quotation' })
+  app.register(journalRouter, { prefix: '/journal' })
 }

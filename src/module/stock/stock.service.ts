@@ -3,6 +3,7 @@ import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord } from "../../utils/extra";
 import { FetchPopup, StockAdditionalParams, StockAdjustFetchParams, StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
+import { buildAuditChanges } from "../journal/journal.utils";
 
 const generateBarcode = (): string => {
   return Math.floor(10000000000 + Math.random() * 90000000000).toString();
@@ -1319,6 +1320,10 @@ export default class StockService {
     ];
 
     await executeInTransaction(client, stockQuery, values);
-    return `${flow_type} created successfully. Quantity changed: ${Math.abs(changed_qty)}`;
+    const changes = buildAuditChanges(isStockExist, updatedStock.rows[0]);
+    return {
+      data:updatedStock.rows[0],
+      changes
+    };
   }
 }

@@ -2,6 +2,7 @@ import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { generateToken, hashPassword, verifyPassword } from "../../utils/auth.util";
 import { cns, convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText } from "../../utils/extra";
+import { emitAuditJournal } from "../journal/journal.utils";
 import StaffService from "./staff.service";
 import { CreateStaffBody, DeleteStaffBody, EditStaffBody, StaffLoginBody, StaffTransfer, StaffTransferRemover } from "./staff.types";
 
@@ -45,16 +46,23 @@ export default class LedgerTransactionController {
         entity_table,
         password_hash: hashed
       }, client);
+      await emitAuditJournal({
+        client,
+        entityId: rest.entity_id,
+        entityType: entity_type,
+        companyId: rest.company_id,
+        tableName: "staff",
+        tableRowId: staff_created.id,
+        action: "create",
+        record: staff_created,
+      });
       return `Staff ${staff_created.full_name} has been created successfully.`;
     })
   }
 
   async fetchStaff(data: any) {
-
     const service = new StaffService();
-
     const staff_with_code = await service.fetchStaff(data);
-
     const staff = staff_with_code.staff.map(({ password_hash, ...rest }) => ({
       ...rest,
       status: getStatusText(rest.status),
@@ -99,16 +107,12 @@ export default class LedgerTransactionController {
     if (entity_type === "F") entity_table = "firm"
 
     return transaction(async (client) => {
-
       let statusCode = undefined;
-
       if (typeof status === "string") {
         statusCode = getStatusCode(status);
       }
-
       const service = new StaffService();
-
-      await service.updateStaff(
+      const updated_staff = await service.updateStaff(
         {
           ...rest,
           id,
@@ -119,6 +123,19 @@ export default class LedgerTransactionController {
         },
         client
       );
+      await emitAuditJournal({
+        client,
+        entityId: rest.entity_id,
+        entityType: entity_type,
+        companyId: company_id,
+        tableName: "staff",
+        tableRowId: updated_staff.data.id,
+        action: "update",
+        record: updated_staff.data,
+        changes: {
+          "staff": updated_staff.changes
+        },
+      });
 
       return `Staff has been updated successfully.`;
     });
@@ -126,19 +143,14 @@ export default class LedgerTransactionController {
 
 
   async deleteStaff(data: DeleteStaffBody) {
-
     const { deleted_by, ...rest } = data;
-
     return transaction(async (client) => {
-
       const remark = {
         action: "Deleted",
         deleted_by,
         deleted_at: Date.now(),
       };
-
       const service = new StaffService();
-
       const staff = await service.deleteStaff(
         {
           ...rest,
@@ -146,7 +158,16 @@ export default class LedgerTransactionController {
         },
         client
       );
-
+      await emitAuditJournal({
+        client,
+        entityId: staff.entity_id,
+        entityType: staff.entity_type,
+        companyId: staff.company_id,
+        tableName: "staff",
+        tableRowId: staff.id,
+        action: "delete",
+        record: staff,
+      });
       return `Staff ${staff.full_name} has been deleted successfully.`;
     });
   }

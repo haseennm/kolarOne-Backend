@@ -16,7 +16,7 @@ export default class PurchaseReturnItemController {
       action: "Created",
       created_at: Date.now(),
     }
-  
+
     const service = new PurchaseReturnItemService();
 
     await service.createPurchaseReturnItems(
@@ -56,22 +56,22 @@ export default class PurchaseReturnItemController {
 
     return purchase_item;
   }
-  async fetchPurchaseItems(data: FetchPurchaseReturnItemParams) {
+  // async fetchPurchaseItems(data: FetchPurchaseReturnItemParams) {
 
-    const service = new PurchaseReturnItemService();
+  //   const service = new PurchaseReturnItemService();
 
-    const rolesWithCode = await service.fetchPurchaseReturnItems(data);
+  //   const rolesWithCode = await service.fetchPurchaseReturnItems(data);
 
-    const roles = rolesWithCode.items.map((row) => ({
-      ...row,
-      status: getStatusText(row.status),
-    }));
+  //   const roles = rolesWithCode.items.map((row) => ({
+  //     ...row,
+  //     status: getStatusText(row.status),
+  //   }));
 
-    return {
-      roles,
-      pagination: { ...rolesWithCode.pagination }
-    };
-  }
+  //   return {
+  //     roles,
+  //     pagination: { ...rolesWithCode.pagination }
+  //   };
+  // }
   async deletePurchaseItem(data: DeletePurchaseReturnItemBody, client: PoolClient) {
 
     const remark = {
@@ -79,8 +79,13 @@ export default class PurchaseReturnItemController {
       deleted_at: Date.now(),
     };
     const service = new PurchaseReturnItemService();
-    await service.deletePurchaseReturnItem({...data,remark},  client);
+    await service.deletePurchaseReturnItem({ ...data, remark }, client);
 
     return `Purchase item has been deleted successfully.`;
+  }
+  async fetchItemsOnly(client: PoolClient, firm_id: number, purchase_return_id: number) {
+    const service = new PurchaseReturnItemService();
+    const items = service.fetchItemsOnly(client, firm_id, purchase_return_id)
+    return items
   }
 }

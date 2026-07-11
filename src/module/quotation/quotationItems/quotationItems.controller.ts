@@ -85,4 +85,9 @@ export default class QuotationItemController {
     const sale_item = await service.changeQuotationItemStatus({ ...data }, client);
     return sale_item;
   }
+   async fetchItemsOnly(client: PoolClient, firm_id: number, quotation_id: number) {
+      const service = new QuotationItemService();
+      const items = service.fetchItemsOnly(client, firm_id, quotation_id)
+      return items
+    }
 }

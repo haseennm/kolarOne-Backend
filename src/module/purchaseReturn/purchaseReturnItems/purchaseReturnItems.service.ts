@@ -1,4 +1,4 @@
-import { getRecord } from "../../../utils/extra";
+import { getRecord, getStatusCode } from "../../../utils/extra";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { PoolClient } from "pg";
@@ -103,78 +103,78 @@ export default class PurchaseReturnItemService {
     return rows[0];
   }
 
-  async fetchPurchaseReturnItems(data: FetchPurchaseReturnItemParams) {
+//   async fetchPurchaseReturnItems(data: FetchPurchaseReturnItemParams) {
 
-    const { filters, offset } = data;
+//     const { filters, offset } = data;
 
-    let where: string[] = [];
-    let values: any[] = [];
+//     let where: string[] = [];
+//     let values: any[] = [];
 
-    // ignore deleted
-    where.push(`status != $${values.length + 1}`);
-    values.push(0);
+//     // ignore deleted
+//     where.push(`status != $${values.length + 1}`);
+//     values.push(0);
 
-    if (filters?.id) {
-      values.push(filters.id);
-      where.push(`id = $${values.length}`);
-    }
+//     if (filters?.id) {
+//       values.push(filters.id);
+//       where.push(`id = $${values.length}`);
+//     }
 
-    if (filters?.purchase_id) {
-      values.push(filters.purchase_id);
-      where.push(`purchase_id = $${values.length}`);
-    }
+//     if (filters?.purchase_id) {
+//       values.push(filters.purchase_id);
+//       where.push(`purchase_id = $${values.length}`);
+//     }
 
-    if (filters?.firm_id) {
-      values.push(filters.firm_id);
-      where.push(`firm_id = $${values.length}`);
-    }
+//     if (filters?.firm_id) {
+//       values.push(filters.firm_id);
+//       where.push(`firm_id = $${values.length}`);
+//     }
 
-    if (filters?.branch_id) {
-      values.push(filters.branch_id);
-      where.push(`branch_id = $${values.length}`);
-    }
+//     if (filters?.branch_id) {
+//       values.push(filters.branch_id);
+//       where.push(`branch_id = $${values.length}`);
+//     }
 
-    const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+//     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-    const purchaseItemQuery = `
-  SELECT 
-    pi.*,
-    p.name AS product_name,
-    pu.bill_number,
-    s.batch_number
-  FROM purchase_items pi
-  LEFT JOIN products p ON p.id = pi.product_id
-  LEFT JOIN purchases pu ON pu.id = pi.purchase_id
-  LEFT JOIN stock s ON s.id = pi.stock_id
-  ${whereClause}
-  ORDER BY pi.id DESC
-  LIMIT $${values.length + 1}
-  OFFSET $${values.length + 2}
-`;
+//     const purchaseItemQuery = `
+//   SELECT 
+//     pi.*,
+//     p.name AS product_name,
+//     pu.bill_number,
+//     s.batch_number
+//   FROM purchase_items pi
+//   LEFT JOIN products p ON p.id = pi.product_id
+//   LEFT JOIN purchases pu ON pu.id = pi.purchase_id
+//   LEFT JOIN stock s ON s.id = pi.stock_id
+//   ${whereClause}
+//   ORDER BY pi.id DESC
+//   LIMIT $${values.length + 1}
+//   OFFSET $${values.length + 2}
+// `;
 
-    const countQuery = `
-    SELECT COUNT(*)
-    FROM purchase_items
-    ${whereClause}
-  `;
+//     const countQuery = `
+//     SELECT COUNT(*)
+//     FROM purchase_items
+//     ${whereClause}
+//   `;
 
-    const items = await query<FetchDbPurchaseReturnItem>(
-      purchaseItemQuery,
-      [...values, filters.limit, offset]
-    );
+//     const items = await query<FetchDbPurchaseReturnItem>(
+//       purchaseItemQuery,
+//       [...values, filters.limit, offset]
+//     );
 
-    const total = await query<PurchaseReturnItemCountResult>(countQuery, values);
+//     const total = await query<PurchaseReturnItemCountResult>(countQuery, values);
 
-    return {
-      items,
-      pagination: {
-        page: filters.page,
-        limit: filters.limit,
-        total: Number(total[0].count),
-        totalPages: Math.ceil(Number(total[0].count) / filters.limit),
-      },
-    };
-  }
+//     return {
+//       items,
+//       pagination: {
+//         page: filters.page,
+//         limit: filters.limit,
+//         total: Number(total[0].count),
+//         totalPages: Math.ceil(Number(total[0].count) / filters.limit),
+//       },
+//     };
+//   }
 
   async updatePurchaseReturnItem(
     data: EditPurchaseReturnItemParams,
@@ -344,7 +344,7 @@ END,
   async deletePurchaseReturnItem(data: DeletePurchaseReturnItemParams, client: PoolClient) {
     const { purchase_id, firm_id, remark } = data;
     const isItemExist = await executeInTransaction(client,
-      `SELECT * FROM purchase_items WHERE purchase_id =$1 AND firm_id= $2`,
+      `SELECT * FROM purchase_return_items WHERE purchase_id =$1 AND firm_id= $2`,
       [purchase_id, firm_id]
     )
     if (isItemExist) {
@@ -352,7 +352,7 @@ END,
     }
 
     const deleteQuery = `
-        UPDATE purchase_items
+        UPDATE purchase_return_items
         SET status = 0
         WHERE purchase_id = $1 AND firm_id = $2
     RETURNING *;
@@ -365,5 +365,13 @@ END,
     );
 
     return rows[0];
+  }
+  async fetchItemsOnly(client: PoolClient, firm_id: number, purchase_return_id: number) {
+    const { rows } = await executeInTransaction(client,
+      `SELECT * FROM purchase_return_items WHERE purchase_return_id = $1 AND
+      firm_id =$2 AND status !=$3`,
+      [purchase_return_id, firm_id, getStatusCode("Deleted")]
+    )
+    return rows[0]
   }
 }

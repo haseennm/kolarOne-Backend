@@ -1,6 +1,8 @@
+import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { generateToken, hashPassword, verifyPassword } from "../../utils/auth.util";
 import { getStatusCode, getStatusText } from "../../utils/extra";
+import { emitAuditJournal } from "../journal/journal.utils";
 import FirmService from "./firm.service";
 import {
   CreateFirmBody,
@@ -35,73 +37,114 @@ export default class FirmController {
   }
 
   async createFirm(data: CreateFirmBody) {
-    const { created_by, status, password, logo, ...rest } = data;
+    return transaction(async (client) => {
+      const { created_by, status, password, logo, ...rest } = data;
 
-    const remark = {
-      action: "Created",
-      created_by,
-      created_at: Date.now(),
-    };
+      const remark = {
+        action: "Created",
+        created_by,
+        created_at: Date.now(),
+      };
 
-    const statusCode = getStatusCode(status);
-    const hashed = await hashPassword(password)
+      const statusCode = getStatusCode(status);
+      const hashed = await hashPassword(password)
 
-    const service = new FirmService();
+      const service = new FirmService();
 
-    const firm = await service.createFirm({
-      ...rest,
-      remark,
-      statusCode,
-      hashed,
-      logo
+      const firm = await service.createFirm({
+        ...rest,
+        remark,
+        statusCode,
+        hashed,
+        logo
+      });
+
+      await emitAuditJournal({
+        client,
+        entityId: firm.id,
+        entityType: "F",
+        companyId: data.company_id,
+        tableName: "firm",
+        tableRowId: firm.id,
+        action: "create",
+        record: firm,
+      });
+
+      return firm;
     });
-
-    return firm;
   }
 
   async editFirm(data: EditFirmBody) {
-    const { updated_by, status, ...rest } = data;
+    return transaction(async (client) => {
+      const { updated_by, status, ...rest } = data;
 
-    const remark = {
-      action: "Updated",
-      updated_by,
-      updated_at: Date.now(),
-    };
+      const remark = {
+        action: "Updated",
+        updated_by,
+        updated_at: Date.now(),
+      };
 
-    let statusCode;
+      let statusCode;
 
-    if (typeof status === "string") {
-      statusCode = getStatusCode(status);
-    }
+      if (typeof status === "string") {
+        statusCode = getStatusCode(status);
+      }
 
-    const service = new FirmService();
+      const service = new FirmService();
 
-    const firm = await service.updateFirm({
-      ...rest,
-      remark,
-      statusCode,
+      const { data: firm, changes } = await service.updateFirm({
+        ...rest,
+        remark,
+        statusCode,
+      });
+
+      await emitAuditJournal({
+        client,
+        entityId: firm.id,
+        entityType: "F",
+        companyId: data.company_id,
+        tableName: "firm",
+        tableRowId: firm.id,
+        action: "update",
+        record: firm,
+        changes:{firm:changes},
+      });
+
+      return { data: firm, changes };
     });
-
-    return firm;
   }
 
   async deleteFirm(data: DeleteFirmBody) {
-    const { deleted_by, ...rest } = data;
+    return transaction(async (client) => {
+      const { deleted_by, ...rest } = data;
 
-    const remark = {
-      action: "Deleted",
-      deleted_by,
-      updated_at: Date.now(),
-    };
+      const remark = {
+        action: "Deleted",
+        deleted_by,
+        updated_at: Date.now(),
+      };
 
-    const service = new FirmService();
+      const service = new FirmService();
+      const companyId = data.company_id ?? 0;
 
-    const firm = await service.deleteFirm({
-      ...rest,
-      remark,
+      const firm = await service.deleteFirm({
+        ...rest,
+        remark,
+      });
+
+      await emitAuditJournal({
+        client,
+        entityId: firm.id,
+        entityType: "F",
+        companyId,
+        tableName: "firm",
+        tableRowId: firm.id,
+        action: "delete",
+        record: firm,
+      });
+
+      return firm;
     });
-
-    return firm;
   }
   async loginFirm(data: FirmLoginBody) {
     const { password, username } = data;

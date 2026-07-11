@@ -1,8 +1,10 @@
+import { transaction } from '../../config/db'
 import { CompanyLoginBody, CreateCompanyBody, DeleteCompanyBody, EditCompanyBody, GetCompanyParams } from './company.types'
 import CompanyService from './company.service'
 import { getStatusCode, getStatusText } from '../../utils/extra'
 import { generateToken, hashPassword, verifyPassword } from '../../utils/auth.util'
 import { AppError } from '../../utils/AppError'
+import { emitAuditJournal } from '../journal/journal.utils'
 
 export default class CompanyController {
 
@@ -26,70 +28,109 @@ export default class CompanyController {
     }
   }
   async createCompany(data: CreateCompanyBody) {
-    const { created_by, status, password, ...rest } = data;
-    const hashed = await hashPassword(password)
+    return transaction(async (client) => {
+      const { created_by, status, password, ...rest } = data;
+      const hashed = await hashPassword(password)
 
-    const remark = {
-      action: "Created",
-      created_by,
-      created_at: Date.now(),
-    };
-    const statusCode = getStatusCode(status)
-    const service = new CompanyService();
+      const remark = {
+        action: "Created",
+        created_by,
+        created_at: Date.now(),
+      };
+      const statusCode = getStatusCode(status)
+      const service = new CompanyService();
 
-    const company = await service.createCompany({
-      ...rest,
-      remark,
-      statusCode,
-      hashed
+      const company = await service.createCompany({
+        ...rest,
+        remark,
+        statusCode,
+        hashed
+      });
+
+      await emitAuditJournal({
+        client,
+        entityId: company.id,
+        entityType: "C",
+        companyId: company.id,
+        tableName: "company",
+        tableRowId: company.id,
+        action: "create",
+        record: company,
+      });
+
+      return company;
     });
-
-    return company;
   }
   async editCompany(data: EditCompanyBody) {
+    return transaction(async (client) => {
+      const { id, updated_by, status, ...rest } = data;
 
-    const { id, updated_by, status, ...rest } = data;
+      const remark = {
+        action: "Updated",
+        updated_by,
+        updated_at: Date.now(),
+      };
 
-    const remark = {
-      action: "Updated",
-      updated_by,
-      updated_at: Date.now(),
-    };
+      let statusCode = 99;
 
-    let statusCode = 99;
+      if (typeof status === "string") {
+        statusCode = getStatusCode(status);
+      }
 
-    if (typeof status === "string") {
-      statusCode = getStatusCode(status);
-    }
+      const service = new CompanyService();
 
-    const service = new CompanyService();
+      const { data: company, changes } = await service.updateCompany({
+        id,
+        ...rest,
+        remark,
+        statusCode
+      });
 
-    const company = await service.updateCompany({
-      id,
-      ...rest,
-      remark,
-      statusCode
+      await emitAuditJournal({
+        client,
+        entityId: company.id,
+        entityType: "C",
+        companyId: company.id,
+        tableName: "company",
+        tableRowId: company.id,
+        action: "update",
+        record: company,
+        changes: { company: changes },
+      });
+
+      return { data: company, changes };
     });
-
-    return company;
   }
   async deleteCompany(data: DeleteCompanyBody) {
-    const { deleted_by, ...rest } = data;
+    return transaction(async (client) => {
+      const { deleted_by, ...rest } = data;
 
-    const remark = {
-      action: "Deleted",
-      deleted_by,
-      updated_at: Date.now(),
-    };
+      const remark = {
+        action: "Deleted",
+        deleted_by,
+        updated_at: Date.now(),
+      };
 
+      const service = new CompanyService();
 
-    const service = new CompanyService();
+      const company = await service.deleteCompany({
+        ...rest,
+        remark,
+      });
 
-    const company = await service.deleteCompany({
-      ...rest,
-      remark,
+      await emitAuditJournal({
+        client,
+        entityId: company.id,
+        entityType: "C",
+        companyId: company.id,
+        tableName: "company",
+        tableRowId: company.id,
+        action: "delete",
+        record: company,
+      });
+
+      return company;
     });
-    return company;
   }
 
   async loginCompany(data: CompanyLoginBody) {

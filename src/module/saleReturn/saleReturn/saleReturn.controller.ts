@@ -9,10 +9,11 @@ import SaleReturnService from "./saleReturn.service";
 import SaleReturnItemController from "../saleReturnItems/saleReturnItems.controller";
 import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 import { AppError } from "../../../utils/AppError";
+import { buildAuditChanges, emitAuditJournal } from "../../journal/journal.utils";
 
 export default class SaleReturnController {
 
-async saleReturnCreate(data: SaleReturnCreateBody) {
+  async saleReturnCreate(data: SaleReturnCreateBody) {
     const { final_amount, status, company_id, created_by, items, payments = [], ...rest } = data;
 
     const remark = {
@@ -47,7 +48,7 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
       // 3. Process return line items and inventory adjustments
       const stockController = new StockController();
       const saleReturnItem = new SaleReturnItemController();
-      
+
       for (const item of items) {
         const resolvedStockId = item.stock_id || 0;
 
@@ -71,7 +72,7 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
             branch_id: rest.branch_id,
             status: status ?? "Completed",
             product_id: item.product_id,
-            stock_id: stock.id, 
+            stock_id: stock.id,
             returned_qty: item.returned_qty,
             unit: item.unit,
             unit_price: item.unit_price,
@@ -137,10 +138,19 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
         },
         client
       );
-
-      return { 
-        msg: `sale return ${sale_return.return_number} has been created successfully.`, 
-        id: sale_return.id 
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: entity_type,
+        companyId: company_id,
+        tableName: "sale_return",
+        tableRowId: sale_return.id,
+        action: "create",
+        record: sale_return,
+      });
+      return {
+        msg: `sale return ${sale_return.return_number} has been created successfully.`,
+        id: sale_return.id
       };
     });
   }
@@ -365,7 +375,6 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
     };
 
     return transaction(async (client: PoolClient) => {
-      const statusCode = getStatusCode(status ?? "Completed");
 
       // 1. Calculate transaction sums and payment array payloads
       const computedPaymentAmount = payments.reduce((sum, item) => sum + (item.amount ?? 0), 0);
@@ -397,13 +406,13 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
       if (items?.some((item) => item.item_id && deletedItemIds.has(item.item_id))) {
         throw new AppError("Cannot edit and delete the same sale return item", 400);
       }
+      const old_items = await saleReturnItem.fetchItemsOnly(client, rest.firm_id, rest.sale_return_id)
 
-      // Process deletions
       if (delete_item_ids?.length) {
         for (const item_id of delete_item_ids) {
           const deletedItem = await saleReturnItem.deleteSaleItem(
             {
-              sale_return_id: saleReturn.id,
+              sale_return_id: saleReturn.data.id,
               firm_id: rest.firm_id,
             },
             client
@@ -445,7 +454,7 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
 
             await saleReturnItem.createSaleReturnItem(
               {
-                sale_return_id: saleReturn.id,
+                sale_return_id: saleReturn.data.id,
                 firm_id: rest.firm_id,
                 branch_id: rest.branch_id,
                 status: status ?? "Completed",
@@ -471,7 +480,7 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
           const updatedReturnItem = await saleReturnItem.editSaleReturnItem(
             {
               item_id: item.item_id,
-              sale_return_id: saleReturn.id,
+              sale_return_id: saleReturn.data.id,
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
               status: status ?? "Completed",
@@ -508,13 +517,28 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
           }
         }
       }
-
+      const updated_items = await saleReturnItem.fetchItemsOnly(client, rest.firm_id, rest.sale_return_id)
+      const item_changes = buildAuditChanges(old_items, updated_items);
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: "F",
+        companyId: company_id,
+        tableName: "sale_return",
+        tableRowId: saleReturn.data.id,
+        action: "update",
+        record: saleReturn.data,
+        changes: {
+          "sale return": saleReturn.changes,
+          "sale return items": item_changes
+        },
+      });
       // 4. Update or Soft-Delete (status = 0) Multi-Payment Transactions 
       const entity_type = convertEntityType("Firm" as EntityKey);
       const payment_transactions_service = new PaymentTransactionService();
 
       await payment_transactions_service.syncPaymentTransactions({
-        ref_id: saleReturn.id,
+        ref_id: saleReturn.data.id,
         ref_type: PaymentTransactionTypeCodeMap["sale_return"],
         company_id,
         firm_id: rest.firm_id,
@@ -524,8 +548,8 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
       }, client);
 
       // 5. Party Balance Processing (Sale Returns usually result in cash outflow 'E')
-      const actualPaidAmount = Number(saleReturn.paid_amount ?? 0);
-      const actualFinalAmount = Number(saleReturn.final_amount ?? 0);
+      const actualPaidAmount = Number(saleReturn.data.paid_amount ?? 0);
+      const actualFinalAmount = Number(saleReturn.data.final_amount ?? 0);
       const difference = actualPaidAmount - actualFinalAmount;
 
       const party_balance_controller = new PartyBalanceController();
@@ -545,7 +569,7 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
 
       await party_balance_controller.editPartyBalance(
         {
-          ref_id: saleReturn.id,
+          ref_id: saleReturn.data.id,
           ref_type: PaymentTransactionTypeCodeMap["sale_return"],
           action_by: updated_by,
           balance: Math.abs(difference),
@@ -556,7 +580,7 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
         client
       );
 
-      return `Sale return document ${saleReturn.return_number} updated successfully.`;
+      return `Sale return document ${saleReturn.data.return_number} updated successfully.`;
     });
   }
 
@@ -631,6 +655,16 @@ async saleReturnCreate(data: SaleReturnCreateBody) {
         },
         client
       );
+      await emitAuditJournal({
+        client,
+        entityId: saleReturn.id,
+        entityType: "F",
+        companyId: saleReturn.company_id,
+        tableName: "saleReturn",
+        tableRowId: saleReturn.id,
+        action: "delete",
+        record: saleReturn,
+      });
       // await partyBalanceService.deletePartyBalance(
       //   {
       //     delete_by: deleted_by, firm_id: rest.firm_id, sale_return_id: rest.id

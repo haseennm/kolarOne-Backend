@@ -70,7 +70,39 @@ export async function getRecord(id: number | string, table: string, bussiness_ca
   )
   return isrowExist.rows[0] || null;
 }
+export async function getCompanyId(
+  client: PoolClient,
+  branch_id?: number,
+  firm_id?: number
+): Promise<number | null> {
+  let companyId: number | null = null;
+  if (branch_id) {
+    const branchResult = await executeInTransaction(
+      client,
+      `SELECT company_id FROM branches WHERE id = $1 AND status != $2`,
+      [branch_id, 0]
+    );
 
+    companyId = branchResult.rows[0]?.company_id || null;
+  } else if (firm_id) {
+    const firmResult = await executeInTransaction(
+      client,
+      `
+      SELECT b.company_id
+      FROM firm f
+      INNER JOIN branches b ON b.id = f.branch_id
+      WHERE f.id = $1
+        AND f.status != $2
+        AND b.status != $2
+      `,
+      [firm_id, 0]
+    );
+
+    companyId = firmResult.rows[0]?.company_id || null;
+  }
+
+  return companyId;
+}
 // const ENTITY_MAP = {
 //   Company: "C",
 //   Branch: "B",

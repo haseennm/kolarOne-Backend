@@ -3,6 +3,8 @@ import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { getRecord, getStatusCode } from "../../../utils/extra";
 import { RepayBalanceSaleReturn, SaleReturnCreateParams, SaleReturnDeleteParams, SaleReturnEditParams, SaleReturnFetchParams } from "./saleReturn.types";
+import { buildAuditChanges } from "../../journal/journal.utils";
+import { table } from "node:console";
 
 export default class SaleReturnService {
   private billStatus(final_amount: number, paid_amount: number) {
@@ -415,7 +417,11 @@ export default class SaleReturnService {
     ];
 
     const { rows } = await executeInTransaction(client, updateQuery, values);
-    return rows[0];
+    const changes = buildAuditChanges(is_return_exist, rows[0]);
+    return {
+      changes,
+      data: rows[0]
+    };
   }
 
   async fetchSaleReturn(data: SaleReturnFetchParams) {
@@ -568,88 +574,91 @@ export default class SaleReturnService {
 
     // 🔥 MAIN QUERY
     const saleReturnQuery = `
-    SELECT 
-      sr.*,
-      s.invoice_number,
-      c.customer_name,
-      pm.method_name AS payment_method,
-      f.branch_id,
-      b.company_id,
+SELECT 
+  sr.*,
+  s.invoice_number,
+  c.customer_name,
+  f.branch_id,
+  b.company_id,
 
-      COALESCE(
-        JSON_AGG(
-          JSON_BUILD_OBJECT(
-            'id', sri.id,
-            'product_id', sri.product_id,
-            'product_name', prd.name,
-            'stock_id', sri.stock_id,
-            'batch_number', st.batch_number,
-            'returned_qty', sri.returned_qty,
-            'unit', sri.unit,
-            'unit_price', sri.unit_price,
-            'sub_total', sri.sub_total,
-            'total_cgst', sri.total_cgst,
-            'total_sgst', sri.total_sgst,
-            'total_igst', sri.total_igst,
-            'net_amount', sri.net_amount,
-            'status', sri.status,
-            'stock_qty', st.available_quantity,
-            'saled_qty', si.saled_qty
-          )
-        ) FILTER (WHERE sri.id IS NOT NULL),
-        '[]'
-      ) AS items,
-       (
-              SELECT COALESCE(
-                  JSON_AGG(
-                      JSON_BUILD_OBJECT(
-                          'id', pt.id,
-                          'payment_method_id', pt.payment_method_id,
-                          'payment_method', pm2.method_name,
-                          'amount', pt.amount,
-                          'payment_flow', pt.payment_flow,
-                          'transaction_date', pt.created_at,
-                          'transaction_reference', pt.transaction_reference
-                      )
-                      ORDER BY pt.id
-                  ),
-                  '[]'
-              )
-              FROM payment_transactions pt
-              LEFT JOIN payment_methods pm2
-                  ON pm2.id = pt.payment_method_id
-              WHERE pt.ref_id = sr.id
-                AND pt.ref_type = 'SR'
-          ) AS payments
-    FROM sale_return sr
+  COALESCE(
+    JSON_AGG(
+      JSON_BUILD_OBJECT(
+        'id', sri.id,
+        'product_id', sri.product_id,
+        'product_name', prd.name,
+        'stock_id', sri.stock_id,
+        'batch_number', st.batch_number,
+        'returned_qty', sri.returned_qty,
+        'unit', sri.unit,
+        'unit_price', sri.unit_price,
+        'sub_total', sri.sub_total,
+        'total_cgst', sri.total_cgst,
+        'total_sgst', sri.total_sgst,
+        'total_igst', sri.total_igst,
+        'net_amount', sri.net_amount,
+        'status', sri.status,
+        'stock_qty', st.available_quantity,
+        'saled_qty', si.saled_qty
+      )
+    ) FILTER (WHERE sri.id IS NOT NULL),
+    '[]'
+  ) AS items,
 
-    LEFT JOIN sales s ON s.id = sr.sale_id
-    LEFT JOIN customers c ON c.id = s.customer_id
-    LEFT JOIN payment_methods pm ON pm.id = sr.payment_method_id
+  (
+    SELECT COALESCE(
+      jsonb_agg(
+        p.value || jsonb_build_object(
+          'payment_method',
+          pm.method_name
+        )
+      ),
+      '[]'::jsonb
+    )
+    FROM jsonb_array_elements(COALESCE(sr.payments, '[]'::jsonb)) AS p(value)
+    LEFT JOIN payment_methods pm
+      ON pm.id = (p.value->>'payment_method_id')::int
+  ) AS payments
 
-    LEFT JOIN firm f ON f.id = sr.firm_id
-    LEFT JOIN branches b ON b.id = f.branch_id
+FROM sale_return sr
 
-    LEFT JOIN sale_return_items sri ON sri.sale_return_id = sr.id
-    LEFT JOIN products prd ON prd.id = sri.product_id
-    LEFT JOIN stock st ON st.id = sri.stock_id
-    LEFT JOIN sales_items si ON si.id = sri.sale_item_id
+LEFT JOIN sales s
+  ON s.id = sr.sale_id
 
-    ${whereClause}
+LEFT JOIN customers c
+  ON c.id = s.customer_id
 
-    GROUP BY 
-      sr.id,
-      s.invoice_number,
-      c.customer_name,
-      pm.method_name,
-      f.branch_id,
-      b.company_id
+LEFT JOIN firm f
+  ON f.id = sr.firm_id
 
-    ORDER BY sr.id DESC
-    LIMIT $${values.length + 1}
-    OFFSET $${values.length + 2}
-  `;
+LEFT JOIN branches b
+  ON b.id = f.branch_id
 
+LEFT JOIN sale_return_items sri
+  ON sri.sale_return_id = sr.id
+
+LEFT JOIN products prd
+  ON prd.id = sri.product_id
+
+LEFT JOIN stock st
+  ON st.id = sri.stock_id
+
+LEFT JOIN sales_items si
+  ON si.id = sri.sale_item_id
+
+${whereClause}
+
+GROUP BY
+  sr.id,
+  s.invoice_number,
+  c.customer_name,
+  f.branch_id,
+  b.company_id
+
+ORDER BY sr.id DESC
+LIMIT $${values.length + 1}
+OFFSET $${values.length + 2}
+`;
     // 🔥 COUNT QUERY
     const countQuery = `
     SELECT COUNT(*)
@@ -678,6 +687,7 @@ export default class SaleReturnService {
       },
     };
   }
+
   async deleteSaleReturn(
     data: SaleReturnDeleteParams,
     client: PoolClient
@@ -804,7 +814,8 @@ export default class SaleReturnService {
     ];
 
     const { rows } = await executeInTransaction(client, query, values);
-    return rows[0];
+    const changes = buildAuditChanges(is_sale_return_exist, rows[0]);
+    return { data: rows[0], changes, table_name: "sale_returns" };
   }
   // async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
   //   const { id, firm_id } = data;

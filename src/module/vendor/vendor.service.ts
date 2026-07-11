@@ -11,10 +11,12 @@ import {
   FetchVendorParams,
   RemoveFirmVendorParams
 } from "./vendor.types";
+import { PoolClient } from "pg";
+import { buildAuditChanges } from "../journal/journal.utils";
 
 export default class VendorService {
 
-  async createVendor(data: CreateVendorParams) {
+  async createVendor(data: CreateVendorParams, client: PoolClient) {
 
     const {
       company_id,
@@ -31,51 +33,49 @@ export default class VendorService {
       firm_id,
       branch_id
     } = data;
-console.log("firm_id",firm_id)
-    const result = transaction(async (client) => {
-      if (firm_id && !branch_id) {
-        for (const firmId of firm_id) {
-          const firmExist = await getRecord(firmId, "firm", "id", firmId, client);
+    if (firm_id && !branch_id) {
+      for (const firmId of firm_id) {
+        const firmExist = await getRecord(firmId, "firm", "id", firmId, client);
 
-          if (!firmExist) {
-            throw new AppError("Firm not found", 404);
-          }
+        if (!firmExist) {
+          throw new AppError("Firm not found", 404);
+        }
 
-          const firmBranchId = firmExist.branch_id;
+        const firmBranchId = firmExist.branch_id;
 
-          const branchExist = await getRecord(
-            firmBranchId,
-            "branches",
-            "company_id",
-            company_id,
-            client
+        const branchExist = await getRecord(
+          firmBranchId,
+          "branches",
+          "company_id",
+          company_id,
+          client
+        );
+
+        if (!branchExist) {
+          throw new AppError(
+            `${firmExist.firm_name} does not belong to this company`,
+            404
           );
-
-          if (!branchExist) {
-            throw new AppError(
-              `${firmExist.firm_name} does not belong to this company`,
-              404
-            );
-          }
         }
       }
-      if (firm_id && branch_id) {
-        for (const firmId of firm_id) {
-          const firmExist = await getRecord(
-            firmId,
-            "firm",
-            "id",
-            firmId,
-            client
-          );
+    }
+    if (firm_id && branch_id) {
+      for (const firmId of firm_id) {
+        const firmExist = await getRecord(
+          firmId,
+          "firm",
+          "id",
+          firmId,
+          client
+        );
 
-          if (!firmExist || Number(firmExist.branch_id) !== Number(branch_id)) {
-            throw new AppError(`Firm ${firmId} does not belong to this branch`, 404);
-          }
+        if (!firmExist || Number(firmExist.branch_id) !== Number(branch_id)) {
+          throw new AppError(`Firm ${firmId} does not belong to this branch`, 404);
         }
       }
+    }
 
-      const queryText = `
+    const queryText = `
       INSERT INTO vendors (
         vendor_name,
         email,
@@ -94,27 +94,27 @@ console.log("firm_id",firm_id)
       RETURNING *;
       `;
 
-      const values = [
-        vendor_name,
-        email,
-        phone_number,
-        alternate_phone,
-        address,
-        gstin,
-        pan,
-        state_code,
-        statusCode,
-        JSON.stringify(remark),
-        firm_id ? firm_id : null,
-        company_id
-      ];
-      console.log(values)
-      const { rows } = await executeInTransaction(client, queryText, values);
+    const values = [
+      vendor_name,
+      email,
+      phone_number,
+      alternate_phone,
+      address,
+      gstin,
+      pan,
+      state_code,
+      statusCode,
+      JSON.stringify(remark),
+      firm_id ? firm_id : null,
+      company_id
+    ];
+    console.log(values)
+    const { rows } = await executeInTransaction(client, queryText, values);
 
-      return `${rows[0].vendor_name} created`;
-    });
-
-    return result;
+    return {
+      data: rows[0],
+      message: `${rows[0].vendor_name} created`
+    };
   }
 
   async fetchVendor(data: FetchVendorParams) {
@@ -201,7 +201,7 @@ ${whereClause}
     };
   }
 
-  async updateVendor(data: EditVendorParams) {
+  async updateVendor(data: EditVendorParams, client: PoolClient) {
 
     const {
       id,
@@ -218,15 +218,14 @@ ${whereClause}
       remark
     } = data;
 
-    const result = transaction(async (client) => {
 
-      const vendor = await getRecord(id, "vendors", "company_id", company_id, client);
+    const vendor = await getRecord(id, "vendors", "company_id", company_id, client);
 
-      if (!vendor) {
-        throw new AppError("Vendor not found", 404);
-      }
+    if (!vendor) {
+      throw new AppError("Vendor not found", 404);
+    }
 
-      const queryText = `
+    const queryText = `
       UPDATE vendors
       SET
         vendor_name = $1,
@@ -249,28 +248,26 @@ ${whereClause}
       RETURNING *;
       `;
 
-      const values = [
-        vendor_name ?? vendor.vendor_name,
-        email ?? vendor.email,
-        phone_number ?? vendor.phone_number,
-        alternate_phone ?? vendor.alternate_phone,
-        address ?? vendor.address,
-        gstin ?? vendor.gstin,
-        pan ?? vendor.pan,
-        state_code ?? vendor.state_code,
-        statusCode ?? vendor.status,
-        JSON.stringify(remark),
-        id
-      ];
+    const values = [
+      vendor_name ?? vendor.vendor_name,
+      email ?? vendor.email,
+      phone_number ?? vendor.phone_number,
+      alternate_phone ?? vendor.alternate_phone,
+      address ?? vendor.address,
+      gstin ?? vendor.gstin,
+      pan ?? vendor.pan,
+      state_code ?? vendor.state_code,
+      statusCode ?? vendor.status,
+      JSON.stringify(remark),
+      id
+    ];
 
-      const { rows } = await executeInTransaction(client, queryText, values);
+    const { rows } = await executeInTransaction(client, queryText, values);
+    const changes = buildAuditChanges(vendor, rows[0]);
+    return { changes, data: rows[0] };
 
-      return rows[0];
-    });
-
-    return result;
   }
-  async addVendorNewFirm(data: AddNewFirm, remark: object) {
+  async addVendorNewFirm(data: AddNewFirm, remark: object, client: PoolClient) {
 
     const {
       vendor_id,
@@ -278,15 +275,14 @@ ${whereClause}
       company_id
     } = data;
 
-    const result = transaction(async (client) => {
 
-      const vendor = await getRecord(vendor_id, "vendors", "company_id", company_id, client);
+    const vendor = await getRecord(vendor_id, "vendors", "company_id", company_id, client);
 
-      if (!vendor) {
-        throw new AppError("Vendor not found", 404);
-      }
+    if (!vendor) {
+      throw new AppError("Vendor not found", 404);
+    }
 
-      const queryText = `
+    const queryText = `
         UPDATE vendors
         SET
         firms =
@@ -308,33 +304,29 @@ ${whereClause}
         RETURNING *;
       `;
 
-      const values = [
-        Number(firm_id),
-        JSON.stringify(remark),
-        vendor_id
-      ];
+    const values = [
+      Number(firm_id),
+      JSON.stringify(remark),
+      vendor_id
+    ];
 
-      const { rows } = await executeInTransaction(client, queryText, values);
+    const { rows } = await executeInTransaction(client, queryText, values);
 
-      return rows[0];
-    });
+    return rows[0];
 
-    return result;
   }
 
-  async deleteVendor(data: DeleteVendorParams) {
+  async deleteVendor(data: DeleteVendorParams, client: PoolClient) {
 
     const { r_id, remark, company_id } = data;
 
-    const result = transaction(async (client) => {
 
-      const vendor = await getRecord(r_id, "vendors", "company_id", company_id, client);
+    const vendor = await getRecord(r_id, "vendors", "company_id", company_id, client);
 
-      if (!vendor) {
-        throw new AppError("Vendor not found", 404);
-      }
-      const result = transaction(async (client) => {
-        const queryText = `
+    if (!vendor) {
+      throw new AppError("Vendor not found", 404);
+    }
+    const queryText = `
       UPDATE vendors
       SET
         status = 0,
@@ -347,38 +339,36 @@ ${whereClause}
       WHERE id = $2
       `;
 
-        await executeInTransaction(client, queryText, [
-          JSON.stringify(remark),
-          r_id
-        ]);
+    const { rows } = await executeInTransaction(client, queryText, [
+      JSON.stringify(remark),
+      r_id
+    ]);
 
-        return `Vendor ${vendor.vendor_name} deleted`;
-      });
+    return {
+      data: rows[0],
+      message: `Vendor ${vendor.vendor_name} deleted`
+    };
 
-      return result;
-    })
   }
-  async removeFirmVendor(data: RemoveFirmVendorParams) {
+  async removeFirmVendor(data: RemoveFirmVendorParams, client: PoolClient) {
 
     const { r_id, remark, firm_id, company_id } = data;
 
-    const result = transaction(async (client) => {
+    const vendor = await getRecord(r_id, "vendors", "company_id", company_id, client);
 
-      const vendor = await getRecord(r_id, "vendors", "company_id", company_id, client);
+    if (!vendor) {
+      throw new AppError("Vendor not found", 404);
+    }
 
-      if (!vendor) {
-        throw new AppError("Vendor not found", 404);
-      }
+    if (!vendor.firms.includes(Number(firm_id))) {
+      throw new AppError("Vendor does not belong to this branch", 400);
+    }
 
-      if (!vendor.firms.includes(Number(firm_id))) {
-        throw new AppError("Vendor does not belong to this branch", 400);
-      }
+    const updatedfirms = vendor.firms.filter(
+      (id: number) => id !== Number(firm_id)
+    );
 
-      const updatedfirms = vendor.firms.filter(
-        (id: number) => id !== Number(firm_id)
-      );
-
-      const queryText = `
+    const queryText = `
       UPDATE vendors
       SET
         firms = array_remove(firms, $1),
@@ -401,16 +391,17 @@ ${whereClause}
       RETURNING *;
     `;
 
-      await executeInTransaction(client, queryText, [
-        Number(firm_id),
-        JSON.stringify(remark),
-        r_id
-      ]);
+    const { rows } = await executeInTransaction(client, queryText, [
+      Number(firm_id),
+      JSON.stringify(remark),
+      r_id
+    ]);
 
-      return `Vendor removed from branch successfully`;
-    });
+    return {
+      data: rows[0],
+      message: `Vendor removed from branch successfully`
+    };
 
-    return result;
   }
   async getVendorReportSummary(data: {
     level: "firm" | "branch" | "company";

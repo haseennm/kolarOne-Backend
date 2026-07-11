@@ -1,4 +1,4 @@
-import { Result } from "pg";
+
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { cns, getRecord, getStatusCode } from "../../utils/extra";
 import {
@@ -10,9 +10,11 @@ import {
   FetchProductCatParams,
 } from "./proCat.types";
 import { AppError } from "../../utils/AppError";
+import { PoolClient } from "pg";
+import { buildAuditChanges } from "../journal/journal.utils";
 
 export default class ProductCatService {
-  async createProductCat(data: CreateProductCatParams) {
+  async createProductCat(data: CreateProductCatParams, client: PoolClient) {
     const {
       company_id,
       description,
@@ -24,21 +26,20 @@ export default class ProductCatService {
       remark,
 
     } = data;
-    const result = transaction(async (client) => {
 
-      const isBranchExist = await getRecord(company_id, "company", "id", company_id, client);
-      if (!isBranchExist) {
-        throw new AppError("Company not found", 404);
+    const isBranchExist = await getRecord(company_id, "company", "id", company_id, client);
+    if (!isBranchExist) {
+      throw new AppError("Company not found", 404);
+    }
+    if (parent_id) {
+      const isProduct_cat_exist = await getRecord(parent_id, "product_categories", "company_id", company_id, client);
+
+      if (!isProduct_cat_exist) {
+        throw new AppError("parent category not found or deleted", 404);
       }
-      if (parent_id) {
-        const isProduct_cat_exist = await getRecord(parent_id, "product_categories", "company_id", company_id, client);
+    }
 
-        if (!isProduct_cat_exist) {
-          throw new AppError("parent category not found or deleted", 404);
-        }
-      }
-
-      const queryText = `
+    const queryText = `
     INSERT INTO product_categories (
     name ,
     parent_id ,
@@ -53,21 +54,20 @@ export default class ProductCatService {
   $1,$2,$3,$4,$5,$6,$7,$8)
     RETURNING *;
   `;
-      const values = [
-        name,
-        parent_id,
-        company_id,
-        description,
-        note,
-        image,
-        statusCode,
-        JSON.stringify(remark),
-      ];
+    const values = [
+      name,
+      parent_id,
+      company_id,
+      description,
+      note,
+      image,
+      statusCode,
+      JSON.stringify(remark),
+    ];
 
-      const { rows } = await executeInTransaction(client, queryText, values);
-      return `${rows[0].name} created`;
-    })
-    return result;
+    const { rows } = await executeInTransaction(client, queryText, values);
+    return rows[0];
+    ;
   }
   async fetchProductCategories(
     params: FetchProductCatParams
@@ -178,7 +178,7 @@ export default class ProductCatService {
   }
 
 
-  async updateProductCat(data: EditProductCatParams) {
+  async updateProductCat(data: EditProductCatParams, client: PoolClient) {
     const {
       id,
       company_id,
@@ -191,14 +191,13 @@ export default class ProductCatService {
       remark,
 
     } = data;
-    const result = transaction(async (client) => {
-      const isProduct_cat_exist = await getRecord(id, "product_categories", "company_id", company_id, client);
+    const isProduct_cat_exist = await getRecord(id, "product_categories", "company_id", company_id, client);
 
-      if (!isProduct_cat_exist) {
-        throw new AppError("product categories not found or deleted", 404);
-      }
+    if (!isProduct_cat_exist) {
+      throw new AppError("product categories not found or deleted", 404);
+    }
 
-      const queryText = `
+    const queryText = `
   UPDATE product_categories
 SET
   name = $1,
@@ -218,36 +217,35 @@ WHERE id = $8
 RETURNING *;
   `;
 
-      const values = [
-        name ?? isProduct_cat_exist.name,
-        description ?? isProduct_cat_exist.description,
-        parent_id ?? isProduct_cat_exist.email,
-        note ?? isProduct_cat_exist.note,
-        image ?? isProduct_cat_exist.image,
-        statusCode ?? isProduct_cat_exist.status,
-        JSON.stringify(remark),
-        id
-      ];
+    const values = [
+      name ?? isProduct_cat_exist.name,
+      description ?? isProduct_cat_exist.description,
+      parent_id ?? isProduct_cat_exist.email,
+      note ?? isProduct_cat_exist.note,
+      image ?? isProduct_cat_exist.image,
+      statusCode ?? isProduct_cat_exist.status,
+      JSON.stringify(remark),
+      id
+    ];
 
-      const { rows } = await executeInTransaction(client, queryText, values);
-      return rows[0];
-    })
-    return result
+    const { rows } = await executeInTransaction(client, queryText, values);
+    const changes = buildAuditChanges(isProduct_cat_exist, rows[0]);
+    return { data: rows[0], changes };
+
   }
 
-  async deleteProductCat(data: DeleteProductCatParams) {
+  async deleteProductCat(data: DeleteProductCatParams, client: PoolClient) {
     const { r_id, remark, company_id, sub_cat_remark } = data;
 
-    const result = transaction(async (client) => {
-      // 1. Verify the target product category exists
-      const isProduct_cat_exist = await getRecord(r_id, "product_categories", "company_id", company_id, client);
+    // 1. Verify the target product category exists
+    const isProduct_cat_exist = await getRecord(r_id, "product_categories", "company_id", company_id, client);
 
-      if (!isProduct_cat_exist) {
-        throw new AppError("product category not found or deleted", 404);
-      }
+    if (!isProduct_cat_exist) {
+      throw new AppError("product category not found or deleted", 404);
+    }
 
-      // 2. Validate Stock for all cascading products (Direct products + Subcategory products)
-      const stock_check_query = `
+    // 2. Validate Stock for all cascading products (Direct products + Subcategory products)
+    const stock_check_query = `
   SELECT 
     s.product_id,
     s.available_quantity,
@@ -270,23 +268,23 @@ RETURNING *;
   LIMIT 1;
 `;
 
-      const stockCheckResult = await executeInTransaction(
-        client,
-        stock_check_query,
-        [r_id, company_id, getStatusCode("Good")]
+    const stockCheckResult = await executeInTransaction(
+      client,
+      stock_check_query,
+      [r_id, company_id, getStatusCode("Good")]
+    );
+
+    if ((stockCheckResult.rowCount ?? 0) > 0) {
+      const stock = stockCheckResult.rows[0];
+
+      throw new AppError(
+        `Cannot delete category. Product "${stock.product_name}" still has active stock in batch "${stock.batch_number}" with quantity ${stock.available_quantity}.`,
+        400
       );
+    }
 
-      if ((stockCheckResult.rowCount ?? 0) > 0) {
-        const stock = stockCheckResult.rows[0];
-
-        throw new AppError(
-          `Cannot delete category. Product "${stock.product_name}" still has active stock in batch "${stock.batch_number}" with quantity ${stock.available_quantity}.`,
-          400
-        );
-      }
-
-      // 3. Delete products directly under the main category
-      const delete_product_query_text = `
+    // 3. Delete products directly under the main category
+    const delete_product_query_text = `
       UPDATE products
       SET
         status = $1,
@@ -394,17 +392,18 @@ RETURNING *;
       r_id,
     ];
 
-    await executeInTransaction(client, queryText, values);
+    const { rows } = await executeInTransaction(client, queryText, values);
 
-    return `
+    const msg = `
       Product Category ${isProduct_cat_exist.name} deleted successfully.
       Deleted products: ${deletedProducts.rowCount}
       Deleted subcategory products: ${deletedSubProducts.rowCount}
       Deleted subcategories: ${deletedSubCategories.rowCount}
     `;
-  });
-
-    return result;
+    return {
+      deleted: msg,
+      data: rows[0]
+    }
   }
 
 }

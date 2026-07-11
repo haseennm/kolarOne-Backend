@@ -17,8 +17,8 @@ const TABLES = [
     'party_balance',
 
     'stock',
-    'ledger_transactions'
-,
+    'ledger_transactions',
+    'journals',
     'rent_bill_items','rent_bills','loss_stocks','rent_customer_ledger','rent_payments'
 ]
 

@@ -4,12 +4,13 @@ import { transaction } from "../../../config/db";
 import QuotationService from "./quotation.service";
 import QuotationItemController from "../quotationItems/quotationItems.controller";
 import { getStatusText } from "../../../utils/extra";
+import { emitAuditJournal } from "../../journal/journal.utils";
 
 
 export default class QuotationController {
 
   async QuotationCreate(data: QuotationCreateBody) {
-    const {  final_amount, company_id, created_by, items, ...rest } = data;
+    const { final_amount, company_id, created_by, items, ...rest } = data;
 
     const remark = {
       action: "Created",
@@ -34,7 +35,7 @@ export default class QuotationController {
         await quotationItem.createQuotationItem({
           quotation_id: quotation.id,
           firm_id: rest.firm_id,
-          status:  "Completed",
+          status: "Completed",
           product_id: item.product_id,
           stock_id: item.stock_id,
           quotation_qty: item.quotation_qty,
@@ -54,7 +55,16 @@ export default class QuotationController {
               + (item.total_cgst ?? 0)) // added
         }, client);
       }
-
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: "F",
+        companyId: company_id,
+        tableName: "quotations",
+        tableRowId: quotation.id,
+        action: "create",
+        record: quotation,
+      });
       return {
         msg: `Quotation ${quotation.invoice_number} has been created successfully.`,
         id: quotation.id
@@ -85,17 +95,17 @@ export default class QuotationController {
       );
 
       const quotationItem = new QuotationItemController();
+      const oldItems = await quotationItem.fetchItemsOnly(client, rest.firm_id, rest.quotation_id)
 
-      // ✅ Edit existing items
       if (items && items.length > 0) {
         for (const item of items) {
           const quotationItemData = await quotationItem.editQuotationItem(
             {
               item_id: item.item_id,
-              quotation_id: quotation.id,
+              quotation_id: quotation.data.id,
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
-              status:  "Completed",
+              status: "Completed",
               product_id: item.product_id,
               stock_id: item.stock_id,
               quotation_qty: item.quotation_qty,
@@ -118,8 +128,23 @@ export default class QuotationController {
           );
         }
       }
+      const updatedItems = await quotationItem.fetchItemsOnly(client, rest.firm_id, rest.quotation_id)
 
-      return `Quotation ${quotation.invoice_number} has been updated successfully.`;
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: "F",
+        companyId: company_id,
+        tableName: "quotations",
+        tableRowId: quotation.data.id,
+        action: "update",
+        record: quotation.data,
+        changes: {
+          "quotation": quotation.changes,
+          "quotation items": updatedItems
+        },
+      });
+      return `Quotation ${quotation.data.invoice_number} has been updated successfully.`;
     });
   }
 
@@ -196,27 +221,36 @@ export default class QuotationController {
         },
         client
       );
-   
+      await emitAuditJournal({
+        client,
+        entityId: quotation.id,
+        entityType: "F",
+        companyId: quotation.company_id,
+        tableName: "quotations",
+        tableRowId: quotation.id,
+        action: "delete",
+        record: quotation,
+      });
 
       return `Quotatioin ${quotation.invoice_number} deleted successfully`
     })
   }
-  async QuotationStatusChange(data: ChangeQuotationStatus,client:PoolClient) {
-   
-      const quotationService = new QuotationService();
-      const itemService = new QuotationItemController();
+  async QuotationStatusChange(data: ChangeQuotationStatus, client: PoolClient) {
 
-      const quotation = await quotationService.changeQuotationStatus(data, client);
-      await itemService.changeQuotationItemStatus(
-        {
-          quotation_id: data.id,
-          firm_id: data.firm_id,
-          remark:data.remark,
-          status:data.status
-        },
-        client
-      );
-   
-      return `Quotatioin ${quotation.invoice_number} status changed to ${getStatusText(data.status)} successfully`
-    }
+    const quotationService = new QuotationService();
+    const itemService = new QuotationItemController();
+
+    const quotation = await quotationService.changeQuotationStatus(data, client);
+    await itemService.changeQuotationItemStatus(
+      {
+        quotation_id: data.id,
+        firm_id: data.firm_id,
+        remark: data.remark,
+        status: data.status
+      },
+      client
+    );
+
+    return `Quotatioin ${quotation.invoice_number} status changed to ${getStatusText(data.status)} successfully`
   }
+}

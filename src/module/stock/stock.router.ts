@@ -71,7 +71,7 @@ export async function stockRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["branch_id","stock_id","product_id"],
+          required: ["branch_id", "stock_id", "product_id"],
           properties: {
             branch_id: { type: "number" },
             stock_id: { type: "number" },
@@ -84,7 +84,7 @@ export async function stockRouter(app: FastifyInstance) {
       request: FastifyRequest<{ Body: FetchPopup }>,
       reply: FastifyReply
     ) => {
-      const controller = new StockController(); 
+      const controller = new StockController();
       const data = await controller.fetchPopupStock(request.body);
       return reply.code(200).send(data);
     }
@@ -95,7 +95,7 @@ export async function stockRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["company_id","branch_id"],
+          required: ["company_id", "branch_id"],
           properties: {
             id: { type: "number" },
 
@@ -230,7 +230,7 @@ export async function stockRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["firm_id", "r_id", "mrp_price","retail_price","wholesale_price","branch_price","special_retail_price"],
+          required: ["firm_id", "r_id", "mrp_price", "retail_price", "wholesale_price", "branch_price", "special_retail_price"],
           properties: {
             r_id: { type: "number" },
             special_retail_price: { type: "number" },
@@ -262,10 +262,11 @@ export async function stockRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["branch_id", "r_id", "available_qty", "note"],
+          required: ["branch_id", "company_id", "r_id", "available_qty", "note"],
           properties: {
             r_id: { type: "number" },
             available_qty: { type: "number" },
+            company_id: { type: "number" },
             branch_id: { type: "number" },
             note: { type: "string" },
           }

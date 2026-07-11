@@ -117,7 +117,6 @@ export async function productRouter(app: FastifyInstance): Promise<void> {
           limit,
         },
       });
-
       return reply.code(200).send(products);
     }
   );

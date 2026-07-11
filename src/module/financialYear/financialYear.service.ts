@@ -1,6 +1,7 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord } from "../../utils/extra";
+import { buildAuditChanges } from "../journal/journal.utils";
 import {
   CreateFinancialYearParams,
   DeleteFinancialYearBody,
@@ -158,21 +159,23 @@ export default class FinancialYearService {
     ];
 
     const { rows } = await executeInTransaction(client, updateQuery, values);
+    const updatedFinancialYear = rows[0];
+    const changes = buildAuditChanges(isFinancialYearExist, updatedFinancialYear);
 
-    return rows[0];
+    return { ...updatedFinancialYear, changes };
   }
 
-  async deleteFinancialYear(data: DeleteFinancialYearBody) {
+  async deleteFinancialYear(data: DeleteFinancialYearBody, client?: any) {
 
     const { id, company_id } = data;
-    const result = transaction(async (client) => {
+    const runDelete = async (txClient: any) => {
 
       const isFinancialYearExist = await getRecord(
         id,
         "financial_year",
         "company_id",
         company_id,
-        client
+        txClient
       );
 
       if (!isFinancialYearExist) {
@@ -187,14 +190,15 @@ export default class FinancialYearService {
       `;
 
       const { rows } = await executeInTransaction(
-        client,
+        txClient,
         deleteQuery,
         [id]
       );
 
       return rows[0];
-    });
+    };
 
-    return result;
+    if (client) return runDelete(client);
+    return transaction(runDelete);
   }
 }

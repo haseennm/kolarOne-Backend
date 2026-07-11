@@ -4,13 +4,14 @@ import { AppError } from "../../utils/AppError";
 import { cns, getRecord } from "../../utils/extra";
 import { GetReportSalePurchaseLedger } from "../sale/sale/sale.types";
 import { CreateLedgerTransactionParams, DeleteLedgerTransactionParams, LedgerTransactionCountResult, EditLedgerTransactionParams, FetchLedgerTransactionParams, FetchDbLedgerTransaction } from "./ledgertransaction.types";
+import { buildAuditChanges } from "../journal/journal.utils";
 export default class LedgerTransactionService {
 
-  async createLedgerTransaction(data: CreateLedgerTransactionParams, client: any) {
+  async createLedgerTransaction(data: CreateLedgerTransactionParams, client: PoolClient) {
 
     const {
       entity_id, amount, category_id, company_id, entity_type, reference_id,
-      remark, statusCode, transaction_date,transaction_time
+      remark, statusCode, transaction_date, transaction_time
     } = data;
 
 
@@ -62,7 +63,7 @@ export default class LedgerTransactionService {
 
     const queryText = `
   INSERT INTO ledger_transactions (
-    entity_id, amount, category_id, company_id, entity_type,
+    entity_id, amount, ledger_category_id, company_id, entity_type,
     reference_id, transaction_date, status, remarks,transaction_time
   )
   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
@@ -104,7 +105,7 @@ export default class LedgerTransactionService {
 
     if (filters?.category_id) {
       values.push(filters.category_id);
-      where.push(`lt.category_id = $${values.length}`);
+      where.push(`lt.ledger_category_id = $${values.length}`);
     }
 
     // FIX: entity_type quotes + logic grouping
@@ -113,7 +114,7 @@ export default class LedgerTransactionService {
       where.push(`(lt.entity_type = 'B' AND lt.entity_id = $${values.length})`);
     }
 
-    if (filters?.firm_id && filters.level ==="firm") {
+    if (filters?.firm_id && filters.level === "firm") {
       values.push(filters.firm_id);
       where.push(`(lt.entity_type = 'F' AND lt.entity_id = $${values.length})`);
     }
@@ -134,10 +135,10 @@ export default class LedgerTransactionService {
     }
 
     // FIX: ensure company_id exists
-    if (filters?.company_id && filters.level ==="company") {
+    if (filters?.company_id && filters.level === "company") {
       values.push(filters.company_id);
       where.push(`(lt.entity_type = 'C' AND lt.entity_id = $${values.length})`);
-      
+
     }
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
@@ -158,7 +159,7 @@ export default class LedgerTransactionService {
     FROM ledger_transactions lt
 
     LEFT JOIN ledger_categories lc 
-      ON lt.category_id = lc.id
+      ON lt.ledger_category_id = lc.id
 
     LEFT JOIN company c 
       ON lt.entity_type = 'C' AND lt.entity_id = c.id
@@ -175,7 +176,7 @@ export default class LedgerTransactionService {
     LIMIT $${values.length + 1}
     OFFSET $${values.length + 2}
   `;
-  
+
     const countQuery = `
     SELECT COUNT(*) AS count
     FROM ledger_transactions lt
@@ -201,7 +202,7 @@ export default class LedgerTransactionService {
   }
 
 
-  async updateLedgerTransaction(data: EditLedgerTransactionParams, client: any) {
+  async updateLedgerTransaction(data: EditLedgerTransactionParams, client: PoolClient) {
 
     const {
       id,
@@ -233,7 +234,7 @@ export default class LedgerTransactionService {
   SET
     company_id = $1,
     amount = $2,
-    category_id = $3,
+    ledger_category_id = $3,
     reference_id = $4,
     transaction_date = $5,
     status = $6,
@@ -255,7 +256,7 @@ export default class LedgerTransactionService {
     const values = [
       isLedgerTransactionExist.company_id,
       amount ?? isLedgerTransactionExist.amount,
-      category_id ?? isLedgerTransactionExist.category_id,
+      category_id ?? isLedgerTransactionExist.ledger_category_id,
       reference_id ?? isLedgerTransactionExist.reference_id,
       transaction_date ?? isLedgerTransactionExist.transaction_date,
       status,
@@ -265,7 +266,8 @@ export default class LedgerTransactionService {
     ];
 
     const { rows } = await executeInTransaction(client, updateQuery, values);
-    return rows;
+    const changes = buildAuditChanges(isLedgerTransactionExist, rows[0]);
+    return { data: rows[0], changes };
 
 
   }
@@ -366,7 +368,7 @@ export default class LedgerTransactionService {
       params.push(end_date);
     }
 
- const query = `
+    const query = `
   SELECT
     CASE WHEN lt.amount > 0 THEN 'income' ELSE 'expense' END AS type,
     lt.id,
@@ -376,7 +378,7 @@ export default class LedgerTransactionService {
     lc.name AS ledger_category
   FROM ledger_transactions lt
   LEFT JOIN ledger_categories lc
-    ON lc.id = lt.category_id
+    ON lc.id = lt.ledger_category_id
   WHERE lt.status != 0
   ${condition}
   ORDER BY lt.transaction_date DESC

@@ -85,7 +85,11 @@ export default class PurchaseItemController {
     };
   }
 
-
+  async fetchItemsOnly(client: PoolClient, firm_id: number, sale_id: number) {
+    const service = new PurchaseItemService();
+    const items = service.fetchItemsOnly(client, firm_id, sale_id)
+    return items
+  }
 
 
   async deletePurchaseItem(data: DeletePurchaseItemBody, client: PoolClient) {
@@ -94,7 +98,7 @@ export default class PurchaseItemController {
       deleted_at: Date.now(),
     };
     const service = new PurchaseItemService();
-    const deletedItem = await service.deletePurchaseItem({...data,remark},  client);
+    const deletedItem = await service.deletePurchaseItem({ ...data, remark }, client);
 
     return deletedItem;
   }

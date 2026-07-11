@@ -3,6 +3,7 @@ import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { getRecord, getStatusCode } from "../../../utils/extra";
 import { PurchaseCreateParams, PurchaseDeleteParams, PurchaseEditParams, PurchaseFetchParams, RepayBalancePurchase } from "./purchase.types";
+import { buildAuditChanges } from "../../journal/journal.utils";
 
 export default class PurchaseService {
   private billStatus(final_amount: number, paid_amount: number) {
@@ -345,9 +346,9 @@ export default class PurchaseService {
     }
 
     // 4. Update Core purchases Record
- // Inside purchase.services.ts
-// Ensure returning row mapping attributes target paid_amount = $11 correctly
-const purchaseQuery = `
+    // Inside purchase.services.ts
+    // Ensure returning row mapping attributes target paid_amount = $11 correctly
+    const purchaseQuery = `
   UPDATE purchases SET
     vendor_id = $1,
     bill_number = $2,
@@ -400,7 +401,8 @@ const purchaseQuery = `
     ];
 
     const { rows } = await executeInTransaction(client, purchaseQuery, values);
-    return rows[0];
+    const changes = buildAuditChanges(is_purchase_exist, rows[0]);
+    return {data:rows[0],changes};
   }
   async fetchPurchase(data: PurchaseFetchParams) {
     const { filters, offset } = data;
@@ -817,7 +819,9 @@ RETURNING *;
     ];
 
     const { rows } = await executeInTransaction(client, query, values);
-    return rows[0];
+    const changes = buildAuditChanges(is_purchase_exist, rows[0]);
+    return { data: rows[0], changes, table_name: "purchases" };
+
   }
 
 

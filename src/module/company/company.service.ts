@@ -3,6 +3,7 @@ import { executeInTransaction, pool, query, transaction } from "../../config/db"
 import { getRecord } from "../../utils/extra";
 import { CompanyLoginBody, CountResult, CreateCompanyParams, DeleteCompanyParams, EditCompanyParams, GetCompanyParams, getDbCompany } from "./company.types";
 import { AppError } from "../../utils/AppError";
+import { buildAuditChanges } from "../journal/journal.utils";
 
 export default class CompanyService {
 
@@ -166,7 +167,9 @@ export default class CompanyService {
             ];
 
             const { rows } = await executeInTransaction(client, update_query, values);
-            return rows[0];
+            const updatedCompany = rows[0];
+            const changes = buildAuditChanges(existing, updatedCompany);
+            return { data: updatedCompany, changes };
         })
         return result;
     }
@@ -260,8 +263,8 @@ export default class CompanyService {
                 r_id
             ];
 
-            await pool.query(query, values);
-            return `${isCompanyExist.company_name} Company Deleted Successfull`;
+            const { rows } = await pool.query(query, values);
+            return rows[0];
         })
         return result;
     }

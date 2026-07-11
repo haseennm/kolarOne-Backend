@@ -1,5 +1,6 @@
 import { Result } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
+import { buildAuditChanges } from "../journal/journal.utils";
 import { getRecord } from "../../utils/extra";
 import {
   CountResult,
@@ -13,7 +14,7 @@ import {
 import { AppError } from "../../utils/AppError";
 
 export default class FirmService {
-  async createFirm(data: CreateFirmParams) {
+  async createFirm(data: CreateFirmParams): Promise<any> {
     const {
       company_id,
       branch_id,
@@ -89,7 +90,7 @@ export default class FirmService {
       ];
 
       const { rows } = await executeInTransaction(client, queryText, values);
-      return `${rows[0].firm_name} created`;
+      return rows[0];
     })
     return result;
   }
@@ -242,7 +243,9 @@ RETURNING *;
       ];
 
       const { rows } = await executeInTransaction(client, queryText, values);
-      return `Branch ${rows[0].firm_name} Updated successfully`;
+      const updatedFirm = rows[0];
+      const changes = buildAuditChanges(isFirmExist, updatedFirm);
+      return { data: updatedFirm, changes };
     })
     return result
   }
@@ -276,9 +279,9 @@ RETURNING *;
         r_id,
       ];
 
-      await executeInTransaction(client, queryText, values);
+      const { rows } = await executeInTransaction(client, queryText, values);
 
-      return `Firm ${isFirmExist.firm_name} Deleted Successfully`;
+      return rows[0];
     })
     return result
   }

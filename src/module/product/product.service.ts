@@ -1,7 +1,6 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { getRecord } from "../../utils/extra";
 import {
-  CountResult,
   CreateProductParams,
   Product,
   DeleteProductParams,
@@ -10,10 +9,12 @@ import {
   GetProductReport,
 } from "./product.types";
 import { AppError } from "../../utils/AppError";
+import { PoolClient } from "pg";
+import { buildAuditChanges } from "../journal/journal.utils";
 
 export default class ProductService {
 
-  async createProduct(data: CreateProductParams) {
+  async createProduct(data: CreateProductParams, client: PoolClient) {
     const {
       company_id,
       category_id,
@@ -32,48 +33,46 @@ export default class ProductService {
       statusCode
     } = data;
 
-    return transaction(async (client) => {
+    const companyExist = await getRecord(
+      company_id,
+      "company",
+      "id",
+      company_id,
+      client
+    );
+    if (!companyExist) throw new AppError("Company not found", 404);
 
-      const companyExist = await getRecord(
-        company_id,
-        "company",
-        "id",
-        company_id,
-        client
-      );
-      if (!companyExist) throw new AppError("Company not found", 404);
+    const categoryExist = await getRecord(
+      category_id,
+      "product_categories",
+      "company_id",
+      company_id,
+      client
+    );
+    if (!categoryExist)
+      throw new AppError("Product category not found", 404);
+    if (brand_id) {
 
-      const categoryExist = await getRecord(
-        category_id,
-        "product_categories",
+      const brandExist = await getRecord(
+        brand_id,
+        "brand",
         "company_id",
         company_id,
         client
       );
-      if (!categoryExist)
-        throw new AppError("Product category not found", 404);
-      if (brand_id) {
+      if (!brandExist)
+        throw new AppError("brand not found", 404);
+    }
+    const skuResult = await executeInTransaction(
+      client,
+      `SELECT CONCAT('SKU-', nextval('product_sku_seq')) AS sku`
+    );
 
-        const brandExist = await getRecord(
-          brand_id,
-          "brand",
-          "company_id",
-          company_id,
-          client
-        );
-        if (!brandExist)
-          throw new AppError("brand not found", 404);
-      }
-      const skuResult = await executeInTransaction(
-        client,
-        `SELECT CONCAT('SKU-', nextval('product_sku_seq')) AS sku`
-      );
+    const sku = skuResult.rows[0].sku;
 
-      const sku = skuResult.rows[0].sku;
-
-      const queryText = `
+    const queryText = `
         INSERT INTO products (
-          category_id,
+          product_category_id,
           brand_id,
           name,
           short_name,
@@ -97,33 +96,31 @@ export default class ProductService {
         RETURNING *;
       `;
 
-      const values = [
-        category_id,
-        brand_id,
-        name,
-        short_name,
-        description,
-        sku,
-        barcode,
-        hsn_sac_code,
-        unit,
-        cgst_rate ?? 0,
-        sgst_rate ?? 0,
-        igst_rate ?? 0,
-        statusCode ?? 1,
-        JSON.stringify(remarks),
-        image,
-        company_id,
-      ];
+    const values = [
+      category_id,
+      brand_id,
+      name,
+      short_name,
+      description,
+      sku,
+      barcode,
+      hsn_sac_code,
+      unit,
+      cgst_rate ?? 0,
+      sgst_rate ?? 0,
+      igst_rate ?? 0,
+      statusCode ?? 1,
+      JSON.stringify(remarks),
+      image,
+      company_id,
+    ];
 
-      const { rows } = await executeInTransaction(
-        client,
-        queryText,
-        values
-      );
-
-      return rows[0];
-    });
+    const { rows } = await executeInTransaction(
+      client,
+      queryText,
+      values
+    );
+    return rows[0];
   }
 
   async fetchProducts(params: FetchProductParams) {
@@ -220,7 +217,7 @@ export default class ProductService {
   FROM products p
 
   LEFT JOIN product_categories c
-    ON p.category_id = c.id
+    ON p.product_category_id = c.id
 
   LEFT JOIN brand b
     ON p.brand_id = b.id
@@ -242,7 +239,7 @@ export default class ProductService {
   FROM products p
 
   LEFT JOIN product_categories c
-    ON p.category_id = c.id
+    ON p.product_category_id = c.id
 
   LEFT JOIN brand b
     ON p.brand_id = b.id
@@ -275,46 +272,45 @@ export default class ProductService {
   }
 
 
-  async updateProduct(data: EditProductParams) {
+  async updateProduct(data: EditProductParams, client: PoolClient) {
     const { id, company_id, remarks, statusCode, category_id, brand_id, ...rest } = data;
-    return transaction(async (client) => {
-      const existing = await getRecord(
-        id,
-        "products",
+    const existing = await getRecord(
+      id,
+      "products",
+      "company_id",
+      company_id,
+      client
+    );
+
+    if (!existing)
+      throw new AppError("Product not found", 404);
+
+    if (category_id && category_id !== existing.product_category_id) {
+      const categoryExist = await getRecord(
+        category_id,
+        "product_categories",
         "company_id",
         company_id,
         client
       );
-
-      if (!existing)
-        throw new AppError("Product not found", 404);
-
-      if (category_id && category_id !== existing.category_id) {
-        const categoryExist = await getRecord(
-          category_id,
-          "product_categories",
-          "company_id",
-          company_id,
-          client
-        );
-        if (!categoryExist)
-          throw new AppError("Product category not found", 404);
-      }
-      if (brand_id && brand_id !== existing.brand_id) {
-        const brandExist = await getRecord(
-          brand_id,
-          "brand",
-          "company_id",
-          company_id,
-          client
-        );
-        if (!brandExist)
-          throw new AppError("brand not found", 404);
-      }
-      const queryText = `
+      if (!categoryExist)
+        throw new AppError("Product category not found", 404);
+    }
+    if (brand_id && brand_id !== existing.brand_id) {
+      const brandExist = await getRecord(
+        brand_id,
+        "brand",
+        "company_id",
+        company_id,
+        client
+      );
+      if (!brandExist)
+        throw new AppError("brand not found", 404);
+    }
+    const queryText = `
   UPDATE products
   SET
-    category_id = $1,
+    product_category_id = $1,
     brand_id = $2,
     name = $3,
     short_name = $4,
@@ -338,51 +334,50 @@ export default class ProductService {
   RETURNING *;
 `;
 
-      const values = [
-        category_id ?? existing.category_id,
-        brand_id ?? existing.brand_id,
-        rest.name ?? existing.name,
-        rest.short_name ?? existing.short_name,
-        rest.description ?? existing.description,
-        existing.sku,
-        rest.barcode ?? existing.barcode,
-        rest.hsn_sac_code ?? existing.hsn_sac_code,
-        rest.unit ?? existing.unit,
-        rest.cgst_rate ?? existing.cgst_rate,
-        rest.sgst_rate ?? existing.sgst_rate,
-        rest.igst_rate ?? existing.igst_rate,
-        statusCode ?? existing.status,
-        rest.image ?? existing.image,
-        JSON.stringify(remarks),
-        id
-      ];
+    const values = [
+      category_id ?? existing.product_category_id,
+      brand_id ?? existing.brand_id,
+      rest.name ?? existing.name,
+      rest.short_name ?? existing.short_name,
+      rest.description ?? existing.description,
+      existing.sku,
+      rest.barcode ?? existing.barcode,
+      rest.hsn_sac_code ?? existing.hsn_sac_code,
+      rest.unit ?? existing.unit,
+      rest.cgst_rate ?? existing.cgst_rate,
+      rest.sgst_rate ?? existing.sgst_rate,
+      rest.igst_rate ?? existing.igst_rate,
+      statusCode ?? existing.status,
+      rest.image ?? existing.image,
+      JSON.stringify(remarks),
+      id
+    ];
 
-      const { rows } = await executeInTransaction(
-        client,
-        queryText,
-        values
-      );
+    const { rows } = await executeInTransaction(
+      client,
+      queryText,
+      values
+    );
+    const changes = buildAuditChanges(existing, rows[0]);
+    return { data: rows[0], changes };
 
-      return rows[0];
-    });
   }
 
-  async deleteProduct(data: DeleteProductParams) {
+  async deleteProduct(data: DeleteProductParams, client: PoolClient) {
     const { r_id, company_id, remarks } = data;
 
-    return transaction(async (client) => {
-      const existing = await getRecord(
-        r_id,
-        "products",
-        "company_id",
-        company_id,
-        client
-      );
+    const existing = await getRecord(
+      r_id,
+      "products",
+      "company_id",
+      company_id,
+      client
+    );
 
-      if (!existing)
-        throw new AppError("Product not found", 404);
+    if (!existing)
+      throw new AppError("Product not found", 404);
 
-      const queryText = `
+    const queryText = `
         UPDATE products
         SET
           status = 0,
@@ -396,13 +391,11 @@ export default class ProductService {
         RETURNING *;
       `;
 
-      await executeInTransaction(client, queryText, [
-        JSON.stringify(remarks),
-        r_id,
-      ]);
-
-      return `Product ${existing.name} deleted successfully`;
-    });
+    const {rows} =await executeInTransaction(client, queryText, [
+      JSON.stringify(remarks),
+      r_id,
+    ]);
+    return rows[0]
   }
   async getProductReportSummary(data: GetProductReport) {
 

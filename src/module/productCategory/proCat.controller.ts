@@ -1,3 +1,5 @@
+import { PoolClient } from "pg";
+import { transaction } from "../../config/db";
 import { getStatusCode, getStatusText } from "../../utils/extra";
 import ProductCatService from "./proCat.service";
 import {
@@ -6,6 +8,7 @@ import {
   EditProductCatBody,
   FetchProductCatParams,
 } from "./proCat.types";
+import { emitAuditJournal } from "../journal/journal.utils";
 
 export default class ProCatController {
 
@@ -32,75 +35,112 @@ export default class ProCatController {
   }
 
   async createProductCat(data: CreateProductCatBody) {
-    const { created_by, status, image, ...rest } = data;
+    return transaction(async (client: PoolClient) => {
 
-    const remark = {
-      action: "Created",
-      created_by,
-      created_at: Date.now(),
-    };
+      const { created_by, status, image, ...rest } = data;
 
-    const statusCode = getStatusCode(status);
+      const remark = {
+        action: "Created",
+        created_by,
+        created_at: Date.now(),
+      };
 
-    const service = new ProductCatService();
+      const statusCode = getStatusCode(status);
 
-    const firm = await service.createProductCat({
-      ...rest,
-      remark,
-      statusCode,
-      image
-    });
+      const service = new ProductCatService();
 
-    return firm;
+      const product_category = await service.createProductCat({
+        ...rest,
+        remark,
+        statusCode,
+        image
+      }, client);
+      await emitAuditJournal({
+        client,
+        entityId: rest.company_id,
+        entityType: "C",
+        companyId: rest.company_id,
+        tableName: "product_categories",
+        tableRowId: product_category.id,
+        action: "create",
+        record: product_category,
+      });
+      return product_category;
+    })
   }
 
   async editProductCat(data: EditProductCatBody) {
-    const { updated_by, status, ...rest } = data;
+    return transaction(async (client: PoolClient) => {
 
-    const remark = {
-      action: "Updated",
-      updated_by,
-      updated_at: Date.now(),
-    };
+      const { updated_by, status, ...rest } = data;
 
-    let statusCode;
+      const remark = {
+        action: "Updated",
+        updated_by,
+        updated_at: Date.now(),
+      };
 
-    if (typeof status === "string") {
-      statusCode = getStatusCode(status);
-    }
+      let statusCode;
 
-    const service = new ProductCatService();
+      if (typeof status === "string") {
+        statusCode = getStatusCode(status);
+      }
 
-    const product_category = await service.updateProductCat({
-      ...rest,
-      remark,
-      statusCode,
-    });
+      const service = new ProductCatService();
 
-    return product_category;
+      const product_category = await service.updateProductCat({
+        ...rest,
+        remark,
+        statusCode,
+      }, client);
+      await emitAuditJournal({
+        client,
+        entityId: rest.company_id,
+        entityType: "C",
+        companyId: rest.company_id,
+        tableName: "product_categories",
+        tableRowId: product_category.data.id,
+        action: "update",
+        record: product_category,
+        changes: { product_categories: product_category.changes },
+      });
+      return product_category;
+    })
   }
 
   async deleteProductCat(data: DeleteProductCatBody) {
-    const { deleted_by, ...rest } = data;
+    return transaction(async (client: PoolClient) => {
 
-    const remark = {
-      action: "Deleted",
-      deleted_by,
-      updated_at: Date.now(),
-    };
-    const sub_cat_remark = {
-      action: "Deleted Due to delete parent category",
-      deleted_by,
-      deleted_at: Date.now(),
-    };
-    const service = new ProductCatService();
+      const { deleted_by, ...rest } = data;
 
-    const product_category = await service.deleteProductCat({
-      ...rest,
-      remark,
-      sub_cat_remark
-    });
+      const remark = {
+        action: "Deleted",
+        deleted_by,
+        updated_at: Date.now(),
+      };
+      const sub_cat_remark = {
+        action: "Deleted Due to delete parent category",
+        deleted_by,
+        deleted_at: Date.now(),
+      };
+      const service = new ProductCatService();
 
-    return product_category;
+      const product_category = await service.deleteProductCat({
+        ...rest,
+        remark,
+        sub_cat_remark
+      }, client);
+      await emitAuditJournal({
+        client,
+        entityId: rest.company_id,
+        entityType: "C",
+        companyId: rest.company_id,
+        tableName: "product_categories",
+        tableRowId: product_category.data.id,
+        action: "delete",
+        record: product_category.data,
+      });
+      return product_category;
+    })
   }
 }

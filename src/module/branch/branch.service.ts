@@ -1,11 +1,12 @@
 import { executeInTransaction, pool, query, transaction } from "../../config/db"
 import { AppError } from "../../utils/AppError";
 import { getRecord } from "../../utils/extra";
+import { buildAuditChanges } from "../journal/journal.utils";
 import { BranchLoginBody, CountResult, CreateBranchParams, DeleteBranchParams, EditBranchParams, FetchBranchParams, FetchDbBranch } from "./branch.types";
 
 export default class BranchService {
 
-    async createBranch(data: CreateBranchParams) {
+    async createBranch(data: CreateBranchParams): Promise<any> {
         const {
             company_id,
             branch_code,
@@ -270,9 +271,10 @@ export default class BranchService {
                 JSON.stringify(remark),
                 id
             ];
-
+            
             const { rows } = await executeInTransaction(client, query, values);
-            return rows[0];
+            const changes = buildAuditChanges(is_branch_exist, rows[0]);
+            return{data: rows[0],changes};
         });
 
         return result;
@@ -305,8 +307,8 @@ export default class BranchService {
                 r_id
             ];
 
-            await query(dlt_query, values);
-            return `${isbranch_exist.branch_name}(${isbranch_exist.branch_code}) Company Deleted Successfull`;
+            const { rows } = await executeInTransaction(client, dlt_query, values);
+            return rows[0];
         })
         return result
     }

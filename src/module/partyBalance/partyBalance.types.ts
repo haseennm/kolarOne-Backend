@@ -83,3 +83,8 @@ export interface DeletePartyBalanceBody {
 export interface DeletePartyBalanceParams extends Omit<DeletePartyBalanceBody, "delete_by"> {
   remark: object
 }
+export type AuditRecord = {
+  data: any;
+  changes: Record<string, { old: unknown; new: unknown }> | null;
+  table_name: string;
+};

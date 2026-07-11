@@ -8,6 +8,7 @@ import PurchaseService from "./purchase.service";
 import PurchaseItemController from "../purchaseitems/purchaseitems.controller";
 import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 import { PaymentTransactionService } from "../../paymentTransaction/paymenttransaction.services";
+import { buildAuditChanges, emitAuditJournal } from "../../journal/journal.utils";
 
 export default class PurchaseController {
 
@@ -121,7 +122,16 @@ export default class PurchaseController {
           client
         );
       }
-
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: "F",
+        companyId: company_id,
+        tableName: "purchases",
+        tableRowId: purchase.id,
+        action: "create",
+        record: purchase,
+      });
       return `purchase ${purchase.bill_number} has been created successfully.`;
     });
   }
@@ -346,7 +356,6 @@ export default class PurchaseController {
     };
 
     return transaction(async (client: PoolClient) => {
-      const statusCode = getStatusCode(status ?? "Completed");
 
       // 1. Compute total paid amount and format the JSON storage block layout exactly as requested
       const computedPaymentAmount = payments.reduce((sum, item) => sum + (item.amount ?? 0), 0);
@@ -383,16 +392,17 @@ export default class PurchaseController {
       if (delete_item_ids?.length) {
         for (const item_id of delete_item_ids) {
           const deletedItem = await purchaseItem.deletePurchaseItem(
-            { purchase_id: purchase.id, firm_id: rest.firm_id, item_id },
+            { purchase_id: purchase.data.id, firm_id: rest.firm_id, item_id },
             client
           );
           await stockController.deleteStock(
-            { purchase_id: purchase.id, firm_id: rest.firm_id, stock_id: deletedItem.stock_id },
+            { purchase_id: purchase.data.id, firm_id: rest.firm_id, stock_id: deletedItem.stock_id },
             client
           );
         }
       }
 
+      const exist_items = await purchaseItem.fetchItemsOnly(client, rest.firm_id, rest.purchase_id)
       if (items) {
         const newProductIds = new Set<number>();
         for (const item of items) {
@@ -407,14 +417,14 @@ export default class PurchaseController {
             newProductIds.add(item.product_id);
 
             await this.ensurePurchaseItemCanBeAdded(
-              { purchase_id: purchase.id, firm_id: rest.firm_id, product_id: item.product_id },
+              { purchase_id: purchase.data.id, firm_id: rest.firm_id, product_id: item.product_id },
               client
             );
 
             const stock = await stockController.createStock({
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
-              purchase_id: purchase.id,
+              purchase_id: purchase.data.id,
               product_id: item.product_id,
               available_qty: item.received_qty!,
               purchased_qty: item.purchased_qty!,
@@ -425,7 +435,7 @@ export default class PurchaseController {
             }, client);
 
             await purchaseItem.createPurchaseItem({
-              purchase_id: purchase.id,
+              purchase_id: purchase.data.id,
               firm_id: rest.firm_id,
               branch_id: rest.branch_id,
               status: item.status ?? status ?? "Completed",
@@ -447,7 +457,7 @@ export default class PurchaseController {
 
           const purchase_item = await purchaseItem.editPurchaseItem({
             item_id: item.item_id,
-            purchase_id: purchase.id,
+            purchase_id: purchase.data.id,
             firm_id: rest.firm_id,
             branch_id: rest.branch_id,
             status: item.status ?? status ?? "Completed",
@@ -469,7 +479,7 @@ export default class PurchaseController {
             firm_id: rest.firm_id,
             branch_id: rest.branch_id,
             company_id,
-            purchase_id: purchase.id,
+            purchase_id: purchase.data.id,
             product_id: item.product_id,
             available_qty: item.received_qty,
             purchased_qty: item.purchased_qty,
@@ -479,13 +489,14 @@ export default class PurchaseController {
           }, client);
         }
       }
-
+      const updated_items = await purchaseItem.fetchItemsOnly(client, rest.firm_id, rest.purchase_id)
+      const item_changes = buildAuditChanges(exist_items, updated_items);
       // 4. Update or Soft-Delete Payment Audit Transaction Ledgers
       const entity_type = convertEntityType("Firm" as EntityKey);
       const payment_transactions_service = new PaymentTransactionService();
 
       await payment_transactions_service.syncPaymentTransactions({
-        ref_id: purchase.id,
+        ref_id: purchase.data.id,
         company_id,
         firm_id: rest.firm_id,
         statusCode: getStatusCode("Paid"), // Or customized fallback code variable
@@ -495,8 +506,8 @@ export default class PurchaseController {
       }, client);
 
       // 5. Party Balance Processing (Uses strictly updated database returned data values)
-      const actualPaidAmount = Number(purchase.paid_amount ?? 0);
-      const actualFinalAmount = Number(purchase.final_amount ?? 0);
+      const actualPaidAmount = Number(purchase.data.paid_amount ?? 0);
+      const actualFinalAmount = Number(purchase.data.final_amount ?? 0);
       const difference = actualPaidAmount - actualFinalAmount;
 
       const party_balance_controller = new PartyBalanceController();
@@ -516,7 +527,7 @@ export default class PurchaseController {
 
       await party_balance_controller.editPartyBalance(
         {
-          ref_id: purchase.id,
+          ref_id: purchase.data.id,
           ref_type: PaymentTransactionTypeCodeMap["purchase"],
           action_by: updated_by,
           balance: Math.abs(difference),
@@ -526,8 +537,21 @@ export default class PurchaseController {
         },
         client
       );
-
-      return `purchase ${purchase.bill_number} has been updated successfully.`;
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: "F",
+        companyId: company_id,
+        tableName: "purchases",
+        tableRowId: purchase.data.id,
+        action: "update",
+        record: purchase,
+        changes: {
+          purchase: purchase.changes,
+          "purchase items": item_changes
+        },
+      });
+      return `purchase ${purchase.data.bill_number} has been updated successfully.`;
     });
   }
   private async ensurePurchaseItemCanBeAdded(
@@ -630,6 +654,16 @@ export default class PurchaseController {
         ref_id: rest.id,
         ref_type: PaymentTransactionTypeCodeMap["purchase"],
       }, client)
+      await emitAuditJournal({
+        client,
+        entityId: rest.firm_id,
+        entityType: "F",
+        companyId:purchase.company_id,
+        tableName: "purchases",
+        tableRowId: purchase.id,
+        action: "delete",
+        record: purchase,
+      });
 
       return "purchase deleted successfully"
     })
