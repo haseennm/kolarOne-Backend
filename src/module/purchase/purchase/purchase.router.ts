@@ -318,12 +318,16 @@ export async function purchaseRouter(app: FastifyInstance) {
               "type": "array",
               items: {
                 "type": "object",
-                "required": ["payment_method_id", "amount"],
+                "required": ["payment_method_id", "amount","payment_flow"],
                 properties: {
                   id: { "type": ["number", "null"] },
                   payment_method_id: { "type": "number" },
                   amount: { "type": "number", "minimum": 0 },
-                  transaction_reference: { "type": ["string", "null"] }
+                  transaction_reference: { "type": ["string", "null"] },
+                  payment_flow: {
+                    "type": "string",
+                    "enum": ["E", "I"]
+                  }
                 }
               }
             },

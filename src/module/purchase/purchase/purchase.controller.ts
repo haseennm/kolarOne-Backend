@@ -358,7 +358,9 @@ export default class PurchaseController {
     return transaction(async (client: PoolClient) => {
 
       // 1. Compute total paid amount and format the JSON storage block layout exactly as requested
-      const computedPaymentAmount = payments.reduce((sum, item) => sum + (item.amount ?? 0), 0);
+      const computedPaymentAmount = payments
+        .filter(payment => payment.payment_flow === "E")
+        .reduce((sum, payment) => sum + (payment.amount ?? 0), 0);
 
       const paymentsJsonStorage = payments.map(p => ({
         payment_amount: p.amount,
@@ -545,7 +547,7 @@ export default class PurchaseController {
         tableName: "purchases",
         tableRowId: purchase.data.id,
         action: "update",
-        record: purchase,
+        record: purchase.data,
         changes: {
           purchase: purchase.changes,
           "purchase items": item_changes
@@ -658,7 +660,7 @@ export default class PurchaseController {
         client,
         entityId: rest.firm_id,
         entityType: "F",
-        companyId:purchase.company_id,
+        companyId: purchase.company_id,
         tableName: "purchases",
         tableRowId: purchase.id,
         action: "delete",

@@ -11,106 +11,106 @@ export async function saleRouter(app: FastifyInstance) {
 
   app.post<{ Body: SaleCreateBody }>(
     "/create",
-   {
-  schema: {
-    body: {
-      type: "object",
-      required: [
-        "firm_id",
-        "branch_id",
-        "company_id",
-        "created_by",
-        "customer_id",
-        "invoice_date",
-        "subtotal",
-        "discount",
-        "net_amount",
-        "total_cgst",
-        "total_sgst",
-        "total_igst",
-        "final_amount",
-        "payments",
-        "items",
-        "price_pool",
-        "is_intrastate",
-        "state_code"
-      ],
-      properties: {
-        firm_id: { type: "number" },
-        branch_id: { type: "number" },
-        company_id: { type: "number" },
-        created_by: { type: "string", minLength: 1 },
-        customer_id: { type: "string", format: "uuid" },
-        invoice_date: { type: "string", format: "date" },
-        subtotal: { type: "number" },
-        discount: { type: "number" },
-        net_amount: { type: "number" },
-        total_cgst: { type: "number" },
-        total_sgst: { type: "number" },
-        total_igst: { type: "number" },
-        courier_charge: { type: "number" },
-        other_charge: { type: "number" },
-        handling_charge: { type: "number" },
-        final_amount: { type: "number" },
-        quotation_id: { type: ["number", "null"] },
-        state_code: { type: "number" },
-        is_intrastate: { type: "boolean" },
-        notes: { type: ["string", "null"] },
-        status: {
-          type: "string",
-          enum: ["Completed", "Confirm", "Cancelled"]
-        },
-        price_pool: {
-          type: "string",
-          enum: ['branch_price', 'mrp_price', 'retail_price', 'special_retail_price', 'wholesale_price']
-        },
-        payments: {
-          type: "array",
-          minItems: 1,
-          items: {
-            type: "object",
-            required: ["amount"],
-            properties: {
-              payment_method_id: { type: "number" },
-              amount: { type: "number" },
-              reference: { type: ["string", "null"] }
-            }
-          }
-        },
-        items: {
-          type: "array",
-          minItems: 1,
-          items: {
-            type: "object",
-            required: [
-              "product_id",
-              "stock_id",
-              "saled_qty",
-              "unit",
-              "unit_price",
-              "sub_total",
-              "net_amount"
-            ],
-            properties: {
-              product_id: { type: "number" },
-              stock_id: { type: "number" },
-              saled_qty: { type: "number" },
-              unit: { type: "string" },
-              unit_price: { type: "number" },
-              sub_total: { type: "number" },
-              discount: { type: "number", default: 0 },
-              total_igst: { type: "number", default: 0 },
-              total_sgst: { type: "number", default: 0 },
-              total_cgst: { type: "number", default: 0 },
-              net_amount: { type: "number" },
-              final_amount: { type: ["number", "null"] }
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: [
+            "firm_id",
+            "branch_id",
+            "company_id",
+            "created_by",
+            "customer_id",
+            "invoice_date",
+            "subtotal",
+            "discount",
+            "net_amount",
+            "total_cgst",
+            "total_sgst",
+            "total_igst",
+            "final_amount",
+            "payments",
+            "items",
+            "price_pool",
+            "is_intrastate",
+            "state_code"
+          ],
+          properties: {
+            firm_id: { type: "number" },
+            branch_id: { type: "number" },
+            company_id: { type: "number" },
+            created_by: { type: "string", minLength: 1 },
+            customer_id: { type: "string", format: "uuid" },
+            invoice_date: { type: "string", format: "date" },
+            subtotal: { type: "number" },
+            discount: { type: "number" },
+            net_amount: { type: "number" },
+            total_cgst: { type: "number" },
+            total_sgst: { type: "number" },
+            total_igst: { type: "number" },
+            courier_charge: { type: "number" },
+            other_charge: { type: "number" },
+            handling_charge: { type: "number" },
+            final_amount: { type: "number" },
+            quotation_id: { type: ["number", "null"] },
+            state_code: { type: "number" },
+            is_intrastate: { type: "boolean" },
+            notes: { type: ["string", "null"] },
+            status: {
+              type: "string",
+              enum: ["Completed", "Confirm", "Cancelled"]
+            },
+            price_pool: {
+              type: "string",
+              enum: ['branch_price', 'mrp_price', 'retail_price', 'special_retail_price', 'wholesale_price']
+            },
+            payments: {
+              type: "array",
+              minItems: 1,
+              items: {
+                type: "object",
+                required: ["payment_amount","payment_method_id"],
+                properties: {
+                  payment_method_id: { type: "number" },
+                  payment_amount: { type: "number" },
+                  reference: { type: ["string", "null"] }
+                }
+              }
+            },
+            items: {
+              type: "array",
+              minItems: 1,
+              items: {
+                type: "object",
+                required: [
+                  "product_id",
+                  "stock_id",
+                  "saled_qty",
+                  "unit",
+                  "unit_price",
+                  "sub_total",
+                  "net_amount"
+                ],
+                properties: {
+                  product_id: { type: "number" },
+                  stock_id: { type: "number" },
+                  saled_qty: { type: "number" },
+                  unit: { type: "string" },
+                  unit_price: { type: "number" },
+                  sub_total: { type: "number" },
+                  discount: { type: "number", default: 0 },
+                  total_igst: { type: "number", default: 0 },
+                  total_sgst: { type: "number", default: 0 },
+                  total_cgst: { type: "number", default: 0 },
+                  net_amount: { type: "number" },
+                  final_amount: { type: ["number", "null"] }
+                }
+              }
             }
           }
         }
       }
-    }
-  }
-},
+    },
     async (
       request: FastifyRequest<{ Body: SaleCreateBody }>,
       reply: FastifyReply
@@ -202,91 +202,95 @@ export async function saleRouter(app: FastifyInstance) {
   // EDIT SALE
   app.post<{ Body: SaleEditBody }>(
     "/edit",
-  {
-    schema: {
-      body: {
-        type: "object",
-        required: ["sale_id", "firm_id", "updated_by"],
-        properties: {
-          sale_id: { type: "number" },
-          company_id: { type: "number" },
-          updated_by: { type: "string", minLength: 1 },
-          firm_id: { type: "number" },
-          branch_id: { type: "number" },
-          customer_id: { type: "string" },
-          invoice_number: { type: "string" },
-          invoice_date: { type: "string", format: "date" },
-          subtotal: { type: "number" },
-          discount: { type: "number" },
-          net_amount: { type: "number" },
-          total_cgst: { type: "number" },
-          total_sgst: { type: "number" },
-          total_igst: { type: "number" },
-          courier_charge: { type: "number" },
-          other_charge: { type: "number" },
-          handling_charge: { type: "number" },
-          final_amount: { type: "number" },
-          notes: { type: ["string", "null"] },
-          ref_no: { type: ["string", "null"] },
-          price_pool: { type: ["string", "null"] },
-          is_intrastate: { type: "boolean" },
-          state_code: { type: ["string", "null"] },
-          status: {
-            type: ["string", "null"],
-            enum: ["Completed", "Confirm", "Cancelled", null]
-          },
-          payments: {
-            type: "array",
-            items: {
-              type: "object",
-              required: ["payment_method_id", "amount"],
-              properties: {
-                id: { type: ["number", "null"] },
-                payment_method_id: { type: "number" },
-                amount: { type: "number", minimum: 0 },
-                transaction_reference: { type: ["string", "null"] }
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["sale_id", "firm_id", "updated_by"],
+          properties: {
+            sale_id: { type: "number" },
+            company_id: { type: "number" },
+            updated_by: { type: "string", minLength: 1 },
+            firm_id: { type: "number" },
+            branch_id: { type: "number" },
+            customer_id: { type: "string" },
+            invoice_number: { type: "string" },
+            invoice_date: { type: "string", format: "date" },
+            subtotal: { type: "number" },
+            discount: { type: "number" },
+            net_amount: { type: "number" },
+            total_cgst: { type: "number" },
+            total_sgst: { type: "number" },
+            total_igst: { type: "number" },
+            courier_charge: { type: "number" },
+            other_charge: { type: "number" },
+            handling_charge: { type: "number" },
+            final_amount: { type: "number" },
+            notes: { type: ["string", "null"] },
+            ref_no: { type: ["string", "null"] },
+            price_pool: { type: ["string", "null"] },
+            is_intrastate: { type: "boolean" },
+            state_code: { type: ["string", "null"] },
+            status: {
+              type: ["string", "null"],
+              enum: ["Completed", "Confirm", "Cancelled", null]
+            },
+            payments: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["payment_method_id", "amount"],
+                properties: {
+                  id: { type: ["number", "null"] },
+                  payment_method_id: { type: "number" },
+                  amount: { type: "number", minimum: 0 },
+                  transaction_reference: { type: ["string", "null"] },
+                  payment_flow: {
+                    "type": "string",
+                    "enum": ["E", "I"]
+                  }
+                }
               }
-            }
-          },
-          items: {
-            type: "array",
+            },
             items: {
-              type: "object",
-              required: [
-                "product_id",
-                "received_qty",
-                "purchased_qty",
-                "unit",
-                "unit_price",
-                "sub_total",
-                "net_amount"
-              ],
-              properties: {
-                item_id: { type: "number" },
-                is_new: { type: "boolean" },
-                product_id: { type: "number" },
-                received_qty: { type: "number" }, // maps to physical stock updates
-                purchased_qty: { type: "number" },
-                unit: { type: "string" },
-                unit_price: { type: "number" },
-                sub_total: { type: "number" },
-                total_igst: { type: "number" },
-                total_sgst: { type: "number" },
-                total_cgst: { type: "number" },
-                net_amount: { type: "number" },
-                status: { type: "string" }
+              type: "array",
+              items: {
+                type: "object",
+                required: [
+                  "product_id",
+                  "received_qty",
+                  "purchased_qty",
+                  "unit",
+                  "unit_price",
+                  "sub_total",
+                  "net_amount"
+                ],
+                properties: {
+                  item_id: { type: "number" },
+                  is_new: { type: "boolean" },
+                  product_id: { type: "number" },
+                  received_qty: { type: "number" }, // maps to physical stock updates
+                  purchased_qty: { type: "number" },
+                  unit: { type: "string" },
+                  unit_price: { type: "number" },
+                  sub_total: { type: "number" },
+                  total_igst: { type: "number" },
+                  total_sgst: { type: "number" },
+                  total_cgst: { type: "number" },
+                  net_amount: { type: "number" },
+                  status: { type: "string" }
+                }
               }
+            },
+            delete_item_ids: {
+              type: "array",
+              items: { type: "number" }
             }
-          },
-          delete_item_ids: {
-            type: "array",
-            items: { type: "number" }
           }
         }
       }
-    }
-  },
-  async (
+    },
+    async (
       request: FastifyRequest<{ Body: SaleEditBody }>,
       reply: FastifyReply
     ) => {

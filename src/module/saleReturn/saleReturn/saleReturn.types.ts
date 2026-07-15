@@ -15,7 +15,7 @@ export interface SaleReturnCreateBody {
   branch_id: number;
   company_id: number;
   // ✅ Accepts multiple payments during creation
-  payments?: { payment_method_id: number; amount: number; transaction_reference?: string | null }[];
+  payments?: { payment_method_id: number; payment_amount: number; transaction_reference?: string | null }[];
   items: CreateSaleRetunItemBody[];
 }
 
@@ -24,6 +24,13 @@ export interface SaleReturnCreateParams
   remark: object;
   computed_payment_amount: number;
   merged_payments_json: string;
+}
+export interface PurchasePaymentEditItem {
+  id?: number | null;
+  payment_method_id: number;
+  amount: number;
+  transaction_reference?: string | null;
+  payment_flow: "I" | "E"
 }
 export interface SaleReturnEditBody {
   sale_return_id: number;
@@ -40,7 +47,7 @@ export interface SaleReturnEditBody {
   final_amount?: number;
   reason?: string | null;
   status?: string;
-  payments?: { id?: number | null; payment_method_id: number; amount: number; transaction_reference?: string | null }[];
+  payments?: PurchasePaymentEditItem[]; // Group payment inputs
   items?: any[];//EditSaleRetunItemBody
   delete_item_ids?: number[];
 }

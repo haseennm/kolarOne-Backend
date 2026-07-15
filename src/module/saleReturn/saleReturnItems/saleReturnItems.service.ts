@@ -356,6 +356,7 @@ export default class SaleReturnItemService {
 
   async deleteSaleReturnItem(data: DeleteSaleReturnItemParams, client: PoolClient) {
     const { sale_return_id, firm_id, remark } = data;
+    console.log(data)
     const isItemExist = await executeInTransaction(client,
       `SELECT * FROM sale_return_items WHERE sale_return_id =$1 AND firm_id= $2`,
       [sale_return_id, firm_id]
@@ -363,14 +364,13 @@ export default class SaleReturnItemService {
     if (isItemExist) {
       throw new AppError("Sale item not found for this Sale", 404)
     }
-
     const deleteQuery = `
         UPDATE sale_return_items
         SET status = 0
         WHERE sale_return_id = $1 AND firm_id = $2
     RETURNING *;
     `;
-
+    
     const { rows } = await executeInTransaction(
       client,
       deleteQuery,

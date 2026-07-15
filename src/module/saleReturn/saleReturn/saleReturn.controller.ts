@@ -24,9 +24,9 @@ export default class SaleReturnController {
 
     return transaction(async (client: PoolClient) => {
       // 1. Compute multi-payment payload sums and structure JSON mapping
-      const computedPaymentAmount = payments.reduce((sum, item) => sum + (item.amount ?? 0), 0);
+      const computedPaymentAmount = payments.reduce((sum, item) => sum + (item.payment_amount ?? 0), 0);
       const paymentsJsonStorage = payments.map(p => ({
-        payment_amount: p.amount,
+        payment_amount: p.payment_amount,
         payment_method_id: p.payment_method_id,
         transaction_reference: p.transaction_reference ?? ""
       }));
@@ -92,22 +92,27 @@ export default class SaleReturnController {
       const entity_type = convertEntityType("Firm" as EntityKey);
       const payment_transactions_service = new PaymentTransactionService();
 
-      if (payments.length > 0) {
-        await payment_transactions_service.syncPaymentTransactions({
-          ref_id: sale_return.id,
-          ref_type: PaymentTransactionTypeCodeMap["sale_return"],
-          company_id,
-          firm_id: rest.firm_id,
-          statusCode: getStatusCode("Paid"),
-          entity_type,
-          payments: payments.map(p => ({
-            id: null, // Always null because they are new insert rows during create
-            payment_method_id: p.payment_method_id,
-            amount: p.amount,
-            transaction_reference: p.transaction_reference
-          }))
-        }, client);
-      }
+        await Promise.all(
+        payments.map((p) => {
+          if ((p.payment_amount ?? 0) <= 0) return Promise.resolve(); // Skip processing zero balances
+
+          return payment_transactions_service.insertPaymentTransaction(
+            {
+              ref_id: sale_return.id,
+              amount: p.payment_amount,
+              ref_type: PaymentTransactionTypeCodeMap["sale_return"],
+              status: getStatusCode("Paid"),
+              payment_method_id: p.payment_method_id ?? null,
+              transaction_reference: p.transaction_reference ?? null,
+              business_id: rest.firm_id,
+              business_ref: convertEntityType("Firm" as EntityKey),
+              company_id,
+              payment_flow: "E" // Income cash-flow stream direction incoming from vendor refund
+            },
+            client
+          );
+        })
+      );
 
       // 5. Initialize Party Balance values 
       const party_balance_controller = new PartyBalanceController();
@@ -377,7 +382,9 @@ export default class SaleReturnController {
     return transaction(async (client: PoolClient) => {
 
       // 1. Calculate transaction sums and payment array payloads
-      const computedPaymentAmount = payments.reduce((sum, item) => sum + (item.amount ?? 0), 0);
+      const computedPaymentAmount = payments
+        .filter(payment => payment.payment_flow === "E")
+        .reduce((sum, payment) => sum + (payment.amount ?? 0), 0);
       const paymentsJsonStorage = payments.map(p => ({
         payment_amount: p.amount,
         payment_method_id: p.payment_method_id,

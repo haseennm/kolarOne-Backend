@@ -1,7 +1,7 @@
 import { CreateSaleItemBody, EditSaleItemBody } from "../saleItems/saleitems.types";
 export interface SalePaymentItem {
-  payment_method_id: number ;
-  amount: number;
+  payment_method_id: number;
+  payment_amount: number;
   reference: string | null;
 }
 export interface SaleProductItem {
@@ -25,11 +25,11 @@ export interface ActionRemark {
   created_at: Date;
 }
 
-export type PricePoolType = 
-  | 'branch_price' 
-  | 'mrp_price' 
-  | 'retail_price' 
-  | 'special_retail_price' 
+export type PricePoolType =
+  | 'branch_price'
+  | 'mrp_price'
+  | 'retail_price'
+  | 'special_retail_price'
   | 'wholesale_price';
 
 export type SaleStatusType = 'Completed' | 'Confirm' | 'Cancelled';
@@ -69,7 +69,7 @@ export interface SaleCreateBody {
 // 3. Service Layer Parameter Interface
 // ==========================================
 
-export interface SaleCreateParams extends Omit<SaleCreateBody, 'items' | 'payments'|'created_by' | 'quotation_id'> {
+export interface SaleCreateParams extends Omit<SaleCreateBody, 'items' | 'payments' | 'created_by' | 'quotation_id'> {
   paid: number;          // Evaluated/Calculated dynamically in controller
   payments: string;      // Expected as serialized string for raw JSON/JSONB insertion
   remark: ActionRemark;  // Structured tracking log object
@@ -158,6 +158,14 @@ export interface RepayBalanceSale {
   payments: ObjPayment[],
   remark: any,
   company_id: number
+  payment_flow :string
+}
+export interface PurchasePaymentEditItem {
+  id?: number | null;
+  payment_method_id: number;
+  amount: number;
+  transaction_reference?: string | null;
+  payment_flow: "I" | "E"
 }
 export interface SaleEditBody {
   sale_id: number;
@@ -177,8 +185,8 @@ export interface SaleEditBody {
   final_amount?: number;
   notes?: string | null;
   status?: string;
-  payments?: { id?: number | null; payment_method_id: number; amount: number; transaction_reference?: string | null }[];
-  items?: any[]; 
+  payments?: PurchasePaymentEditItem[]; // Group payment inputs
+  items?: any[];
   delete_item_ids?: number[];
   ref_no?: string | null;
   price_pool?: string | null;

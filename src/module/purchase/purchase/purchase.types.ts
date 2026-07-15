@@ -27,8 +27,8 @@ export interface PurchaseCreateBody {
   handling_charge?: number
 }
 export interface PurchaseCreateParams
-  extends Omit<PurchaseCreateBody, "status" | "created_by" | "items" |"payments"> {
-  remark: object; 
+  extends Omit<PurchaseCreateBody, "status" | "created_by" | "items" | "payments"> {
+  remark: object;
   paid_amount: number; // Aggregate total payment amount
   payments: string;    // Stringified JSON breakdown for the database column
 }
@@ -66,10 +66,11 @@ export interface PurchaseCreateParams
 // }
 
 export interface PurchasePaymentEditItem {
-  id?: number | null; // ID tracking reference inside the payment_transactions table
+  id?: number | null;
   payment_method_id: number;
   amount: number;
   transaction_reference?: string | null;
+  payment_flow: "I" | "E"
 }
 
 export interface PurchaseEditBody {
@@ -91,7 +92,7 @@ export interface PurchaseEditBody {
   notes?: string | null;
   status?: string;
   payments?: PurchasePaymentEditItem[]; // Group payment inputs
-  items?: any[]; 
+  items?: any[];
   delete_item_ids?: number[];
   courier_charge?: number;
   other_charge?: number;
@@ -150,5 +151,5 @@ export interface RepayBalancePurchase {
   payments: ObjPayment[],
   remark: any,
   company_id: number
-  payment_flow:"exp" |"inc"
+  payment_flow: "exp" | "inc"
 }

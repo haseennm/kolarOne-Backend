@@ -450,7 +450,7 @@ RETURNING *;
 
     const { rows } = await executeInTransaction(client, prQuery, values);
     const changes = buildAuditChanges(is_return_exist, rows[0]);
-    return {data:rows[0],changes};
+    return { data: rows[0], changes };
   }
 
 
@@ -623,7 +623,21 @@ RETURNING *;
                       'total_sgst', pri.total_sgst,
                       'total_igst', pri.total_igst,
                       'final_amount', pri.net_amount,
-                      'max_return_qty', pi.purchased_qty,
+                      'max_return_qty',
+(
+    pi.purchased_qty -
+    COALESCE(
+        (
+            SELECT SUM(pri2.returned_qty)
+            FROM purchase_return_items pri2
+            JOIN purchase_return pr2
+              ON pr2.id = pri2.purchase_return_id
+            WHERE pri2.purchase_item_id = pi.id
+              AND pr2.status <> '0'
+        ),
+        0
+    )
+),
                       'purchase_item_id', pri.purchase_item_id,
                       'status', pri.status
                   )
@@ -813,8 +827,12 @@ RETURNING *;
 
     const query = `
       UPDATE purchase_return
-      SET 
-        paid_amount = paid_amount + $1,
+      SET
+  refund_amount = CASE
+    WHEN $2 = 'inc' THEN refund_amount - $1
+    WHEN $2 = 'exp' THEN refund_amount + $1
+    ELSE refund_amount
+  END,
         payments = (
           SELECT jsonb_agg(jsonb_build_object(
             'payment_amount', summed_data.total_amount,

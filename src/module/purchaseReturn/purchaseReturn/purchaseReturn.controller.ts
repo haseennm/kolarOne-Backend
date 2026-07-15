@@ -122,7 +122,7 @@ export default class PurchaseReturnController {
     };
 
     // 1. Compute aggregate balance sums dynamically across split transactions collection array
-    const totalPaymentAmount = payments.reduce((sum, p) => sum + (p.amount ?? 0), 0);
+    const totalPaymentAmount = payments.reduce((sum, p) => sum + (p.payment_amount ?? 0), 0);
 
     return transaction(async (client: PoolClient) => {
       const statusCode = getStatusCode(status ?? "Completed");
@@ -207,12 +207,12 @@ export default class PurchaseReturnController {
       const payment_transactions_service = new PaymentTransactionService();
       await Promise.all(
         payments.map((p) => {
-          if ((p.amount ?? 0) <= 0) return Promise.resolve(); // Skip processing zero balances
+          if ((p.payment_amount ?? 0) <= 0) return Promise.resolve(); // Skip processing zero balances
 
           return payment_transactions_service.insertPaymentTransaction(
             {
               ref_id: purchase_return.id,
-              amount: p.amount,
+              amount: p.payment_amount,
               ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
               status: getStatusCode("Paid"),
               payment_method_id: p.payment_method_id ?? null,
@@ -362,7 +362,10 @@ export default class PurchaseReturnController {
     return transaction(async (client: PoolClient) => {
 
       // 1. Accumulate payment values and format structured storage matrix
-      const computedPaymentAmount = payments.reduce((sum, item) => sum + (item.amount ?? 0), 0);
+      const computedPaymentAmount = payments
+        .filter(payment => payment.payment_flow === "I")
+        .reduce((sum, payment) => sum + (payment.amount ?? 0), 0);
+        console.log("computedPaymentAmount",computedPaymentAmount)
       const paymentsJsonStorage = payments.map(p => ({
         payment_amount: p.amount,
         payment_method_id: p.payment_method_id,
@@ -638,7 +641,7 @@ export default class PurchaseReturnController {
         client,
         entityId: purchase_return.id,
         entityType: "F",
-        companyId:purchase_return.company_id,
+        companyId: purchase_return.company_id,
         tableName: "purchase_return",
         tableRowId: purchase_return.id,
         action: "delete",

@@ -64,7 +64,7 @@ export class PaymentTransactionService {
       firm_id: number;
       statusCode: number;
       entity_type: string;
-      payments: { id?: number | null; payment_method_id: number; amount: number; transaction_reference?: string | null }[];
+      payments: { id?: number | null; payment_method_id: number; amount: number; transaction_reference?: string | null,payment_flow?:"I"|"E" }[];
       ref_type: string
     },
     client: PoolClient
@@ -109,7 +109,7 @@ export class PaymentTransactionService {
         `UPDATE payment_transactions 
          SET status = 0 
          WHERE ref_id = $1 AND ref_type = $2 AND company_id = $3`,
-        [ref_id, PaymentTransactionTypeCodeMap["purchase"], company_id]
+        [ref_id, ref_type, company_id]
       );
     }
 
@@ -133,14 +133,14 @@ export class PaymentTransactionService {
           [
             ref_id,
             p.amount,
-            PaymentTransactionTypeCodeMap["purchase"],
+            ref_type,
             statusCode,
             p.payment_method_id,
             p.transaction_reference ?? null,
             firm_id,
             entity_type,
             company_id,
-            "E"
+            p.payment_flow
           ]
         );
       }

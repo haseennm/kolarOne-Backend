@@ -23,7 +23,7 @@ export default class SaleController {
     };
 
     // 1. Compute aggregate paid sum dynamically directly from incoming payment items array
-    const totalPaidAmount = payments.reduce((sum, p) => sum + (p.amount ?? 0), 0);
+    const totalPaidAmount = payments.reduce((sum, p) => sum + (p.payment_amount ?? 0), 0);
 
     return transaction(async (client: PoolClient) => {
       const service = new SaleService();
@@ -106,12 +106,12 @@ export default class SaleController {
       const payment_transactions_service = new PaymentTransactionService();
       await Promise.all(
         payments.map((p) => {
-          if ((p.amount ?? 0) <= 0) return Promise.resolve(); // Safe skip for zero values
+          if ((p.payment_amount ?? 0) <= 0) return Promise.resolve(); // Safe skip for zero values
 
           return payment_transactions_service.insertPaymentTransaction(
             {
               ref_id: sale.id,
-              amount: p.amount,
+              amount: p.payment_amount,
               ref_type: PaymentTransactionTypeCodeMap["sale"],
               status: getStatusCode("Paid"),
               payment_method_id: p.payment_method_id ?? null,
@@ -130,7 +130,7 @@ export default class SaleController {
         entityId: rest.firm_id,
         entityType: "F",
         companyId: company_id,
-        tableName: "hiring_staff",
+        tableName: "sales",
         tableRowId: sale.id,
         action: "create",
         record: sale,
@@ -174,10 +174,11 @@ export default class SaleController {
     };
 
     return transaction(async (client: PoolClient) => {
-      const statusCode = getStatusCode(status ?? "Completed");
 
       // 1. Calculate transaction sums and payment array payloads
-      const computedPaymentAmount = payments.reduce((sum, item) => sum + (item.amount ?? 0), 0);
+      const computedPaymentAmount = payments
+        .filter(payment => payment.payment_flow === "I")
+        .reduce((sum, payment) => sum + (payment.amount ?? 0), 0);
       const paymentsJsonStorage = payments.map(p => ({
         payment_amount: p.amount,
         payment_method_id: p.payment_method_id,
@@ -623,4 +624,5 @@ export default class SaleController {
       return "Sale deleted successfully"
     })
   }
+  
 }

@@ -27,7 +27,7 @@ import { CreatePurchaseRetunItemBody, EditPurchaseReturnItemBody } from "../purc
 // }
 export interface PurchaseReturnPaymentItem {
   payment_method_id: number | null;
-  amount: number;
+  payment_amount: number;
   reference: string | null;
 }
 
@@ -96,6 +96,13 @@ export interface PurchaseReturnCreateParams
 //   statusCode: number;
 //   remark: object
 // }
+export interface PurchasePaymentEditItem {
+  id?: number | null;
+  payment_method_id: number;
+  amount: number;
+  transaction_reference?: string | null;
+  payment_flow: "I" | "E"
+}
 export interface PurchaseReturnEditBody {
   purchase_return_id: number;
   purchase_id?: number;
@@ -116,7 +123,7 @@ export interface PurchaseReturnEditBody {
   notes?: string | null;
   reason?: string | null;
   status?: string;
-  payments?: { id?: number | null; payment_method_id: number; amount: number; transaction_reference?: string | null }[];
+  payments?: PurchasePaymentEditItem[]; // Group payment inputs
   items?: any[];
   delete_item_ids?: number[];
   courier_charge?: number;

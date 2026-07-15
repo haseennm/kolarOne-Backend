@@ -907,83 +907,94 @@ OFFSET $${values.length + 2}
     return rows;
   }
 
-  async updateSalePayment(
-    data: RepayBalanceSale,
-    client: PoolClient
-  ) {
-    const { firm_id, payments, remark, sale_id, company_id } = data;
-
-    const is_sale_exist = await getRecord(
-      sale_id,
-      "sales",
-      "firm_id",
-      firm_id,
-      client
-    );
-
-    if (!is_sale_exist) {
-      throw new AppError("Sale not found", 404);
-    }
-
-    // Validate payment methods
-    for (const p of payments) {
-      const is_payment_method_exist = await getRecord(
-        p.payment_method_id,
-        "payment_methods",
-        "company_id",
-        company_id,
-        client
-      );
-      if (!is_payment_method_exist) {
-        throw new AppError(`Payment method not found: ${p.payment_method_id}`, 404);
-      }
-    }
-
-    const incomingTotal = payments.reduce((sum, p) => sum + p.payment_amount, 0);
-    const paymentObj = payments.map((p) => ({
-      payment_amount: p.payment_amount,
-      payment_method_id: p.payment_method_id,
-      transaction_reference: p.transaction_reference ?? ""
-    }));
-
-    const query = `
-      UPDATE sales
-      SET 
-        paid = paid + $1,
-        payments = (
-          SELECT jsonb_agg(jsonb_build_object(
-            'payment_amount', summed_data.total_amount,
-            'payment_method_id', summed_data.payment_method_id,
-            'transaction_reference', summed_data.merged_reference
-          ))
-          FROM (
-            SELECT 
-              (elem->>'payment_method_id')::int as payment_method_id,
-              SUM((elem->>'payment_amount')::numeric) as total_amount,
-              STRING_AGG(NULLIF(elem->>'transaction_reference', ''), ', ') as merged_reference
-            FROM jsonb_array_elements(COALESCE(sales.payments, '[]'::jsonb) || $2::jsonb) AS elem
-            GROUP BY (elem->>'payment_method_id')::int
-          ) summed_data
-        ),
-        remarks = CASE
-          WHEN remarks IS NULL THEN $3::jsonb
-          WHEN jsonb_typeof(remarks) = 'array' THEN remarks || $3::jsonb
-          ELSE jsonb_build_array(remarks) || $3::jsonb
-        END
-      WHERE id = $4 AND firm_id = $5
-      RETURNING *;
-    `;
-
-    const values = [
-      incomingTotal,
-      JSON.stringify(paymentObj),
-      JSON.stringify(remark),
-      sale_id,
-      firm_id
-    ];
-    const { rows } = await executeInTransaction(client, query, values);
-    const changes = buildAuditChanges(is_sale_exist, rows[0]);
-    return { data: rows[0], changes, table_name: "sales" };
-
-  }
+ async updateSalePayment(
+     data: RepayBalanceSale,
+     client: PoolClient
+   ) {
+     const { firm_id, payments, sale_id, remark, company_id, payment_flow } = data;
+     // 1. Fetch record first to check existence
+     const is_sale_exist = await getRecord(
+       sale_id,
+       "sales",
+       "firm_id",
+       firm_id,
+       client
+     );
+ 
+     if (!is_sale_exist) {
+       throw new AppError("Sale not found", 404);
+     }
+ 
+     // 2. Validate payment methods
+     for (const p of payments) {
+       const is_payment_method_exist = await getRecord(
+         p.payment_method_id,
+         "payment_methods",
+         "company_id",
+         company_id,
+         client
+       );
+       if (!is_payment_method_exist) {
+         throw new AppError(`Payment method not found: ${p.payment_method_id}`, 404);
+       }
+     }
+ 
+     // Calculate aggregated total payment added
+     const incomingTotal = payments.reduce((sum, p) => sum + p.payment_amount, 0);
+     const paymentObj = payments.map((p) => ({
+       payment_amount: p.payment_amount,
+       payment_method_id: p.payment_method_id,
+       transaction_reference: p.transaction_reference ?? ""
+     }));
+     const query = `
+ UPDATE sales
+ SET
+   paid = CASE
+     WHEN $2 = 'inc' THEN paid - $1
+     WHEN $2 = 'exp' THEN paid + $1
+     ELSE paid
+   END,
+   payments = (
+     SELECT jsonb_agg(
+       jsonb_build_object(
+         'payment_amount', summed_data.total_amount,
+         'payment_method_id', summed_data.payment_method_id,
+         'transaction_reference', summed_data.merged_reference
+       )
+     )
+     FROM (
+       SELECT
+         (elem->>'payment_method_id')::int AS payment_method_id,
+         SUM((elem->>'payment_amount')::numeric) AS total_amount,
+         STRING_AGG(NULLIF(elem->>'transaction_reference', ''), ', ') AS merged_reference
+       FROM jsonb_array_elements(
+         COALESCE(sales.payments, '[]'::jsonb) || $3::jsonb
+       ) AS elem
+       GROUP BY (elem->>'payment_method_id')::int
+     ) summed_data
+   ),
+   remarks = CASE
+     WHEN remarks IS NULL THEN $4::jsonb
+     WHEN jsonb_typeof(remarks) = 'array' THEN remarks || $4::jsonb
+     ELSE jsonb_build_array(remarks) || $4::jsonb
+   END
+ WHERE id = $5
+   AND firm_id = $6
+ RETURNING *;
+ `;
+ 
+     const values = [
+       incomingTotal,              // $1
+       payment_flow,               // $2
+       JSON.stringify(paymentObj), // $3
+       JSON.stringify(remark),     // $4
+       sale_id,                // $5
+       firm_id                     // $6
+     ];
+ 
+     const { rows } = await executeInTransaction(client, query, values);
+     const changes = buildAuditChanges(is_sale_exist, rows[0]);
+     return { data: rows[0], changes, table_name: "sales" };
+ 
+   }
 }

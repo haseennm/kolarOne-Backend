@@ -240,7 +240,8 @@ export default class PartyBalanceController {
           firm_id: rest.firm_id,
           payments: payments, // ✅ Matches exact uniform data structure
           remark: base_update_remark,
-          company_id: company_id
+          company_id: company_id,
+          payment_flow: party_balance.flow === "I" ? "exp" : "inc"
         }, client);
       }
 
@@ -308,7 +309,7 @@ export default class PartyBalanceController {
         tableName: record?.table_name,
         tableRowId: rest.ref_id,
         action: "repay",
-        record: record?.data,
+        record: { ...record?.data, totalPayAmount },
         changes: {
           record: record?.changes ?? {},
           payment: paymentChanges

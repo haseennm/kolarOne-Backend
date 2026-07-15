@@ -599,26 +599,35 @@ SELECT
         'net_amount', sri.net_amount,
         'status', sri.status,
         'stock_qty', st.available_quantity,
-        'saled_qty', si.saled_qty
+        'saled_qty', si.saled_qty,
+        'sale_item_id', sri.sale_item_id
       )
     ) FILTER (WHERE sri.id IS NOT NULL),
     '[]'
   ) AS items,
 
   (
-    SELECT COALESCE(
-      jsonb_agg(
-        p.value || jsonb_build_object(
-          'payment_method',
-          pm.method_name
-        )
-      ),
-      '[]'::jsonb
-    )
-    FROM jsonb_array_elements(COALESCE(sr.payments, '[]'::jsonb)) AS p(value)
-    LEFT JOIN payment_methods pm
-      ON pm.id = (p.value->>'payment_method_id')::int
-  ) AS payments
+              SELECT COALESCE(
+                  JSON_AGG(
+                      JSON_BUILD_OBJECT(
+                          'id', pt.id,
+                          'payment_method_id', pt.payment_method_id,
+                          'payment_method', pm2.method_name,
+                          'amount', pt.amount,
+                          'payment_flow', pt.payment_flow,
+                          'transaction_date', pt.created_at,
+                          'transaction_reference', pt.transaction_reference
+                      )
+                      ORDER BY pt.id
+                  ),
+                  '[]'
+              )
+              FROM payment_transactions pt
+              LEFT JOIN payment_methods pm2
+                  ON pm2.id = pt.payment_method_id
+              WHERE pt.ref_id = sr.id
+                AND pt.ref_type = 'SR'
+          ) AS payments
 
 FROM sale_return sr
 
@@ -746,7 +755,7 @@ OFFSET $${values.length + 2}
 
     const is_sale_return_exist = await getRecord(
       sale_return_id,
-      "sale_returns",
+      "sale_return",
       "firm_id",
       firm_id,
       client
@@ -778,7 +787,7 @@ OFFSET $${values.length + 2}
     }));
 
     const query = `
-      UPDATE sale_returns
+      UPDATE sale_return
       SET 
         paid_amount = paid_amount + $1,
         payments = (
@@ -792,7 +801,7 @@ OFFSET $${values.length + 2}
               (elem->>'payment_method_id')::int as payment_method_id,
               SUM((elem->>'payment_amount')::numeric) as total_amount,
               STRING_AGG(NULLIF(elem->>'transaction_reference', ''), ', ') as merged_reference
-            FROM jsonb_array_elements(COALESCE(sale_returns.payments, '[]'::jsonb) || $2::jsonb) AS elem
+            FROM jsonb_array_elements(COALESCE(sale_return.payments, '[]'::jsonb) || $2::jsonb) AS elem
             GROUP BY (elem->>'payment_method_id')::int
           ) summed_data
         ),
@@ -815,7 +824,7 @@ OFFSET $${values.length + 2}
 
     const { rows } = await executeInTransaction(client, query, values);
     const changes = buildAuditChanges(is_sale_return_exist, rows[0]);
-    return { data: rows[0], changes, table_name: "sale_returns" };
+    return { data: rows[0], changes, table_name: "sale_return" };
   }
   // async canDeletePurchase(data: PurchaseDeleteParams, client: PoolClient) {
   //   const { id, firm_id } = data;

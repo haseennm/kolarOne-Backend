@@ -90,13 +90,13 @@ function getTableLabel(tableName: string) {
   return tableName;
 }
 
-export function buildJournalMessage(tableName: string, action: "create" | "update" | "delete" | "confirm" |"repay", record: Record<string, any> = {}) {
+export function buildJournalMessage(tableName: string, action: "create" | "update" | "delete" | "confirm" | "repay", record: Record<string, any> = {}) {
   const normalized = tableName.toLowerCase();
   const label = getTableLabel(tableName);
   const productName = getRecordValue(record, ["product_name", "name", "product"]);
   const categoryName = getRecordValue(record, ["category_name", "name"]);
-  const invoiceNo = getRecordValue(record, ["invoice_no", "invoice_number", "invoice"]);
-  const amount = getRecordValue(record, ["amount", "loan_amount", "salary_amount", "pay_amount"]);
+  const invoiceNo = getRecordValue(record, ["invoice_no", "invoice_number", "invoice", "bill_number", "return_number"]);
+  const amount = getRecordValue(record, ["totalPayAmount","amount", "loan_amount", "salary_amount", "pay_amount", "final_amount"]);
   const branchName = getRecordValue(record, ["branch_name"]);
   const vendorName = getRecordValue(record, ["vendor_name"]);
   const customerName = getRecordValue(record, ["customer_name", "full_name"]);
@@ -220,12 +220,18 @@ export function buildJournalMessage(tableName: string, action: "create" | "updat
           ? `Product "${productName ?? ""}" updated.`
           : `Product "${productName ?? ""}" deleted.`;
     case "purchases":
+      if (action === "repay") {
+        return `Repayment of ${amount ?? 0} recorded for Purchase invoice "${invoiceNo ?? ""}".`;
+      }
       return action === "create"
         ? `Purchase invoice "${invoiceNo ?? ""}" created. Amount: ${amount ?? 0}.`
         : action === "update"
           ? `Purchase invoice "${invoiceNo ?? ""}" updated. Amount: ${amount ?? 0}.`
           : `Purchase invoice "${invoiceNo ?? ""}" deleted. Amount: ${amount ?? 0}.`;
     case "purchase_return":
+       if (action === "repay") {
+        return `Repayment of ${amount ?? 0} recorded for Purchase return invoice "${invoiceNo ?? ""}".`;
+      }
       return action === "create"
         ? `Purchase return invoice "${invoiceNo ?? ""}" created. Amount: ${amount ?? 0}.`
         : action === "update"
@@ -238,6 +244,9 @@ export function buildJournalMessage(tableName: string, action: "create" | "updat
           ? `Quotation "${quotationNo ?? ""}" updated.`
           : `Quotation "${quotationNo ?? ""}" deleted.`;
     case "rent_bills":
+       if (action === "repay") {
+        return `Repayment of ${amount ?? 0} recorded for rent invoice "${invoiceNo ?? ""}".`;
+      }
       return action === "create"
         ? `Rent bill "${billNo ?? ""}" created. Amount: ${amount ?? 0}.`
         : action === "update"
@@ -266,13 +275,18 @@ export function buildJournalMessage(tableName: string, action: "create" | "updat
         ? `Salary confirmed for "${staffName ?? ""}". Amount: ${salaryAmount ?? 0}.`
         : `Salary confirmed for "${staffName ?? ""}". Amount: ${salaryAmount ?? 0}.`;
     case "sales":
+       if (action === "repay") {
+        return `Repayment of ${amount ?? 0} recorded for sale invoice "${invoiceNo ?? ""}".`;
+      }
       return action === "create"
         ? `Sale invoice "${invoiceNo ?? ""}" created. Amount: ${amount ?? 0}.`
         : action === "update"
           ? `Sale invoice "${invoiceNo ?? ""}" updated. Amount: ${amount ?? 0}.`
           : `Sale invoice "${invoiceNo ?? ""}" deleted. Amount: ${amount ?? 0}.`;
-    case "sale_return":
     case "sale_returns":
+       if (action === "repay") {
+        return `Repayment of ${amount ?? 0} recorded for sale return invoice "${invoiceNo ?? ""}".`;
+      }
       return action === "create"
         ? `Sale return invoice "${invoiceNo ?? ""}" created. Amount: ${amount ?? 0}.`
         : action === "update"
@@ -291,7 +305,6 @@ export function buildJournalMessage(tableName: string, action: "create" | "updat
         : action === "update"
           ? `Loan for "${staffName ?? ""}" updated. Amount: ${loanAmount ?? 0}.`
           : `Loan of ${loanAmount ?? 0} for "${staffName ?? ""}" deleted.`;
-    case "party_balance":
     case "party_balances":
       if (action === "repay") return `Party balance repayment of ${balanceAmount ?? amount ?? 0} recorded for "${partyName ?? customerName ?? partnerName ?? staffName ?? ""}".`;
       return action === "create"
@@ -326,10 +339,11 @@ export async function emitAuditJournal(options: {
   companyId: number;
   tableName: string;
   tableRowId: number | string;
-  action: "create" | "update" | "delete" | "confirm"| "repay";
+  action: "create" | "update" | "delete" | "confirm" | "repay";
   record: Record<string, any>;
-   changes?: AuditChanges | null;
+  changes?: AuditChanges | null;
 }) {
+
   const journal = new JournalController();
   const shortTableName = toShortTableName(options.tableName);
 

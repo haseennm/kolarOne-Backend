@@ -139,9 +139,9 @@ export default class PurchaseService {
       payments, // Inserted as a text / jsonb type value directly mapping your payload structure
       firm_id,
       ref_no,
-      courier_charge,
-      handling_charge,
-      other_charge
+      courier_charge ?? 0,
+      handling_charge ?? 0,
+      other_charge ?? 0
     ];
 
     const { rows } = await executeInTransaction(client, purchaseQuery, values);
@@ -337,7 +337,7 @@ export default class PurchaseService {
       const activeVendor = vendor_id ?? is_purchase_exist.vendor_id;
       const is_bill_exist = await executeInTransaction(
         client,
-        `SELECT id FROM purchases WHERE bill_number = $1 AND vendor_id = $2 AND status != 'Cancelled' AND id != $3`,
+        `SELECT id FROM purchases WHERE bill_number = $1 AND vendor_id = $2 AND status != 0 AND id != $3`,
         [bill_number, activeVendor, purchase_id]
       );
       if ((is_bill_exist.rowCount ?? 0) > 0) {
@@ -376,7 +376,6 @@ export default class PurchaseService {
   RETURNING *;
 `;
     const targetFinalAmount = final_amount ?? is_purchase_exist.final_amount;
-
     const values = [
       vendor_id ?? is_purchase_exist.vendor_id,
       bill_number ?? is_purchase_exist.bill_number,
@@ -402,7 +401,7 @@ export default class PurchaseService {
 
     const { rows } = await executeInTransaction(client, purchaseQuery, values);
     const changes = buildAuditChanges(is_purchase_exist, rows[0]);
-    return {data:rows[0],changes};
+    return { data: rows[0], changes };
   }
   async fetchPurchase(data: PurchaseFetchParams) {
     const { filters, offset } = data;
@@ -580,27 +579,28 @@ SELECT
     ) AS items,
 
     (
-        SELECT COALESCE(
-            JSON_AGG(
-                JSON_BUILD_OBJECT(
-                    'id', pt.id,
-                    'payment_method_id', pt.payment_method_id,
-                    'payment_method', pm2.method_name,
-                    'amount', pt.amount,
-                    'payment_flow', pt.payment_flow,
-                    'transaction_date', pt.created_at,
-                    'transaction_reference', pt.transaction_reference
-                )
-                ORDER BY pt.id
-            ),
-            '[]'
-        )
-        FROM payment_transactions pt
-        LEFT JOIN payment_methods pm2
-            ON pm2.id = pt.payment_method_id
-        WHERE pt.ref_id = p.id
-          AND pt.ref_type = 'PS'
-    ) AS payments
+    SELECT COALESCE(
+        JSON_AGG(
+            JSON_BUILD_OBJECT(
+                'id', pt.id,
+                'payment_method_id', pt.payment_method_id,
+                'payment_method', pm2.method_name,
+                'amount', pt.amount,
+                'payment_flow', pt.payment_flow,
+                'transaction_date', pt.created_at,
+                'transaction_reference', pt.transaction_reference
+            )
+            ORDER BY pt.id
+        ),
+        '[]'
+    )
+    FROM payment_transactions pt
+    LEFT JOIN payment_methods pm2
+        ON pm2.id = pt.payment_method_id
+    WHERE pt.ref_id = p.id
+      AND pt.ref_type = 'PS'
+      AND pt.status != 0
+) AS payments
 
 FROM purchases p
 LEFT JOIN vendors v

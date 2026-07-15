@@ -60,10 +60,10 @@ export async function purchaseReturnRouter(app: FastifyInstance) {
               "type": "array",
               "items": {
                 "type": "object",
-                "required": ["payment_method_id", "amount"],
+                "required": ["payment_method_id", "payment_amount"],
                 "properties": {
                   "payment_method_id": { "type": "number" },
-                  "amount": { "type": "number", "minimum": 0 },
+                  "payment_amount": { "type": "number", "minimum": 0 },
                   "reference": { "type": ["string", "null"] }
                 }
               }
@@ -237,7 +237,11 @@ export async function purchaseReturnRouter(app: FastifyInstance) {
                   id: { type: ["number", "null"] },
                   payment_method_id: { type: "number" },
                   amount: { type: "number", minimum: 0 },
-                  transaction_reference: { type: ["string", "null"] }
+                  transaction_reference: { type: ["string", "null"] },
+                  payment_flow: {
+                    "type": "string",
+                    "enum": ["E", "I"]
+                  }
                 }
               }
             },
