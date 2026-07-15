@@ -520,7 +520,7 @@ export default class StockService {
     LEFT JOIN products p 
       ON s.product_id = p.id
     LEFT JOIN product_categories pc 
-      ON p.category_id = pc.id
+      ON p.product_category_id = pc.id
     LEFT JOIN brand br 
       ON p.brand_id = br.id
     LEFT JOIN purchases pu 

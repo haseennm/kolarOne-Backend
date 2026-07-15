@@ -174,7 +174,7 @@ export class ReportService {
         lc.name,
         SUM(lt.amount) AS amount
       FROM ledger_transactions lt
-      JOIN ledger_categories lc ON lc.id = lt.category_id
+      JOIN ledger_categories lc ON lc.id = lt.ledger_category_id
       WHERE lc.category_type = 'E'
       AND ${expenseFilter.condition}
       ${expenseDateFilter.clause}
@@ -980,7 +980,7 @@ private async getFirmWiseReport(
     SELECT 
       COALESCE(SUM(lt.amount), 0) AS total_amount
     FROM ledger_transactions lt
-    JOIN ledger_categories lc ON lc.id = lt.category_id
+    JOIN ledger_categories lc ON lc.id = lt.ledger_category_id
     WHERE lt.status != 0
     AND lc.status != 0
     AND lc.category_type = 'E'
@@ -1015,7 +1015,7 @@ private async getFirmWiseReport(
       lc.name AS category_name,
       COALESCE(SUM(lt.amount), 0) AS total_amount
     FROM ledger_transactions lt
-    JOIN ledger_categories lc ON lc.id = lt.category_id
+    JOIN ledger_categories lc ON lc.id = lt.ledger_category_id
     WHERE lt.status != 0
     AND lc.status != 0
     AND lc.category_type = 'E'
