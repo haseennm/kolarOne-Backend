@@ -1,6 +1,6 @@
 import { PoolClient } from "pg";
 import { transaction } from "../../config/db";
-import { cns, getStatusCode, getStatusText, getTransactionCode } from "../../utils/extra";
+import { getStatusCode, getStatusText, getTransactionCode } from "../../utils/extra";
 import StockService from "./stock.service";
 import { FetchPopup, StockAdditionalBody, StockAdjustFetchParams, StockChangeBody, StockCreateBody, StockDelete, StockEditBody, StockFetchParams, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
 import { AppError } from "../../utils/AppError";
@@ -9,7 +9,6 @@ import { emitAuditJournal } from "../journal/journal.utils";
 export default class StockController {
 
   async createStock(data: StockCreateBody, client: PoolClient) {
-    cns("create stock", data)
     const { status, available_qty, purchased_qty, ...rest } = data;
 
     if (available_qty > purchased_qty) {
@@ -35,7 +34,6 @@ export default class StockController {
     return stock;
   }
   async editStock(data: StockEditBody, client: PoolClient) {
-    cns("Edit stock", data)
     const { status, ...rest } = data;
 
 
@@ -56,7 +54,6 @@ export default class StockController {
     return stock;
   }
   async reduceStock(data: StockChangeBody, client: PoolClient) {
-    cns("Edit reduce controller stock", data)
     const service = new StockService();
 
     const statusCode = getStatusCode("Good");

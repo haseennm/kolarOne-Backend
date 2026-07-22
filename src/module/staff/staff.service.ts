@@ -1,6 +1,6 @@
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { cns, getRecord, getStatusCode } from "../../utils/extra";
+import {getRecord, getStatusCode } from "../../utils/extra";
 import { buildAuditChanges } from "../journal/journal.utils";
 import { CreateStaffParams, DeleteStaffParams, EditStaffParams, FetchDbStaff, FetchStaffParams, StaffCountResult, StaffLoginBody, StaffTransfer, StaffTransferRemover } from "./staff.types";
 

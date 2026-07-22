@@ -9,7 +9,6 @@ import {
   GetVendorReportBody,
   RemoveFirmVendor
 } from "./vendor.types";
-import { cns } from "../../utils/extra";
 
 export async function vendorRouter(app: FastifyInstance) {
 
@@ -92,8 +91,6 @@ export async function vendorRouter(app: FastifyInstance) {
       reply: FastifyReply
     ) => {
 
-      cns(request.url, request.body);
-
       const controller = new VendorController();
 
       const vendor = await controller.createVendor(request.body);
@@ -136,8 +133,6 @@ export async function vendorRouter(app: FastifyInstance) {
       request: FastifyRequest<{ Body: FetchVendorBody }>,
       reply: FastifyReply
     ) => {
-
-      cns(request.url, request.body);
 
       const { page = 1, limit = 10, ...filters } = request.body;
 
@@ -234,8 +229,6 @@ export async function vendorRouter(app: FastifyInstance) {
       reply: FastifyReply
     ) => {
 
-      cns(request.url, request.body);
-
       const controller = new VendorController();
 
       const vendor = await controller.editVendor(request.body);
@@ -276,8 +269,6 @@ export async function vendorRouter(app: FastifyInstance) {
       reply: FastifyReply
     ) => {
 
-      cns(request.url, request.body);
-
       const controller = new VendorController();
 
       const vendor = await controller.addnewFirm(request.body);
@@ -317,8 +308,6 @@ export async function vendorRouter(app: FastifyInstance) {
       reply: FastifyReply
     ) => {
 
-      cns(request.url, request.body);
-
       const controller = new VendorController();
 
       const vendor = await controller.deleteVendor(request.body);
@@ -356,8 +345,6 @@ export async function vendorRouter(app: FastifyInstance) {
       request: FastifyRequest<{ Body: RemoveFirmVendor }>,
       reply: FastifyReply
     ) => {
-
-      cns(request.url, request.body);
 
       const controller = new VendorController();
 
@@ -412,8 +399,6 @@ export async function vendorRouter(app: FastifyInstance) {
       request: FastifyRequest<{ Body: GetVendorReportBody }>,
       reply: FastifyReply
     ) => {
-
-      cns(request.url, request.body);
 
       const controller = new VendorController();
 

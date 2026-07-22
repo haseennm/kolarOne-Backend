@@ -1,6 +1,6 @@
 
 import { executeInTransaction, query, transaction } from "../../config/db";
-import { cns, getRecord, getStatusCode } from "../../utils/extra";
+import { getRecord, getStatusCode } from "../../utils/extra";
 import {
   CountResult,
   CreateProductCatParams,

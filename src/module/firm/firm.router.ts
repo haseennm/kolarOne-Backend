@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fs from "fs";
 import { pipeline } from "stream/promises";
-import { cns, el } from "../../utils/extra";
+import {  el } from "../../utils/extra";
 import {
   CreateFirmBody,
   DeleteFirmBody,
@@ -124,7 +124,6 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
       request: FastifyRequest<{ Body: FetchFirmBody }>,
       reply: FastifyReply
     ) => {
-      cns(request.url, request.body);
 
       const { page = 1, limit = 10, ...filters } = request.body;
       const offset = (page - 1) * limit;
@@ -238,7 +237,6 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       // try {
-      cns(request.url, request.body);
       const controller = new FirmController();
       const firm = await controller.deleteFirm(request.body);
       return reply.code(201).send(firm);
@@ -266,7 +264,6 @@ export async function firmRouter(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       // try {
-      cns(request.url, request.body);
       const controller = new FirmController();
       const firm = await controller.loginFirm(request.body);
       return reply.code(201).send(firm);

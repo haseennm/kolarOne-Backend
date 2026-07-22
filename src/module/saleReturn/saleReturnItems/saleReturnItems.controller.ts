@@ -1,7 +1,5 @@
 import { PoolClient } from "pg";
-import { transaction } from "../../../config/db";
-import { cns, getStatusCode, getStatusText } from "../../../utils/extra";
-import { AppError } from "../../../utils/AppError";
+import { getStatusCode } from "../../../utils/extra";
 import { CreateSaleRetunItemBody, DeleteSaleReturnItemBody, EditSaleRetunItemBody, FetchSaleReturnItemFilters, FetchSaleReturnItemParams } from "./saleReturnItems.types";
 import SaleReturnItemService from "./saleReturnItems.service";
 

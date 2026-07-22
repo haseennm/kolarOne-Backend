@@ -1,5 +1,4 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { cns } from "../../utils/extra";
 import {
   createRentLossSchema,
   CreateRentLossBody,
@@ -24,7 +23,6 @@ export async function rentLostRouter(app: FastifyInstance): Promise<void> {
       request,
       reply
     ) => {
-      cns(request.url, request.body);
 
       const controller =
         new RentLossController();

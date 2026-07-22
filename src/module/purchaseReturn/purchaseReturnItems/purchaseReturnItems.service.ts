@@ -1,4 +1,4 @@
-import { cns, getRecord, getStatusCode } from "../../../utils/extra";
+import {  getRecord, getStatusCode } from "../../../utils/extra";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
 import { PoolClient } from "pg";
@@ -337,7 +337,6 @@ END,
     : Number(returned_qty) > Number(existingItem.returned_qty)
     ? "O"
     : "I";
-    cns("returned_qty === existingItem.returned_qty", `${returned_qty} === ${existingItem.returned_qty} move ${movement_type}`)
     return {
       row: rows[0],
       movement_type,

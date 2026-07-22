@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
-import { cns, getRecord } from "../../utils/extra";
+import {  getRecord } from "../../utils/extra";
 import { GetReportSalePurchaseLedger } from "../sale/sale/sale.types";
 import { CreateLedgerTransactionParams, DeleteLedgerTransactionParams, LedgerTransactionCountResult, EditLedgerTransactionParams, FetchLedgerTransactionParams, FetchDbLedgerTransaction } from "./ledgertransaction.types";
 import { buildAuditChanges } from "../journal/journal.utils";
@@ -290,7 +290,6 @@ export default class LedgerTransactionService {
       if (!isLedgerTransactionExist) {
         throw new AppError("Ledger transaction not found or already deleted", 404);
       }
-      cns("category", [isLedgerTransactionExist.entity_id, entity_id])
 
       if (isLedgerTransactionExist.entity_id != entity_id) {
         throw new AppError("Entity id not matching", 400);

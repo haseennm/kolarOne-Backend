@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import fs from "fs";
 import { pipeline } from "stream/promises";
-import { cns, el } from '../../utils/extra';
 import { BranchLoginBody, CreateBranchBody, DeleteBranchBody, EditBranchBody, FetchBranchBody } from './branch.types';
 import BranchController from './branch.controller';
 import path from 'path';
@@ -74,7 +73,6 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
                 ...body,
                 logo: logoPath
             });
-            cns("branch", "branch")
             return reply.code(201).send({
                 status: "Success",
                 message: result
@@ -106,7 +104,6 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             }
         },
         async (request: FastifyRequest<{ Body: FetchBranchBody }>, reply: FastifyReply) => {
-            cns(request.url, request.body)
             const { page = 1, limit = 10, ...filters } = request.body;
             const offset = (page - 1) * limit;
             const controller = new BranchController();
@@ -203,7 +200,6 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             },
         },
         async (request, reply) => {
-            cns(request.url, request.body)
             const controller = new BranchController()
             const branch = await controller.deleteBranch(request.body)
             return reply.code(201).send(branch)
@@ -227,7 +223,6 @@ export async function branchRouter(app: FastifyInstance): Promise<void> {
             },
         },
         async (request, reply) => {
-            cns(request.url, request.body);
             const controller = new BranchController();
             const firm = await controller.loginBranch(request.body);
             return reply.code(201).send(firm);

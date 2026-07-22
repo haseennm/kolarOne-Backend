@@ -1,5 +1,4 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { cns } from "../../utils/extra";
 import {
   CreateCustomerBody,
   DeleteCustomerBody,
@@ -91,8 +90,6 @@ export async function customerRouter(app: FastifyInstance): Promise<void> {
       reply: FastifyReply
     ) => {
 
-      cns(request.url, request.body);
-
       const controller = new CustomerController();
 
       const customer = await controller.createCustomer(request.body);
@@ -129,9 +126,6 @@ export async function customerRouter(app: FastifyInstance): Promise<void> {
       request: FastifyRequest<{ Body: FetchCustomerBody }>,
       reply: FastifyReply
     ) => {
-
-      cns(request.url, request.body);
-
       const { page = 1, limit = 10, ...filters } = request.body;
       const offset = (page - 1) * limit;
 
@@ -230,9 +224,6 @@ export async function customerRouter(app: FastifyInstance): Promise<void> {
       request: FastifyRequest<{ Body: EditCustomerBody }>,
       reply: FastifyReply
     ) => {
-
-      cns(request.url, request.body);
-
       const controller = new CustomerController();
 
       const customer = await controller.editCustomer(request.body);
@@ -263,9 +254,6 @@ export async function customerRouter(app: FastifyInstance): Promise<void> {
       request: FastifyRequest<{ Body: DeleteCustomerBody }>,
       reply: FastifyReply
     ) => {
-
-      cns(request.url, request.body);
-
       const controller = new CustomerController();
 
       const customer = await controller.deleteCustomer(request.body);

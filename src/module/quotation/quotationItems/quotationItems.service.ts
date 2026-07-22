@@ -1,7 +1,7 @@
 import { json } from "node:stream/consumers";
 import { executeInTransaction, query } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { cns, getRecord, getStatusCode } from "../../../utils/extra";
+import { getRecord, getStatusCode } from "../../../utils/extra";
 import { ChangeQuotationItemStatus, CreateQuotationItemParams, DeleteQuotationItemBody, DeleteQuotationItemParams, EditQuotationItemParams, FetchDbQuotationItem, FetchQuotationItemParams, QuotationItemCountResult, UpdateQuotationItemParams } from "./quotationItems.types";
 import { PoolClient } from "pg";
 

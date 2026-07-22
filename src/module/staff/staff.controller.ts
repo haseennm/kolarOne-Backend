@@ -1,7 +1,7 @@
 import { transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { generateToken, hashPassword, verifyPassword } from "../../utils/auth.util";
-import { cns, convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText } from "../../utils/extra";
+import { convertEntityCode, convertEntityType, EntityKey, getStatusCode, getStatusText } from "../../utils/extra";
 import { emitAuditJournal } from "../journal/journal.utils";
 import StaffService from "./staff.service";
 import { CreateStaffBody, DeleteStaffBody, EditStaffBody, StaffLoginBody, StaffTransfer, StaffTransferRemover } from "./staff.types";

@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fs from "fs";
 import { pipeline } from "stream/promises";
-import { cns, el } from "../../utils/extra";
 import ProCatController from "./proCat.controller";
 import path from "path";
 import { DeleteProductCatBody, FetchProductCatBody } from "./proCat.types";
@@ -111,7 +110,6 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
       request: FastifyRequest<{ Body: FetchProductCatBody }>,
       reply: FastifyReply
     ) => {
-      cns(request.url, request.body);
 
       const { page = 1, limit = 10, ...filters } = request.body;
       const offset = (page - 1) * limit;
@@ -218,7 +216,6 @@ export async function productCategoryRouter(app: FastifyInstance): Promise<void>
       },
     },
     async (request, reply) => {
-      cns(request.url, request.body);
       const controller = new ProCatController();
       const deleted_product_cat = await controller.deleteProductCat(request.body);
       return reply.code(201).send({

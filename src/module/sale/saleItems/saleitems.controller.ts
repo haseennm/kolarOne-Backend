@@ -1,12 +1,11 @@
 import { PoolClient } from "pg";
-import { cns, getStatusCode, getStatusText } from "../../../utils/extra";
+import { getStatusCode, getStatusText } from "../../../utils/extra";
 import { CreateSaleItemBody, DeleteSaleItemBody, EditSaleItemBody, FetchSaleItemParams } from "./saleitems.types";
 import SaleItemService from "./saleitems.service";
 
 export default class SaleItemController {
 
   async createSaleItem(data: CreateSaleItemBody, client: PoolClient) {
-    cns("create purchase items", data)
     const { status, ...rest } = data;
 
 
@@ -29,7 +28,6 @@ export default class SaleItemController {
     return `sale item has been created successfully.`;
   }
   async editSaleItem(data: EditSaleItemBody, client: PoolClient) {
-    cns("edit sale item", data);
     const { status, ...rest } = data;
 
     let statusCode = undefined;

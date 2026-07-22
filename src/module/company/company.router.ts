@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { CompanyLoginBody, CreateCompanyBody, DeleteCompanyBody, EditCompanyBody, GetCompanyBody } from './company.types'
 import CompanyController from './company.controller'
-import { cns, el } from '../../utils/extra';
 import fs from "fs";
 import path from "path";
 import { pipeline } from "stream/promises";
@@ -87,7 +86,6 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             }
         },
         async (request: FastifyRequest<{ Body: GetCompanyBody }>, reply: FastifyReply) => {
-            cns(request.url, request.body)
             const { page = 1, limit = 10, ...filters } = request.body;
             const offset = (page - 1) * limit;
             const controller = new CompanyController();
@@ -176,7 +174,6 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
             },
         },
         async (request, reply) => {
-            cns(request.url, request.body)
             const controller = new CompanyController()
             const company = await controller.deleteCompany(request.body)
             return reply.code(201).send(company)
@@ -200,7 +197,6 @@ export async function companyRoutes(app: FastifyInstance): Promise<void> {
         },
         async (request, reply) => {
 
-            cns(request.url, request.body);
             const controller = new CompanyController();
             const firm = await controller.loginCompany(request.body);
             return reply.code(201).send(firm);

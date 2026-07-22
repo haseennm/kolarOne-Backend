@@ -1,8 +1,6 @@
 import { PoolClient } from "pg";
-import { transaction } from "../../../config/db";
-import { cns, getStatusCode, getStatusText } from "../../../utils/extra";
+import {  getStatusCode } from "../../../utils/extra";
 import PurchaseReturnItemService from "./purchaseReturnItems.service";
-import { AppError } from "../../../utils/AppError";
 import { CreatePurchaseRetunItemBody, DeletePurchaseReturnItemBody, EditPurchaseReturnItemBody, FetchPurchaseReturnItemFilters, FetchPurchaseReturnItemParams } from "./purchaseReturnItems.types";
 
 export default class PurchaseReturnItemController {
@@ -32,7 +30,6 @@ export default class PurchaseReturnItemController {
     return `purchaseItem has been created successfully.`;
   }
   async editPurchaseReturnItem(data: EditPurchaseReturnItemBody, client: PoolClient) {
-    cns("create purchase items", data)
     const { status, ...rest } = data;
 
     let statusCode = undefined

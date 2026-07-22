@@ -1,5 +1,4 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { cns } from "../../utils/extra";
 
 import { CreateStockRentBody, DeleteStockRentBody, EditStockRentBody, FetchStockRentBody } from "./stockRent.types";
 import StockRentalController from "./stockRent.controller";
@@ -89,8 +88,6 @@ export async function stockRentalRouter(app: FastifyInstance): Promise<void> {
       reply: FastifyReply
     ) => {
 
-      cns(request.url, request.body);
-
       const controller = new StockRentalController();
 
       const customer = await controller.createStockRental(request.body);
@@ -124,8 +121,6 @@ export async function stockRentalRouter(app: FastifyInstance): Promise<void> {
       request: FastifyRequest<{ Body: FetchStockRentBody }>,
       reply: FastifyReply
     ) => {
-
-      cns(request.url, request.body);
 
       const { page = 1, limit = 10, ...filters } = request.body;
       const offset = (page - 1) * limit;
@@ -219,7 +214,6 @@ export async function stockRentalRouter(app: FastifyInstance): Promise<void> {
       request: FastifyRequest<{ Body: EditStockRentBody }>,
       reply: FastifyReply
     ) => {
-      cns(request.url, request.body);
       const controller = new StockRentalController();
       const customer = await controller.editStockRental(request.body);
       return reply.code(200).send({
@@ -248,8 +242,6 @@ export async function stockRentalRouter(app: FastifyInstance): Promise<void> {
       request: FastifyRequest<{ Body: DeleteStockRentBody }>,
       reply: FastifyReply
     ) => {
-
-      cns(request.url, request.body);
 
       const controller = new StockRentalController();
 

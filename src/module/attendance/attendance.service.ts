@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { AttendanceRow, DailyAttendanceRow, DeleteHoliday, HolidayEntry, HolidayListItem, MarkHolidayBody, MonthlyStaffSummary, StaffRow } from "./attendance.types";
-import { cns, getRecord, isFutureDay } from "../../utils/extra";
+import { getRecord, isFutureDay } from "../../utils/extra";
 
 export default class AttendanceService {
 

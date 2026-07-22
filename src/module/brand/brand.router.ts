@@ -6,7 +6,6 @@ import {
   DeleteBrandBody,
   FetchBrandBody,
 } from "./brand.types";
-import { cns } from "../../utils/extra";
 
 export async function brandRouter(app: FastifyInstance): Promise<void> {
 
@@ -29,7 +28,6 @@ export async function brandRouter(app: FastifyInstance): Promise<void> {
       },
     },
     async (request: FastifyRequest<{ Body: CreateBrandBody }>, reply: FastifyReply) => {
-      cns(request.url, request.body)
       const body = request.body;
 
       const controller = new BrandController();
