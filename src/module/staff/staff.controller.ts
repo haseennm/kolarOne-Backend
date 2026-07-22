@@ -19,7 +19,7 @@ export default class LedgerTransactionController {
     ];
 
     if (data.blood_group && !validBloodGroups.includes(data.blood_group)) {
-      throw new AppError("Invalid blood group", 400);
+      throw new AppError("Invalid blood group formate is like A+ or O-", 400);
     }
     const remark = {
       action: "Created",

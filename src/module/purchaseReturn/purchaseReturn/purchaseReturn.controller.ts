@@ -7,111 +7,13 @@ import StockController from "../../stock/stock.controller";
 import { PaymentTransactionService } from "../../paymentTransaction/paymenttransaction.services";
 import PurchaseReturnService from "./purchaseReturn.service";
 import PurchaseReturnItemController from "../purchaseReturnItems/purchaseReturnItems.controller";
-import PartyBalanceController from "../../partyBalance/partyBalance.controller";
+// import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 import { AppError } from "../../../utils/AppError";
 import { buildAuditChanges, emitAuditJournal } from "../../journal/journal.utils";
 
 export default class PurchaseReturnController {
 
-  // async purchaseReturnCreate(data: PurchaseReturnCreateBody) {
-  //   const { payment_amount, final_amount, status, company_id, created_by, items, ...rest } = data;
 
-  //   const remark = {
-  //     action: "Created",
-  //     created_by,
-  //     created_at: new Date(),
-  //   };
-
-  //   return transaction(async (client: PoolClient) => {
-  //     const statusCode = getStatusCode(status ?? "Completed");
-  //     const service = new PurchaseReturnService();
-  //     const purchase_return = await service.createPurchaseReturn(
-  //       {
-  //         ...rest,
-  //         payment_amount, final_amount,
-  //         remark,
-  //         statusCode,
-  //         company_id
-  //       },
-  //       client
-  //     );
-
-  //     const stockController = new StockController();
-  //     const purchaseReturnItem = new PurchaseReturnItemController();
-  //     for (const item of items) {
-
-  //       const stock = await stockController.reduceStock(
-  //         {
-  //           stock_id: item.stock_id ?? purchase_return.stock_id,
-  //           branch_id: rest.branch_id,
-  //           firm_id: rest.firm_id,
-  //           qty: Math.abs(item.returned_qty),
-
-  //           movement_type: 'O',
-  //           reason: getTransactionCode("purchase_return"),
-  //           is_relate_purchase: true
-  //         },
-  //         client
-  //       );
-  //       await purchaseReturnItem.createPurchaseReturnItem(
-  //         {
-  //           purchase_return_id: purchase_return.id,
-  //           firm_id: rest.firm_id,
-  //           branch_id: rest.branch_id,
-  //           status: status ?? "Completed",
-  //           product_id: item.product_id,
-  //           stock_id: stock.id,
-  //           returned_qty: item.returned_qty,
-  //           unit: item.unit,
-  //           unit_price: item.unit_price,
-  //           sub_total: item.sub_total,
-  //           total_igst: item.total_igst ?? 0,
-  //           total_sgst: item.total_sgst ?? 0,
-  //           total_cgst: item.total_cgst ?? 0,
-  //           net_amount: item.net_amount,
-  //           purchase_item_id: item.purchase_item_id
-  //         },
-  //         client
-  //       );
-  //     }
-  //     const party_balance_controller = new PartyBalanceController();
-  //     const difference = payment_amount - final_amount;
-
-  //     if (difference !== 0) {
-  //       const isAdvance = difference > 0;
-
-  //       await party_balance_controller.createPartyBalance(
-  //         {
-  //           ref_id: purchase_return.id,
-  //           ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
-  //           created_by,
-  //           balance: Math.abs(difference),
-  //           flow: isAdvance ? "O" : "I",
-  //           firm_id: rest.firm_id,
-  //         },
-  //         client
-  //       );
-  //     }
-  //     const payment_transactions_service = new PaymentTransactionService()
-  //     await payment_transactions_service.insertPaymentTransaction(
-  //       {
-  //         ref_id: purchase_return.id,
-  //         amount: payment_amount,
-  //         ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
-  //         status: getStatusCode("Paid"),
-  //         payment_method_id: rest.payment_method_id ?? null,
-  //         transaction_reference: rest.transaction_reference ?? null,
-  //         business_id: rest.firm_id,
-  //         business_ref: convertEntityType("Firm" as EntityKey),
-  //         company_id,
-  //         payment_flow:"I"
-  //       },
-  //       client
-  //     );
-
-  //     return {msg:`purchase return ${purchase_return.return_number} has been created successfully.`,id:purchase_return.id};
-  //   });
-  // }
   async purchaseReturnCreate(data: PurchaseReturnCreateBody) {
     const { final_amount, status, company_id, created_by, items, payments, ...rest } = data;
 
@@ -154,9 +56,9 @@ export default class PurchaseReturnController {
             branch_id: rest.branch_id,
             firm_id: rest.firm_id,
             qty: Math.abs(item.returned_qty),
-            movement_type: 'O', // Outgoing stock adjustment 
+            movement_type: 'O', 
             reason: getTransactionCode("purchase_return"),
-            is_relate_purchase: true
+            is_relate_purchase: false
           },
           client
         );
@@ -184,23 +86,23 @@ export default class PurchaseReturnController {
       }
 
       // Party Balance adjustments 
-      const party_balance_controller = new PartyBalanceController();
+      // const party_balance_controller = new PartyBalanceController();
       const difference = totalPaymentAmount - final_amount;
 
       if (difference !== 0) {
         const isAdvance = difference > 0;
 
-        await party_balance_controller.createPartyBalance(
-          {
-            ref_id: purchase_return.id,
-            ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
-            created_by,
-            balance: Math.abs(difference),
-            flow: isAdvance ? "O" : "I",
-            firm_id: rest.firm_id,
-          },
-          client
-        );
+        // await party_balance_controller.createPartyBalance(
+        //   {
+        //     ref_id: purchase_return.id,
+        //     ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
+        //     created_by,
+        //     balance: Math.abs(difference),
+        //     flow: isAdvance ? "O" : "I",
+        //     firm_id: rest.firm_id,
+        //   },
+        //   client
+        // );
       }
 
       // 2. Iterate and split transactions entries tracking allocations independently
@@ -365,7 +267,6 @@ export default class PurchaseReturnController {
       const computedPaymentAmount = payments
         .filter(payment => payment.payment_flow === "I")
         .reduce((sum, payment) => sum + (payment.amount ?? 0), 0);
-        console.log("computedPaymentAmount",computedPaymentAmount)
       const paymentsJsonStorage = payments.map(p => ({
         payment_amount: p.amount,
         payment_method_id: p.payment_method_id,
@@ -456,8 +357,7 @@ export default class PurchaseReturnController {
             continue;
           }
 
-          // Existing Item adjustment logic
-          const pr_item = await prItemController.editPurchaseReturnItem(
+          const prItem = await prItemController.editPurchaseReturnItem(
             {
               item_id: item.item_id,
               purchase_return_id: rest.purchase_return_id,
@@ -478,20 +378,18 @@ export default class PurchaseReturnController {
             },
             client
           );
-
-          await stockController.editStock({
-            stock_id: pr_item.row.stock_id,
-            firm_id: rest.firm_id,
-            branch_id: rest.branch_id,
-            company_id,
-            purchase_id: prRecord.data.purchase_id,
-            product_id: item.product_id,
-            available_qty: -item.return_qty!, // Adjust delta bounds safely
-            purchased_qty: item.return_qty,
-            status: "Good",
-            movement_type: "O",
-            reason: getTransactionCode("purchase_return")
-          }, client);
+          if (prItem.movement_type !== "") {
+            await stockController.reduceStock(
+              {
+                stock_id: prItem.row.stock_id,
+                branch_id: rest.branch_id,
+                firm_id: rest.firm_id,
+                qty: item.returned_qty,
+                movement_type: prItem.movement_type,
+                reason: getTransactionCode("purchase_return"),
+                is_relate_purchase: false
+              }, client);
+          }
         }
       }
       const updatedItems = await prItemController.fetchItemsOnly(client, rest.firm_id, rest.purchase_return_id)
@@ -515,7 +413,7 @@ export default class PurchaseReturnController {
       const actualFinalAmount = Number(prRecord.data.final_amount ?? 0);
       const difference = actualRefundAmount - actualFinalAmount;
 
-      const party_balance_controller = new PartyBalanceController();
+      // const party_balance_controller = new PartyBalanceController();
 
       const isAdvance = difference > 0;
       let part_status: string;
@@ -530,18 +428,18 @@ export default class PurchaseReturnController {
         part_status = "Unpaid";
       }
 
-      await party_balance_controller.editPartyBalance(
-        {
-          ref_id: prRecord.data.id,
-          ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
-          action_by: updated_by,
-          balance: Math.abs(difference),
-          status: part_status,
-          flow: isAdvance ? "I" : "O", // Reversal matrix flow logic orientation
-          firm_id: rest.firm_id,
-        },
-        client
-      );
+      // await party_balance_controller.editPartyBalance(
+      //   {
+      //     ref_id: prRecord.data.id,
+      //     ref_type: PaymentTransactionTypeCodeMap["purchase_return"],
+      //     action_by: updated_by,
+      //     balance: Math.abs(difference),
+      //     status: part_status,
+      //     flow: isAdvance ? "I" : "O", // Reversal matrix flow logic orientation
+      //     firm_id: rest.firm_id,
+      //   },
+      //   client
+      // );
       const item_changes = buildAuditChanges(oldItems, updatedItems);
       await emitAuditJournal({
         client,

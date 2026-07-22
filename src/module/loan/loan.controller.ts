@@ -111,7 +111,7 @@ export default class LoanController {
         tableName: "staff_loans",
         tableRowId: loan.id,
         action: "repay",
-        record: loan
+        record: {...loan,amount:pay_amount}
       });
       return `Payment of ${pay_amount} has been successfully applied to ${loan.staff_name}'s loan.`;
     });

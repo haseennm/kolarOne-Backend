@@ -57,6 +57,7 @@ export default class TodaySnapdealService {
       purchaseReturnIncome,
       balanceTotals,
       ledgerTotals,
+      loanTotal
     ] = await Promise.all([
       this.getTodaySalesTotal(scope),
       this.getTodaySaleReturnTotal(scope),
@@ -64,18 +65,21 @@ export default class TodaySnapdealService {
       this.getTodayPurchaseReturnTotal(scope),
       this.getTodayBalanceTotal(scope),
       this.getTodayLedgerTotal(scope),
+      this.getTodayLoanTotal(scope),
     ]);
 
     const total_income =
       salesIncome +
       purchaseReturnIncome +
       balanceTotals.income +
+      loanTotal.income +
       ledgerTotals.income;
 
     const total_expense =
       saleReturnExpense +
       purchaseExpense +
       balanceTotals.expense +
+      loanTotal.expense +
       ledgerTotals.expense;
 
     return {
@@ -88,6 +92,7 @@ export default class TodaySnapdealService {
         purchase_return: purchaseReturnIncome,
         balance_income: balanceTotals.income,
         ledger_income: ledgerTotals.income,
+        loan_income: loanTotal.income,
       },
 
       expense_breakdown: {
@@ -95,6 +100,7 @@ export default class TodaySnapdealService {
         purchase: purchaseExpense,
         balance_expense: balanceTotals.expense,
         ledger_expense: ledgerTotals.expense,
+        loan_expense: loanTotal.expense,
       },
     };
   }
@@ -178,6 +184,34 @@ export default class TodaySnapdealService {
   // PURCHASE RETURN -> INCOME
   // =========================================================
 
+  private async getTodayLoanTotal(
+    scope: BusinessScope
+  ): Promise<{ income: number; expense: number }> {
+    const sql = `
+    SELECT
+      COALESCE(SUM(CASE WHEN pt.ref_type = 'LR' THEN pt.amount ELSE 0 END), 0) AS income,
+      COALESCE(SUM(CASE WHEN pt.ref_type = 'LN' THEN pt.amount ELSE 0 END), 0) AS expense
+    FROM payment_transactions pt
+    WHERE pt.ref_type IN ('LN', 'LR')
+      AND pt.status = 5
+      AND DATE(pt.created_at) = CURRENT_DATE
+      AND ${this.buildBusinessCondition()}
+  `;
+
+    const [row] = await query<{ income: string | number; expense: string | number }>(
+      sql,
+      [
+        scope.companyIds,
+        scope.branchIds,
+        scope.firmIds,
+      ]
+    );
+
+    return {
+      income: Number(row?.income ?? 0),
+      expense: Number(row?.expense ?? 0),
+    };
+  }
   private async getTodayPurchaseReturnTotal(
     scope: BusinessScope
   ): Promise<number> {
@@ -195,7 +229,6 @@ export default class TodaySnapdealService {
       scope.branchIds,
       scope.firmIds,
     ]);
-
     return Number(rows[0]?.total || 0);
   }
 

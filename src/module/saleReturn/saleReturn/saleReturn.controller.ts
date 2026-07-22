@@ -3,11 +3,10 @@ import { transaction } from "../../../config/db";
 import { convertEntityType, EntityKey, getStatusCode, getStatusText, getTransactionCode, PaymentTransactionTypeCodeMap } from "../../../utils/extra";
 import { SaleReturnCreateBody, SaleReturnDeleteBody, SaleReturnEditBody, SaleReturnFetchParams } from "./saleReturn.types";
 import StockController from "../../stock/stock.controller";
-// import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 import { PaymentTransactionService } from "../../paymentTransaction/paymenttransaction.services";
 import SaleReturnService from "./saleReturn.service";
 import SaleReturnItemController from "../saleReturnItems/saleReturnItems.controller";
-import PartyBalanceController from "../../partyBalance/partyBalance.controller";
+// import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 import { AppError } from "../../../utils/AppError";
 import { buildAuditChanges, emitAuditJournal } from "../../journal/journal.utils";
 
@@ -92,7 +91,7 @@ export default class SaleReturnController {
       const entity_type = convertEntityType("Firm" as EntityKey);
       const payment_transactions_service = new PaymentTransactionService();
 
-        await Promise.all(
+      await Promise.all(
         payments.map((p) => {
           if ((p.payment_amount ?? 0) <= 0) return Promise.resolve(); // Skip processing zero balances
 
@@ -107,7 +106,7 @@ export default class SaleReturnController {
               business_id: rest.firm_id,
               business_ref: convertEntityType("Firm" as EntityKey),
               company_id,
-              payment_flow: "E" // Income cash-flow stream direction incoming from vendor refund
+              payment_flow: "E"
             },
             client
           );
@@ -115,34 +114,34 @@ export default class SaleReturnController {
       );
 
       // 5. Initialize Party Balance values 
-      const party_balance_controller = new PartyBalanceController();
+      // const party_balance_controller = new PartyBalanceController();
       const difference = computedPaymentAmount - final_amount;
 
-      const isAdvance = difference > 0;
-      let part_status: string;
+      // const isAdvance = difference > 0;
+      // let part_status: string;
 
-      if (difference === 0) {
-        part_status = "Paid";
-      } else if (difference > 0) {
-        part_status = "Advance";
-      } else if (difference < 0 && computedPaymentAmount > 0) {
-        part_status = "Partial";
-      } else {
-        part_status = "Unpaid";
-      }
+      // if (difference === 0) {
+      //   part_status = "Paid";
+      // } else if (difference > 0) {
+      //   part_status = "Advance";
+      // } else if (difference < 0 && computedPaymentAmount > 0) {
+      //   part_status = "Partial";
+      // } else {
+      //   part_status = "Unpaid";
+      // }
 
-      await party_balance_controller.editPartyBalance(
-        {
-          ref_id: sale_return.id,
-          ref_type: PaymentTransactionTypeCodeMap["sale_return"],
-          action_by: created_by,
-          balance: Math.abs(difference),
-          status: part_status,
-          flow: isAdvance ? "O" : "I",
-          firm_id: rest.firm_id,
-        },
-        client
-      );
+      // await party_balance_controller.editPartyBalance(
+      //   {
+      //     ref_id: sale_return.id,
+      //     ref_type: PaymentTransactionTypeCodeMap["sale_return"],
+      //     action_by: created_by,
+      //     balance: Math.abs(difference),
+      //     status: part_status,
+      //     flow: isAdvance ? "O" : "I",
+      //     firm_id: rest.firm_id,
+      //   },
+      //   client
+      // );
       await emitAuditJournal({
         client,
         entityId: rest.firm_id,
@@ -431,7 +430,7 @@ export default class SaleReturnController {
               branch_id: rest.branch_id,
               firm_id: rest.firm_id,
               qty: deletedItem.returned_qty,
-              movement_type: 'O', // 'I' stands for incoming stock return
+              movement_type: 'I',
               reason: getTransactionCode("sale_return"),
               is_relate_purchase: false
             },
@@ -508,7 +507,7 @@ export default class SaleReturnController {
           );
 
           // Update tracking pool quantities
-          if (item.returned_qty !== updatedReturnItem.old_row.returned_qty) {
+          if (Number(item.returned_qty) !== Number(updatedReturnItem.old_row.returned_qty)) {
             await stockController.reduceStock(
               {
                 stock_id: item.stock_id ?? updatedReturnItem.row.stock_id,
@@ -559,7 +558,7 @@ export default class SaleReturnController {
       const actualFinalAmount = Number(saleReturn.data.final_amount ?? 0);
       const difference = actualPaidAmount - actualFinalAmount;
 
-      const party_balance_controller = new PartyBalanceController();
+      // const party_balance_controller = new PartyBalanceController();
 
       const isAdvance = difference > 0;
       let part_status: string;
@@ -574,18 +573,18 @@ export default class SaleReturnController {
         part_status = "Unpaid";
       }
 
-      await party_balance_controller.editPartyBalance(
-        {
-          ref_id: saleReturn.data.id,
-          ref_type: PaymentTransactionTypeCodeMap["sale_return"],
-          action_by: updated_by,
-          balance: Math.abs(difference),
-          status: part_status,
-          flow: isAdvance ? "O" : "I", // Maintain relative balance ledger directional flow
-          firm_id: rest.firm_id,
-        },
-        client
-      );
+      // await party_balance_controller.editPartyBalance(
+      //   {
+      //     ref_id: saleReturn.data.id,
+      //     ref_type: PaymentTransactionTypeCodeMap["sale_return"],
+      //     action_by: updated_by,
+      //     balance: Math.abs(difference),
+      //     status: part_status,
+      //     flow: isAdvance ? "O" : "I", // Maintain relative balance ledger directional flow
+      //     firm_id: rest.firm_id,
+      //   },
+      //   client
+      // );
 
       return `Sale return document ${saleReturn.data.return_number} updated successfully.`;
     });

@@ -26,7 +26,6 @@ import { purchaseRouter } from './module/purchase/purchase/purchase.router'
 import { saleReturnRouter } from './module/saleReturn/saleReturn/saleReturn.router'
 import { saleRouter } from './module/sale/sale/sale.router'
 import { purchaseReturnRouter } from './module/purchaseReturn/purchaseReturn/purchaseReturn.router'
-import { partyBalanceRouter } from './module/partyBalance/partyBalance.router'
 import { financialYearRouter } from './module/financialYear/financialYear.router'
 import { maintenanceRouter } from './module/maintenance/maintenance.router'
 import { companyBrandingRouter } from './module/companyBranding/companyBranding.router'
@@ -40,6 +39,8 @@ import { rentReportRouter } from './module/rent Report/rentReport.router'
 import { hiringStaffRouter } from './module/hiringStaffs/hiringstaff.router'
 import { quotationRouter } from './module/quotation/quotation/quotation.router'
 import { journalRouter } from './module/journal/journal.router'
+import settlementRoutes from './module/settlement/settlement.router'
+import { paymentTransactionRouter } from './module/paymentTransaction/paymenttransaction.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -69,7 +70,6 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(saleRouter, { prefix: '/sale' })
   app.register(saleReturnRouter, { prefix: '/sale/return' })
   app.register(todaySnapdealRouter, { prefix: '/today/snapdeals' })
-  app.register(partyBalanceRouter, { prefix: 'balance' })
   app.register(financialYearRouter, { prefix: 'financial/year' })
   app.register(maintenanceRouter, { prefix: '/maintenance' })
   app.register(companyBrandingRouter, { prefix: '/company/branding' })
@@ -82,4 +82,6 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(hiringStaffRouter, { prefix: '/hire/application' })
   app.register(quotationRouter, { prefix: '/quotation' })
   app.register(journalRouter, { prefix: '/journal' })
+  app.register(settlementRoutes, { prefix: '/settlement' })
+  app.register(paymentTransactionRouter, { prefix: '/payment/transaction' })
 }

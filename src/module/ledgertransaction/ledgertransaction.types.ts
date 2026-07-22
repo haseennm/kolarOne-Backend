@@ -1,5 +1,5 @@
 export interface CreateLedgerTransactionBody {
-  category_id: number;
+  ledger_category_id: number;
   amount: number;
   transaction_date: string;
   transaction_time: string;

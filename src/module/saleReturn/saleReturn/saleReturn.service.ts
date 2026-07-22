@@ -1,24 +1,12 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { getRecord, getStatusCode } from "../../../utils/extra";
+import { billStatus, getRecord, getStatusCode } from "../../../utils/extra";
 import { RepayBalanceSaleReturn, SaleReturnCreateParams, SaleReturnDeleteParams, SaleReturnEditParams, SaleReturnFetchParams } from "./saleReturn.types";
 import { buildAuditChanges } from "../../journal/journal.utils";
-import { table } from "node:console";
 
 export default class SaleReturnService {
-  private billStatus(final_amount: number, paid_amount: number) {
-    if (paid_amount <= 0) {
-      return getStatusCode("Unpaid");
-    }
-    if (paid_amount == final_amount) {
-      return getStatusCode("Paid");
-    }
-    if (paid_amount > final_amount) {
-      return getStatusCode("Over Pay");
-    }
-    return getStatusCode("Partial");
-  }
+  
 
   // async createSaleReturn(data: SaleReturnCreateParams, client: PoolClient) {
   //   const {
@@ -230,7 +218,7 @@ export default class SaleReturnService {
       total_cgst ?? 0,
       total_sgst ?? 0,
       total_igst ?? 0,
-      this.billStatus(final_amount ?? 0, computed_payment_amount),
+      billStatus(final_amount ?? 0, computed_payment_amount),
       JSON.stringify(remark ?? {}),
       firm_id,
       final_amount ?? 0,
@@ -411,7 +399,7 @@ export default class SaleReturnService {
       computed_payment_amount,
       merged_payments_json,
       JSON.stringify([remark]),
-      this.billStatus(Number(targetFinalAmount), computed_payment_amount),
+      billStatus(Number(targetFinalAmount), computed_payment_amount),
       firm_id,
       sale_return_id
     ];

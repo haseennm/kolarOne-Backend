@@ -108,7 +108,6 @@ export default class VendorService {
       firm_id ? firm_id : null,
       company_id
     ];
-    console.log(values)
     const { rows } = await executeInTransaction(client, queryText, values);
 
     return {

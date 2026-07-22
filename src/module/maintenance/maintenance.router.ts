@@ -8,7 +8,6 @@ interface ClearBody {
 export async function maintenanceRouter(app: FastifyInstance): Promise<void> {
   app.post<{ Body: ClearBody }>('/', async (request: FastifyRequest<{ Body: ClearBody }>, reply: FastifyReply) => {
     const controller = new MaintenanceController()
-    console.log("first")
     const result = await controller.clearTables({
       tables: request.body?.tables,
     })

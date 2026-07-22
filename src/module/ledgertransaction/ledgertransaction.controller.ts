@@ -99,7 +99,7 @@ export default class LedgerTransactionController {
         statusCode, entity_type, entity_id
       }, client);
       const payment_transactions_service = new PaymentTransactionService()
-      await payment_transactions_service.editPaymentTransaction({
+      await payment_transactions_service.editSinglePaymentTransaction({
         company_id,
         amount,
         payment_method_id: null,
@@ -113,12 +113,12 @@ export default class LedgerTransactionController {
       await emitAuditJournal({
         client,
         entityId: entity_id,
-        entityType: entity_type,
+        entityType: convertEntityType(entity_type as EntityKey),
         companyId: data.company_id,
         tableName: "ledger_transactions",
         tableRowId: id,
         action: "update",
-        record: ledger_transaction,
+        record: ledger_transaction.data,
         changes:{ledger_transaction :ledger_transaction.changes},
       });
       return `Ledger transaction has been updated successfully.`;

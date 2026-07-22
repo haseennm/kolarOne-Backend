@@ -27,7 +27,6 @@ export default class JournalService {
     const values = [
       entity_id, entity_type, journal, table_name, table_row_id, company_id, changes
     ];
-
     const { rows } = await executeInTransaction(client, journal_sql, values);
     return rows[0];
   }
@@ -235,7 +234,6 @@ ${whereClause}
     if (!config) {
       return null;
     }
-    console.log(`${config.nameColumn} table is ${config.table}`)
     let fetchQuery = `
     SELECT ${config.nameColumn} AS name
     FROM ${config.table}

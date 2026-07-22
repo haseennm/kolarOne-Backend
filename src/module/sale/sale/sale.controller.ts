@@ -4,7 +4,7 @@ import { convertEntityType, EntityKey, getStatusCode, getStatusText, getTransact
 import { GetReportSalePurchaseLedger, SaleCreateBody, SaleDeleteBody, SaleEditBody, SaleFetchParams } from "./sale.types";
 import StockController from "../../stock/stock.controller";
 import SaleService from "./sale.service";
-import PartyBalanceController from "../../partyBalance/partyBalance.controller";
+// import PartyBalanceController from "../../partyBalance/partyBalance.controller";
 import { PaymentTransactionService } from "../../paymentTransaction/paymenttransaction.services";
 import SaleItemController from "../saleItems/saleitems.controller";
 import { AppError } from "../../../utils/AppError";
@@ -83,23 +83,23 @@ export default class SaleController {
       }
 
       // 2. Adjust Ledger party balances against total calculated payment allocation
-      const party_balance_controller = new PartyBalanceController();
+      // const party_balance_controller = new PartyBalanceController();
       const difference = totalPaidAmount - final_amount;
 
       if (difference !== 0) {
         const isAdvance = difference > 0;
 
-        await party_balance_controller.createPartyBalance(
-          {
-            ref_id: sale.id,
-            ref_type: PaymentTransactionTypeCodeMap["sale"],
-            created_by,
-            balance: Math.abs(difference),
-            flow: isAdvance ? "O" : "I",
-            firm_id: rest.firm_id,
-          },
-          client
-        );
+        // await party_balance_controller.createPartyBalance(
+        //   {
+        //     ref_id: sale.id,
+        //     ref_type: PaymentTransactionTypeCodeMap["sale"],
+        //     created_by,
+        //     balance: Math.abs(difference),
+        //     flow: isAdvance ? "O" : "I",
+        //     firm_id: rest.firm_id,
+        //   },
+        //   client
+        // );
       }
 
       // 3. Process item history records into transactional breakdown tables
@@ -155,27 +155,26 @@ export default class SaleController {
       };
     });
   }
-  async saleEdit(data: SaleEditBody) {
-    const {
-      final_amount,
-      status,
-      company_id,
-      updated_by,
-      items,
-      delete_item_ids,
-      payments = [],
-      ...rest
-    } = data;
-
-    const remark = {
-      action: "Updated",
-      updated_by,
-      created_at: new Date(),
-    };
-
-    return transaction(async (client: PoolClient) => {
-
-      // 1. Calculate transaction sums and payment array payloads
+  async saleEdit(data: SaleEditBody, client?: PoolClient) {
+    const saleEdit = async (
+      data: SaleEditBody,
+      client: PoolClient
+    ): Promise<string> => {
+      const {
+        final_amount,
+        status,
+        company_id,
+        updated_by,
+        items,
+        delete_item_ids,
+        payments = [],
+        ...rest
+      } = data;
+      const remark = {
+        action: "Updated",
+        updated_by,
+        created_at: new Date(),
+      };
       const computedPaymentAmount = payments
         .filter(payment => payment.payment_flow === "I")
         .reduce((sum, payment) => sum + (payment.amount ?? 0), 0);
@@ -356,35 +355,42 @@ export default class SaleController {
       const actualFinalAmount = Number(sale.data.final_amount ?? 0);
       const difference = actualPaidAmount - actualFinalAmount;
 
-      const party_balance_controller = new PartyBalanceController();
+      // const party_balance_controller = new PartyBalanceController();
 
-      const isAdvance = difference > 0;
-      let part_status: string;
+      // const isAdvance = difference > 0;
+      // let part_status: string;
 
-      if (difference === 0) {
-        part_status = "Paid";
-      } else if (difference > 0) {
-        part_status = "Advance";
-      } else if (difference < 0 && actualPaidAmount > 0) {
-        part_status = "Partial";
-      } else {
-        part_status = "Unpaid";
-      }
+      // if (difference === 0) {
+      //   part_status = "Paid";
+      // } else if (difference > 0) {
+      //   part_status = "Advance";
+      // } else if (difference < 0 && actualPaidAmount > 0) {
+      //   part_status = "Partial";
+      // } else {
+      //   part_status = "Unpaid";
+      // }
 
-      await party_balance_controller.editPartyBalance(
-        {
-          ref_id: sale.data.id,
-          ref_type: PaymentTransactionTypeCodeMap["sale"],
-          action_by: updated_by,
-          balance: Math.abs(difference),
-          status: part_status,
-          flow: isAdvance ? "I" : "O", // Advance collection on sales is Incoming 'I' to your balances
-          firm_id: rest.firm_id,
-        },
-        client
-      );
+      // await party_balance_controller.editPartyBalance(
+      //   {
+      //     ref_id: sale.data.id,
+      //     ref_type: PaymentTransactionTypeCodeMap["sale"],
+      //     action_by: updated_by,
+      //     balance: Math.abs(difference),
+      //     status: part_status,
+      //     flow: isAdvance ? "I" : "O", // Advance collection on sales is Incoming 'I' to your balances
+      //     firm_id: rest.firm_id,
+      //   },
+      //   client
+      // );
 
       return `Invoice ${sale.data.invoice_number} has been updated successfully.`;
+    }
+    if (client) {
+      return await saleEdit(data, client);
+    }
+
+    return transaction(async (client: PoolClient) => {
+      return await saleEdit(data, client);
     });
   }
   // async saleEdit(data: SaleEditBody) {
@@ -577,7 +583,7 @@ export default class SaleController {
       const saleService = new SaleService();
       const itemService = new SaleItemController();
       const stockController = new StockController();
-      const partyBalanceService = new PartyBalanceController();
+      // const partyBalanceService = new PartyBalanceController();
       const payment_transactions_service = new PaymentTransactionService()
 
       const sale = await saleService.deleteSale({ remark, ...rest }, client);
@@ -600,12 +606,12 @@ export default class SaleController {
         },
         client
       );
-      await partyBalanceService.deletePartyBalance(
-        {
-          delete_by: deleted_by, firm_id: rest.firm_id, purchase_id: rest.id
-        },
-        client
-      );
+      // await partyBalanceService.deletePartyBalance(
+      //   {
+      //     delete_by: deleted_by, firm_id: rest.firm_id, purchase_id: rest.id
+      //   },
+      //   client
+      // );
       payment_transactions_service.deletePaymentTransaction({
         company_id: sale.company_id,
         ref_id: rest.id,
@@ -624,5 +630,5 @@ export default class SaleController {
       return "Sale deleted successfully"
     })
   }
-  
+
 }

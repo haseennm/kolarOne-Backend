@@ -214,6 +214,7 @@ export default class StockService {
 `;
     const sold_qty = Number(is_stock_exist.purchased_qty) - Number(is_stock_exist.available_quantity);
     const new_available_qty = Number(available_qty) - Number(sold_qty)
+    if (new_available_qty <0) throw new AppError("Available quantity cannot negative",400)
     const values = [
       new_available_qty ?? is_stock_exist.available_quantity,
       statusCode ?? is_stock_exist.status,
@@ -244,12 +245,11 @@ export default class StockService {
     AND branch_id = $8
   RETURNING *;
 `;
-
     const movement_values = [
       product_id,
       branch_id,
       movement_type,
-      available_qty,
+      Math.abs(finalPurchasedQty),
       statusCode,
       stock_id,
       reason,
@@ -1322,7 +1322,7 @@ export default class StockService {
     await executeInTransaction(client, stockQuery, values);
     const changes = buildAuditChanges(isStockExist, updatedStock.rows[0]);
     return {
-      data:updatedStock.rows[0],
+      data: updatedStock.rows[0],
       changes
     };
   }

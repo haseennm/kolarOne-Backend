@@ -10,6 +10,7 @@ export interface TodaySnapdealIncomeBreakdown {
   purchase_return: number;
   balance_income: number;
   ledger_income: number;
+  loan_income: number;
 }
 
 export interface TodaySnapdealExpenseBreakdown {
@@ -17,6 +18,7 @@ export interface TodaySnapdealExpenseBreakdown {
   purchase: number;
   balance_expense: number;
   ledger_expense: number;
+  loan_expense: number;
 }
 
 export interface TodaySnapdealResponseData {

@@ -56,7 +56,7 @@ export default class StockController {
     return stock;
   }
   async reduceStock(data: StockChangeBody, client: PoolClient) {
-    cns("Edit stock", data)
+    cns("Edit reduce controller stock", data)
     const service = new StockService();
 
     const statusCode = getStatusCode("Good");

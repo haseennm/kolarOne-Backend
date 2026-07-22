@@ -146,10 +146,10 @@ export function convertEntityCode(code: string): EntityKey | undefined {
 // PAYMENT TRANSACTION
 // 
 export enum PaymentTransactionCode {
-  SALE_CREDIT = "SC",
+  SALE_SETTLEMENT = "ST",
   SALE = "SL",
   SALE_RETURN = "SR",
-  PURCHASE_CREDIT = "PC",
+  PURCHASE_SETTLEMENT = "PT",
   PURCHASE = "PS",
   PURCHASE_RETURN = "PR",
   BALANCE = "BL",
@@ -159,10 +159,10 @@ export enum PaymentTransactionCode {
   LEDGER_TRANSACTION = "LT"
 }
 export const PaymentTransactionTypeCodeMap: Record<string, PaymentTransactionCode> = {
-  sale_credit: PaymentTransactionCode.SALE_CREDIT,
+  sale_settlement: PaymentTransactionCode.SALE_SETTLEMENT,
   sale: PaymentTransactionCode.SALE,
   sale_return: PaymentTransactionCode.SALE_RETURN,
-  purchase_credit: PaymentTransactionCode.PURCHASE_CREDIT,
+  purchase_settlement: PaymentTransactionCode.PURCHASE_SETTLEMENT,
   purchase: PaymentTransactionCode.PURCHASE,
   purchase_return: PaymentTransactionCode.PURCHASE_RETURN,
   balance: PaymentTransactionCode.BALANCE,
@@ -173,10 +173,10 @@ export const PaymentTransactionTypeCodeMap: Record<string, PaymentTransactionCod
 };
 
 export const PaymentTransactionCodeTypeMap: Record<PaymentTransactionCode, string> = {
-  SC: "sale_credit",
+  ST: "sale_settlement",
   SL: "sale",
   SR: "sale_return",
-  PC: "purchase_credit",
+  PT: "purchase_settlement",
   PS: "purchase",
   PR: "purchase_return",
   BL: "balance",
@@ -418,4 +418,24 @@ export function toFullTableName(shortName: string): string {
   }
 
   return fullName;
+}
+
+export const billStatus = (
+  final_amount: number,
+  paid_amount: number
+): number => {
+  if (paid_amount <= 0) {
+    console.log("UNPAID")
+    return getStatusCode("Unpaid");
+  }
+  if (paid_amount == final_amount) {
+    console.log("PAID")
+    return getStatusCode("Paid");
+  }
+  if (paid_amount > final_amount) {
+    console.log("OVER PAY")
+    return getStatusCode("Over Pay");
+  }
+  console.log("PARTIAL")
+  return getStatusCode("Partial");
 }

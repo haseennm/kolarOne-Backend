@@ -10,7 +10,7 @@ export default class LedgerTransactionService {
   async createLedgerTransaction(data: CreateLedgerTransactionParams, client: PoolClient) {
 
     const {
-      entity_id, amount, category_id, company_id, entity_type, reference_id,
+      entity_id, amount, ledger_category_id, company_id, entity_type, reference_id,
       remark, statusCode, transaction_date, transaction_time
     } = data;
 
@@ -27,7 +27,7 @@ export default class LedgerTransactionService {
       throw new AppError("Company not found", 404);
     }
     const isCategory_exist = await getRecord(
-      category_id,
+      ledger_category_id,
       "ledger_categories",
       "company_id",
       company_id,
@@ -73,7 +73,7 @@ export default class LedgerTransactionService {
     const values = [
       entity_id,
       amount,
-      category_id,
+      ledger_category_id,
       company_id,
       entity_type,
       reference_id,

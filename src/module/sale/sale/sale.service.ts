@@ -1,23 +1,12 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { getRecord, getStatusCode } from "../../../utils/extra";
+import { billStatus, getRecord, getStatusCode } from "../../../utils/extra";
 import { GetReportSalePurchaseLedger, RepayBalanceSale, SaleCreateParams, SaleDeleteParams, SaleEditParams, SaleFetchParams } from "./sale.types";
 import { buildAuditChanges } from "../../journal/journal.utils";
 
 export default class SaleService {
-  private billStatus(final_amount: number, paid_amount: number) {
-    if (paid_amount <= 0) {
-      return getStatusCode("Unpaid");
-    }
-    if (paid_amount == final_amount) {
-      return getStatusCode("Paid");
-    }
-    if (paid_amount > final_amount) {
-      return getStatusCode("Over Pay");
-    }
-    return getStatusCode("Partial");
-  }
+ 
   async createSale(data: SaleCreateParams, client: PoolClient) {
     const {
       customer_id,
@@ -122,7 +111,7 @@ export default class SaleService {
       `SELECT CONCAT('SL-', nextval('sale_ref_seq')) AS ref`
     );
 
-    const status = this.billStatus(final_amount, paid);
+    const status = billStatus(final_amount, paid);
     const ref_no = refResult.rows[0].ref;
 
     const query = `
@@ -420,7 +409,7 @@ export default class SaleService {
       targetFinalAmount,
       computed_payment_amount,
       notes ?? is_sale_exist.notes,
-      status ?? is_sale_exist.status,
+      billStatus(targetFinalAmount,computed_payment_amount),
       JSON.stringify([remark]),
       merged_payments_json,
       courier_charge ?? is_sale_exist.courier_charge,
@@ -655,6 +644,7 @@ SELECT
                   ON pm2.id = pt.payment_method_id
               WHERE pt.ref_id = s.id
                 AND pt.ref_type = 'SL'
+                AND pt.status != 0
           ) AS payments
 FROM sales s
 LEFT JOIN customers c ON c.id = s.customer_id
@@ -761,7 +751,7 @@ OFFSET $${values.length + 2}
       client,
       `SELECT 1 FROM sale_return 
      WHERE sale_id = $1 
-     AND status = $2 
+     AND status != $2 
      AND firm_id = $3`,
       [id, 0, firm_id]
     );

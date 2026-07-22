@@ -1,7 +1,7 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { getRecord, getStatusCode } from "../../../utils/extra";
+import { billStatus, getRecord, getStatusCode } from "../../../utils/extra";
 import { PurchaseReturnCreateParams, PurchaseReturnDeleteParams, PurchaseReturnFetchParams, PurchaseReturnReturnParams, RepayBalancePurchaseReturn } from "./purchaseReturn.types";
 import { buildAuditChanges } from "../../journal/journal.utils";
 
@@ -137,18 +137,7 @@ export default class PurchaseReturnService {
   //     const { rows } = await executeInTransaction(client, query, values);
   //     return rows[0];
   //   }
-  private billStatus(final_amount: number, paid_amount: number) {
-    if (paid_amount <= 0) {
-      return getStatusCode("Unpaid");
-    }
-    if (paid_amount == final_amount) {
-      return getStatusCode("Paid");
-    }
-    if (paid_amount > final_amount) {
-      return getStatusCode("Over Pay");
-    }
-    return getStatusCode("Partial");
-  }
+
   async createPurchaseReturn(data: PurchaseReturnCreateParams, client: PoolClient) {
     const {
       final_amount,
@@ -260,7 +249,7 @@ export default class PurchaseReturnService {
       total_cgst ?? 0,
       total_sgst ?? 0,
       total_igst ?? 0,
-      this.billStatus(final_amount ?? 0, payment_amount ?? 0),
+      billStatus(final_amount ?? 0, payment_amount ?? 0),
       JSON.stringify(remark ?? {}),
       firm_id,
       final_amount ?? 0,
@@ -441,7 +430,7 @@ RETURNING *;
       total_igst ?? is_return_exist.total_igst,
       targetFinalAmount,
       computed_payment_amount,
-      this.billStatus(targetFinalAmount, computed_payment_amount),
+      billStatus(targetFinalAmount, computed_payment_amount),
       JSON.stringify([remark]),
       merged_payments_json,
       firm_id,
@@ -666,6 +655,7 @@ RETURNING *;
                   ON pm2.id = pt.payment_method_id
               WHERE pt.ref_id = pr.id
                 AND pt.ref_type = 'PR'
+                AND pt.status != 0
           ) AS payments
 
       FROM purchase_return pr

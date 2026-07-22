@@ -152,7 +152,7 @@ export default class SaleItemService {
   }
   async fetchItemsOnly(client: PoolClient, firm_id: number, sale_id: number) {
     const { rows } = await executeInTransaction(client,
-      `SELECT * FROM sale_items WHERE sale_id = $1 AND
+      `SELECT * FROM sales_items WHERE sale_id = $1 AND
       firm_id =$2 AND status !=$3`,
       [sale_id, firm_id, getStatusCode("Deleted")]
     )

@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { JournalDetailed, JournalFetchBody } from "./journal.types";
 import { JournalController } from "./journal.controller";
-import { table } from "node:console";
 
 
 export async function journalRouter(app: FastifyInstance) {
@@ -56,7 +55,6 @@ app.post<{ Body: JournalFetchBody }>(
         limit
       }
     });
-    console.log(data.pagination)
     return reply.code(200).send(data);
   }
 );

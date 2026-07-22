@@ -13,7 +13,7 @@ export async function ledgerTransactionRouter(app: FastifyInstance) {
         body: {
           type: "object",
           required: [
-            "category_id",
+            "ledger_category_id",
             "amount",
             "transaction_date",
             "entity_type",

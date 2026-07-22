@@ -47,14 +47,11 @@ export default class VoiceAssistService {
           //   },
           // }
         );
-console.log(response.data)
 
         const normalizedResponse = await this.normalizeMlResponse(response.data, client);
-        console.log("normalizedResponse", normalizedResponse.sql)
         const result = await executeInTransaction(client, normalizedResponse.sql, [])
         return result.rows
       } catch (error: any) {
-        console.error("API Error:", error.response?.data || error.message);
 
         if (error instanceof AppError) throw error;
 

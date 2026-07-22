@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { AppError } from "../../utils/AppError";
 import { executeInTransaction } from "../../config/db";
 import { ConfirmSalaryParams, CreateSalaryParams, GenerateSalaryBody, GetSalaryBody, SalaryGenerationRow } from "./salary.types";
-import { getRecord } from "../../utils/extra";
+import { getRecord, getStatusCode } from "../../utils/extra";
 
 const FULL_DAY_MINUTES = 360;
 const HALF_DAY_MINUTES = 210;
@@ -321,11 +321,15 @@ export default class SalaryService {
       entity_type,
       entity_id
     ];
-
+    const staff = await executeInTransaction(client,
+      `SELECT full_name FROM staff WHERE id = $1 AND status !=$2`,
+      [salary.staff_id, getStatusCode('Deleted')]
+    )
     const { rows } = await executeInTransaction(client, updateQuery, values);
 
     return {
-      data: rows[0]
+      data: { ...rows[0], staff_name: staff.rows[0].full_name },
+
     };
   }
   async getSalary(

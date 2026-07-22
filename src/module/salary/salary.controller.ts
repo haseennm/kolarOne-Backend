@@ -33,18 +33,18 @@ export default class SalaryController {
       const service = new SalaryService();
       const generated = await service.generateSalary({ ...rest, remark, from_date, to_date, salaryMonthStr }, client);
 
-      for (const row of generated) {
-        await emitAuditJournal({
-          client,
-          entityId: rest.entity_id,
-          entityType: rest.entity_type,
-          companyId: rest.entity_id,
-          tableName: "salary_generations",
-          tableRowId: row.staff_id,
-          action: "create",
-          record: row,
-        });
-      }
+      // for (const row of generated) {
+      //   await emitAuditJournal({
+      //     client,
+      //     entityId: rest.entity_id,
+      //     entityType: rest.entity_type,
+      //     companyId: rest.entity_id,
+      //     tableName: "salary_generations",
+      //     tableRowId: row.staff_id,
+      //     action: "create",
+      //     record: row,
+      //   });
+      // }
 
       return { data: generated };
     });
@@ -75,7 +75,6 @@ export default class SalaryController {
         },
         client
       );
-
       await emitAuditJournal({
         client,
         entityId: rest.entity_id,

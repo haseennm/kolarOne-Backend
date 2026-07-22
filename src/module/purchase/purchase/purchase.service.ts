@@ -1,26 +1,12 @@
 import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../../config/db";
 import { AppError } from "../../../utils/AppError";
-import { getRecord, getStatusCode } from "../../../utils/extra";
+import { billStatus, getRecord, getStatusCode } from "../../../utils/extra";
 import { PurchaseCreateParams, PurchaseDeleteParams, PurchaseEditParams, PurchaseFetchParams, RepayBalancePurchase } from "./purchase.types";
 import { buildAuditChanges } from "../../journal/journal.utils";
 
 export default class PurchaseService {
-  private billStatus(final_amount: number, paid_amount: number) {
-    if (paid_amount <= 0) {
-      return getStatusCode("Unpaid");
-    }
 
-    if (paid_amount == final_amount) {
-
-      return getStatusCode("Paid");
-    }
-    if (paid_amount > final_amount) {
-      return getStatusCode("Over Pay");
-    }
-
-    return getStatusCode("Partial");
-  }
 
   async createPurchase(data: PurchaseCreateParams, client: PoolClient) {
     const {
@@ -134,7 +120,7 @@ export default class PurchaseService {
       final_amount ?? 0,
       paid_amount ?? 0,
       notes ?? null,
-      this.billStatus(final_amount ?? 0, paid_amount ?? 0),
+      billStatus(final_amount ?? 0, paid_amount ?? 0),
       JSON.stringify(remark) ?? {},
       payments, // Inserted as a text / jsonb type value directly mapping your payload structure
       firm_id,
@@ -271,7 +257,7 @@ export default class PurchaseService {
   //       final_amount ?? is_purchase_exist.final_amount,
   //       payment_amount ?? is_purchase_exist.payment_amount,
   //       notes ?? is_purchase_exist.notes,
-  //       this.billStatus(
+  //       billStatus(
   //         final_amount ?? is_purchase_exist.final_amount,
   //         payment_amount ?? is_purchase_exist.payment_amount
   //       ),
@@ -389,7 +375,7 @@ export default class PurchaseService {
       targetFinalAmount,
       computed_payment_amount,
       notes ?? is_purchase_exist.notes,
-      this.billStatus(Number(targetFinalAmount), computed_payment_amount),
+      billStatus(Number(targetFinalAmount), computed_payment_amount),
       JSON.stringify([remark]),
       merged_payments_json,
       courier_charge ?? is_purchase_exist.courier_charge,
@@ -551,23 +537,24 @@ SELECT
     (
         SELECT COALESCE(
             JSON_AGG(
-                JSON_BUILD_OBJECT(
-                    'id', pi.id,
-                    'product_id', pi.product_id,
-                    'product_name', pr.name,
-                    'stock_id', pi.stock_id,
-                    'batch_number', s.batch_number,
-                    'received_qty', pi.received_qty,
-                    'purchased_qty', pi.purchased_qty,
-                    'unit', pi.unit,
-                    'unit_price', pi.unit_price,
-                    'sub_total', pi.sub_total,
-                    'total_cgst', pi.total_cgst,
-                    'total_sgst', pi.total_sgst,
-                    'total_igst', pi.total_igst,
-                    'net_amount', pi.net_amount,
-                    'status', pi.status
-                )
+             JSON_BUILD_OBJECT(
+    'id', pi.id,
+    'product_id', pi.product_id,
+    'product_name', pr.name,
+    'stock_id', pi.stock_id,
+    'batch_number', s.batch_number,
+    'received_qty', pi.received_qty,
+    'purchased_qty', pi.purchased_qty,
+    'unit', pi.unit,
+    'unit_price', pi.unit_price,
+    'sub_total', pi.sub_total,
+    'total_cgst', pi.total_cgst,
+    'total_sgst', pi.total_sgst,
+    'total_igst', pi.total_igst,
+    'net_amount', pi.net_amount,
+    'min_available_count', COALESCE(s.purchased_qty - s.available_quantity, 0),
+    'status', pi.status
+)
                 ORDER BY pi.id
             ),
             '[]'
@@ -699,9 +686,9 @@ OFFSET $${values.length + 2}
       `SELECT 1 
      FROM purchase_return 
      WHERE purchase_id = $1 
-       AND status = $2 
+       AND status != $2 
        AND firm_id = $3`,
-      [id, 0, firm_id]
+      [id, getStatusCode("Deleted"), firm_id]
     );
 
     if (purchaseReturn.rows.length > 0) {
