@@ -20,18 +20,30 @@ export default class VendorService {
 
     const {
       company_id,
+      firm_id,
       vendor_name,
       email,
       phone_number,
       alternate_phone,
       address,
+      city,
+      pincode,
       gstin,
       pan,
       state_code,
       statusCode,
+      supply_type,
+      gst_treatment,
       remark,
-      firm_id,
-      branch_id
+      bank_acc_holder,
+      bank_acc_number,
+      ifsc,
+      bank_name,
+      branch_name,
+      currency,
+      payment_terms,
+      opening_balance,
+      branch_id,
     } = data;
     if (firm_id && !branch_id) {
       for (const firmId of firm_id) {
@@ -74,25 +86,73 @@ export default class VendorService {
         }
       }
     }
+    if (gstin) {
+      const gstCheck = await client.query(
+        `
+    SELECT id
+    FROM vendors
+    WHERE company_id = $1
+      AND status != 0
+      AND gstin = $2 
+    `,
+        [company_id, gstin]
+      );
 
+      if (gstCheck.rowCount) {
+        throw new AppError("GSTIN already exists", 409);
+      }
+    }
+
+    if (pan) {
+      const panCheck = await client.query(
+        `
+    SELECT id
+    FROM vendors
+    WHERE company_id = $1
+      AND pan = $2
+      AND status != 0
+    `,
+        [company_id, pan]
+      );
+
+      if (panCheck.rowCount) {
+        throw new AppError("PAN already exists", 409);
+      }
+    }
     const queryText = `
-      INSERT INTO vendors (
-        vendor_name,
-        email,
-        phone_number,
-        alternate_phone,
-        address,
-        gstin,
-        pan,
-        state_code,
-        status,
-        remarks,
-        firms,
-        company_id
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-      RETURNING *;
-      `;
+  INSERT INTO vendors (
+    vendor_name,
+    email,
+    phone_number,
+    alternate_phone,
+    address,
+    city,
+    pincode,
+    gstin,
+    pan,
+    state_code,
+    status,
+    supply_type,
+    gst_treatment,
+    remarks,
+    bank_acc_holder,
+    bank_acc_number,
+    ifsc,
+    bank_name,
+    branch_name,
+    currency,
+    payment_terms,
+    opening_balance,
+    firms,
+    company_id
+  )
+  VALUES (
+    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+    $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
+    $21,$22,$23,$24
+  )
+  RETURNING *;
+`;
 
     const values = [
       vendor_name,
@@ -100,12 +160,24 @@ export default class VendorService {
       phone_number,
       alternate_phone,
       address,
+      city,
+      pincode,
       gstin,
       pan,
       state_code,
       statusCode,
+      supply_type,
+      gst_treatment,
       JSON.stringify(remark),
-      firm_id ? firm_id : null,
+      bank_acc_holder,
+      bank_acc_number,
+      ifsc,
+      bank_name,
+      branch_name,
+      currency,
+      payment_terms,
+      opening_balance,
+      firm_id ?? null,
       company_id
     ];
     const { rows } = await executeInTransaction(client, queryText, values);
@@ -201,51 +273,163 @@ ${whereClause}
   }
 
   async updateVendor(data: EditVendorParams, client: PoolClient) {
-
     const {
       id,
       company_id,
+      firm_id,
+
       vendor_name,
       email,
       phone_number,
       alternate_phone,
       address,
+      city,
+      pincode,
+
       gstin,
       pan,
       state_code,
+
       statusCode,
-      remark
+
+      supply_type,
+      gst_treatment,
+      remark,
+
+      bank_acc_holder,
+      bank_acc_number,
+      ifsc,
+      bank_name,
+      branch_name,
+
+      currency,
+      payment_terms,
+      opening_balance,
+
+      branch_id,
     } = data;
 
-
-    const vendor = await getRecord(id, "vendors", "company_id", company_id, client);
+    const vendor = await getRecord(
+      id,
+      "vendors",
+      "company_id",
+      company_id,
+      client
+    );
 
     if (!vendor) {
       throw new AppError("Vendor not found", 404);
     }
+    if (gstin !== vendor.gstin) {
+      if (gstin) {
+        const gstCheck = await client.query(
+          `
+       SELECT id
+       FROM vendors
+       WHERE company_id = $1
+         AND status != 0
+         AND gstin = $2 
+       `,
+          [company_id, gstin]
+        );
+
+        if (gstCheck.rowCount) {
+          throw new AppError("GSTIN already exists", 409);
+        }
+      }
+    }
+    if (pan !== vendor.pan) {
+      if (pan) {
+        const panCheck = await client.query(
+          `
+    SELECT id
+    FROM vendors
+    WHERE company_id = $1
+      AND pan = $2
+      AND status != 0
+    `,
+          [company_id, pan]
+        );
+
+        if (panCheck.rowCount) {
+          throw new AppError("PAN already exists", 409);
+        }
+      }
+    }
+    // Validate firms if supplied
+    if (firm_id && !branch_id) {
+      for (const firmId of firm_id) {
+        const firmExist = await getRecord(firmId, "firm", "id", firmId, client);
+
+        if (!firmExist) {
+          throw new AppError("Firm not found", 404);
+        }
+
+        const branchExist = await getRecord(
+          firmExist.branch_id,
+          "branches",
+          "company_id",
+          company_id,
+          client
+        );
+
+        if (!branchExist) {
+          throw new AppError(
+            `${firmExist.firm_name} does not belong to this company`,
+            404
+          );
+        }
+      }
+    }
+
+    if (firm_id && branch_id) {
+      for (const firmId of firm_id) {
+        const firmExist = await getRecord(firmId, "firm", "id", firmId, client);
+
+        if (!firmExist || Number(firmExist.branch_id) !== Number(branch_id)) {
+          throw new AppError(
+            `Firm ${firmId} does not belong to this branch`,
+            404
+          );
+        }
+      }
+    }
 
     const queryText = `
-      UPDATE vendors
-      SET
-        vendor_name = $1,
-        email = $2,
-        phone_number = $3,
-        alternate_phone = $4,
-        address = $5,
-        gstin = $6,
-        pan = $7,
-        state_code = $8,
-        status = $9,
-        remarks =
+    UPDATE vendors
+    SET
+      vendor_name = $1,
+      email = $2,
+      phone_number = $3,
+      alternate_phone = $4,
+      address = $5,
+      city = $6,
+      pincode = $7,
+      gstin = $8,
+      pan = $9,
+      state_code = $10,
+      status = $11,
+      supply_type = $12,
+      gst_treatment = $13,
+      remarks =
         CASE
-          WHEN remarks IS NULL THEN $10::jsonb
-          WHEN jsonb_typeof(remarks)='array'
-            THEN remarks || $10::jsonb
-          ELSE jsonb_build_array(remarks) || $10::jsonb
-        END
-      WHERE id = $11
-      RETURNING *;
-      `;
+          WHEN remarks IS NULL THEN $14::jsonb
+          WHEN jsonb_typeof(remarks) = 'array'
+            THEN remarks || $14::jsonb
+          ELSE jsonb_build_array(remarks) || $14::jsonb
+        END,
+      bank_acc_holder = $15,
+      bank_acc_number = $16,
+      ifsc = $17,
+      bank_name = $18,
+      branch_name = $19,
+      currency = $20,
+      payment_terms = $21,
+      opening_balance = $22,
+      firms = $23
+    WHERE id = $24
+    RETURNING *;
+  `;
 
     const values = [
       vendor_name ?? vendor.vendor_name,
@@ -253,18 +437,35 @@ ${whereClause}
       phone_number ?? vendor.phone_number,
       alternate_phone ?? vendor.alternate_phone,
       address ?? vendor.address,
+      city ?? vendor.city,
+      pincode ?? vendor.pincode,
       gstin ?? vendor.gstin,
       pan ?? vendor.pan,
       state_code ?? vendor.state_code,
       statusCode ?? vendor.status,
+      supply_type ?? vendor.supply_type,
+      gst_treatment ?? vendor.gst_treatment,
       JSON.stringify(remark),
-      id
+      bank_acc_holder ?? vendor.bank_acc_holder,
+      bank_acc_number ?? vendor.bank_acc_number,
+      ifsc ?? vendor.ifsc,
+      bank_name ?? vendor.bank_name,
+      branch_name ?? vendor.branch_name,
+      currency ?? vendor.currency,
+      payment_terms ?? vendor.payment_terms,
+      opening_balance ?? vendor.opening_balance,
+      firm_id ?? vendor.firms,
+      id,
     ];
 
     const { rows } = await executeInTransaction(client, queryText, values);
-    const changes = buildAuditChanges(vendor, rows[0]);
-    return { changes, data: rows[0] };
 
+    const changes = buildAuditChanges(vendor, rows[0]);
+
+    return {
+      changes,
+      data: rows[0],
+    };
   }
   async addVendorNewFirm(data: AddNewFirm, remark: object, client: PoolClient) {
 

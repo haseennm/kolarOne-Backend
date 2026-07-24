@@ -17,71 +17,38 @@ export async function vendorRouter(app: FastifyInstance) {
     "/create",
     {
       schema: {
-        body: {
-          type: "object",
-          required: ["vendor_name", "company_id", "status", "created_by", "gstin"],
-          properties: {
-            company_id: { type: "number" },
-            firm_id: {
-              type: "array",
-              items: {
-                type: "number"
-              }
+        "body": {
+          "type": "object",
+          "required": ["vendor_name", "company_id", "phone_number"],
+          "properties": {
+            "company_id": { "type": "number" },
+            "firm_id": {
+              "type": "array",
+              "items": { "type": "number" }
             },
-
-            vendor_name: {
-              type: "string",
-              minLength: 2,
-              maxLength: 255
-            },
-
-            email: {
-              type: ["string", "null"],
-              format: "email",
-              maxLength: 255
-            },
-
-            phone_number: {
-              type: ["string", "null"],
-              minLength: 10,
-              maxLength: 20
-            },
-
-            alternate_phone: {
-              type: ["string", "null"],
-              minLength: 10,
-              maxLength: 20
-            },
-
-            address: {
-              type: ["string", "null"]
-            },
-
-            gstin: {
-              type: ["string", "null"],
-              minLength: 15,
-              maxLength: 15
-            },
-
-            pan: {
-              type: ["string", "null"],
-              minLength: 10,
-              maxLength: 10
-            },
-
-            state_code: {
-              type: ["string", "null"],
-              minLength: 2,
-              maxLength: 2
-            },
-
-            status: {
-              type: "string"
-            },
-
-            created_by: {
-              type: "string"
-            }
+            "vendor_name": { "type": "string", "minLength": 2, "maxLength": 255 },
+            "email": { "type": ["string", "null"], "format": "email", "maxLength": 255 },
+            "phone_number": { "type": ["string", "null"], "minLength": 10, "maxLength": 20 },
+            "alternate_phone": { "type": ["string", "null"], "minLength": 10, "maxLength": 20 },
+            "address": { "type": ["string", "null"] },
+            "city": { "type": ["string", "null"] },
+            "pincode": { "type": ["string", "null"] },
+            "gstin": { "type": ["string", "null"], "minLength": 15, "maxLength": 15 },
+            "pan": { "type": ["string", "null"], "minLength": 10, "maxLength": 10 },
+            "state_code": { "type": ["string", "null"], "minLength": 2, "maxLength": 2 },
+            "status": { "type": "string" },
+            "supply_type": { "type": ["string", "null"] },
+            "gst_treatment": { "type": ["string", "null"] },
+            "remark": { "type": ["string", "null"] },
+            "bank_acc_holder": { "type": ["string", "null"] },
+            "bank_acc_number": { "type": ["string", "null"] },
+            "ifsc": { "type": ["string", "null"] },
+            "bank_name": { "type": ["string", "null"] },
+            "branch_name": { "type": ["string", "null"] },
+            "currency": { "type": ["string", "null"] },
+            "payment_terms": { "type": ["string", "null"] },
+            "opening_balance": { "type": ["string", "null"] },
+            "created_by": { "type": ["string", "null"] }
           }
         }
       }
@@ -156,70 +123,39 @@ export async function vendorRouter(app: FastifyInstance) {
     "/edit",
     {
       schema: {
-        body: {
-          type: "object",
-          required: ["id", "updated_by","company_id"],
-          properties: {
-            id: {
-              type: "string",
-              format: "uuid"
+        "body": {
+          "type": "object",
+          "required": ["id", "company_id"],
+          "properties": {
+            "id": { "type": ["string", "number"] },
+            "company_id": { "type": "number" },
+            "firm_id": {
+              "type": "array",
+              "items": { "type": "number" }
             },
-            company_id: {
-              type: "number"
-            },
-
-            vendor_name: {
-              type: "string",
-              minLength: 2,
-              maxLength: 255
-            },
-
-            email: {
-              type: ["string", "null"],
-              format: "email"
-            },
-
-            phone_number: {
-              type: ["string", "null"],
-              minLength: 10,
-              maxLength: 20
-            },
-
-            alternate_phone: {
-              type: ["string", "null"],
-              minLength: 10,
-              maxLength: 20
-            },
-
-            address: {
-              type: ["string", "null"]
-            },
-
-            gstin: {
-              type: ["string", "null"],
-              minLength: 15,
-              maxLength: 15
-            },
-
-            pan: {
-              type: ["string", "null"],
-              minLength: 10,
-              maxLength: 10
-            },
-
-            state_code: {
-              type: ["string", "null"],
-              minLength: 2,
-              maxLength: 2
-            },
-
-            status: {
-              type: ["string", "null"]
-            },
-
-            updated_by: {
-              type: "string"
-            }
+            "vendor_name": { "type": "string", "minLength": 2, "maxLength": 255 },
+            "email": { "type": ["string", "null"], "format": "email", "maxLength": 255 },
+            "phone_number": { "type": ["string", "null"], "minLength": 10, "maxLength": 20 },
+            "alternate_phone": { "type": ["string", "null"], "minLength": 10, "maxLength": 20 },
+            "address": { "type": ["string", "null"] },
+            "city": { "type": ["string", "null"] },
+            "pincode": { "type": ["string", "null"] },
+            "gstin": { "type": ["string", "null"], "minLength": 15, "maxLength": 15 },
+            "pan": { "type": ["string", "null"], "minLength": 10, "maxLength": 10 },
+            "state_code": { "type": ["string", "null"], "minLength": 2, "maxLength": 2 },
+            "status": { "type": "string" },
+            "supply_type": { "type": ["string", "null"] },
+            "gst_treatment": { "type": ["string", "null"] },
+            "remark": { "type": ["string", "null"] },
+            "bank_acc_holder": { "type": ["string", "null"] },
+            "bank_acc_number": { "type": ["string", "null"] },
+            "ifsc": { "type": ["string", "null"] },
+            "bank_name": { "type": ["string", "null"] },
+            "branch_name": { "type": ["string", "null"] },
+            "currency": { "type": ["string", "null"] },
+            "payment_terms": { "type": ["string", "null"] },
+            "opening_balance": { "type": ["string", "null"] },
+            "updated_by": { "type": ["string", "null"] }
           }
         }
       }
@@ -245,7 +181,7 @@ export async function vendorRouter(app: FastifyInstance) {
       schema: {
         body: {
           type: "object",
-          required: ["vendor_id", "firm_id", "firm_name","company_id"],
+          required: ["vendor_id", "firm_id", "firm_name", "company_id"],
           properties: {
             vendor_id: {
               type: "string",

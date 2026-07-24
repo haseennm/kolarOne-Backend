@@ -26,7 +26,8 @@ export default class CompanyService {
             logo,
             remark,
             username,
-            hashed
+            hashed,
+            pin_code
         } = data;
 
         const insert_query = `
@@ -48,12 +49,13 @@ export default class CompanyService {
       logo,
       remarks,
       username,
-      password
+      password,
+      pin_code
     )
     VALUES (
       $1,$2,$3,$4,$5,
       $6,$7,$8,$9,$10,
-      $11,$12,$13,$14,$15,$16,$17,$18
+      $11,$12,$13,$14,$15,$16,$17,$18, $19
     )
     RETURNING *;
   `;
@@ -76,13 +78,13 @@ export default class CompanyService {
             logo,
             JSON.stringify(remark),
             username,
-            hashed
+            hashed,
+            pin_code
         ];
 
         const { rows } = await pool.query(insert_query, values);
         return rows[0];
     }
-
     async updateCompany(data: EditCompanyParams) {
 
         const {
@@ -102,7 +104,8 @@ export default class CompanyService {
             email,
             website,
             logo,
-            remark
+            remark,
+            pin_code
         } = data;
         const result = transaction(async (client) => {
 
@@ -140,8 +143,9 @@ export default class CompanyService {
                 WHEN jsonb_typeof(remarks) = 'array'
                 THEN remarks || $16::jsonb
                 ELSE jsonb_build_array(remarks) || $16::jsonb
-            END
-        WHERE id = $17
+            END,
+            pin_code =$17
+        WHERE id = $18
         RETURNING *;
     `;
             let status = null;
@@ -163,6 +167,7 @@ export default class CompanyService {
                 website ?? existing.website,
                 logo ?? existing.logo,
                 JSON.stringify(remark),
+                pin_code ?? existing.pin_code,
                 id
             ];
 

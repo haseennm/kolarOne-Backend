@@ -3,19 +3,34 @@ export interface CreateVendorBody {
   firm_id?: number[];
   vendor_name: string;
   email?: string | null;
-  phone_number?: string | null;
+  phone_number: string | null;
   alternate_phone?: string | null;
   address?: string | null;
-  gstin: string | null;
+  city?: string | null;
+  pincode?: string | null;
+  gstin?: string | null;
   pan?: string | null;
   state_code?: string | null;
   status: string;
-  created_by: string;
-  branch_id?:number;
+  supply_type?: string | null;
+  gst_treatment?: string | null;
+  remark?: string | null;
+  bank_acc_holder?: string | null;
+  bank_acc_number?: string | null;
+  ifsc?: string | null;
+  bank_name?: string | null;
+  branch_name?: string | null;
+  currency?: string | null;
+  payment_terms?: string | null;
+  opening_balance?: string | null;
+  created_by?: string | null;
+
+  // Not present in the schema, but included if your API expects it
+  branch_id?: number;
 }
 
 export interface CreateVendorParams
-  extends Omit<CreateVendorBody, "created_by" | "status"> {
+  extends Omit<CreateVendorBody, "created_by" | "status" | "remark"> {
   remark: object;
   statusCode: number;
 }
@@ -53,25 +68,43 @@ export type CountResult = {
 export interface EditVendorBody {
   id: string;
   company_id: number;
+  firm_id?: number[];
+
   vendor_name?: string;
   email?: string | null;
   phone_number?: string | null;
   alternate_phone?: string | null;
   address?: string | null;
+  city?: string | null;
+  pincode?: string | null;
 
   gstin?: string | null;
   pan?: string | null;
   state_code?: string | null;
 
-  status?: string | null;
+  status?: string;
 
-  remarks?: object | null;
+  supply_type?: string | null;
+  gst_treatment?: string | null;
+  remark?: string | null;
+
+  bank_acc_holder?: string | null;
+  bank_acc_number?: string | null;
+  ifsc?: string | null;
+  bank_name?: string | null;
+  branch_name?: string | null;
+
+  currency?: string | null;
+  payment_terms?: string | null;
+  opening_balance?: string | null;
+
+  branch_id?: number;
 
   updated_by: string;
 }
 
 export interface EditVendorParams
-  extends Omit<EditVendorBody, "updated_by" | "status" | "remarks"> {
+  extends Omit<EditVendorBody, "updated_by" | "status" | "remark"> {
   remark: object;
   statusCode?: number;
 }

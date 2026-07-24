@@ -12,6 +12,7 @@ export interface CreateCompanyBody {
   status: string;
   created_by: string;
   phone_number: string;
+  pin_code?: number | null;
   email?: string | null;
   website?: string | null;
   logo?: string | null;
@@ -43,7 +44,6 @@ export type CountResult = {
 }
 
 export interface EditCompanyBody {
-  id: number
   company_name?: string;
   bussiness_category?: string;
   tin_number?: string | null;
@@ -53,6 +53,8 @@ export interface EditCompanyBody {
   city?: string;
   district?: string;
   state?: string;
+  id: number
+  pin_code?: number
   state_code?: string;
   status: string;
   updated_by?: string;

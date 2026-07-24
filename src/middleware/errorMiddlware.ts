@@ -66,6 +66,20 @@ export const registerErrorHandler = (app: FastifyInstance) => {
           message = "Duplicate record already exists";
         }
       }
+      else if (error.code === "23514") {
+        statusCode = 400;
+
+        const constraintMap: Record<string, string> = {
+          chk_pan: "Invalid PAN format",
+          chk_gstin: "Invalid GSTIN format",
+          chk_email: "Invalid email address",
+          vendor_status_check: "Invalid status value",
+        };
+
+        message =
+          constraintMap[error.constraint] ??
+          "Input failed database validation";
+      }
       else if (error.code && typeof error.code === "string") {
         statusCode = 500;
         message = "Database operation failed";
