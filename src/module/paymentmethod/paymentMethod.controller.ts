@@ -82,7 +82,7 @@ export default class PaymentMethodController {
         tableRowId: result.data.id,
         action: "update",
         record: result.data,
-        changes: result.changes,
+        changes: {"payment method":result.changes},
       });
 
       return result;

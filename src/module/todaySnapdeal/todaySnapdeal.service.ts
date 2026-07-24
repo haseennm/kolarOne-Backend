@@ -231,27 +231,20 @@ export default class TodaySnapdealService {
     ]);
     return Number(rows[0]?.total || 0);
   }
-
-  // =========================================================
-  // PARTY BALANCE
-  // =========================================================
-
   private async getTodayBalanceTotal(
     scope: BusinessScope
   ): Promise<{ income: number; expense: number }> {
     const sql = `
-      SELECT
-        COALESCE(SUM(pt.amount), 0) AS total,
-        pb.flow
-      FROM payment_transactions pt
-      JOIN party_balance pb
-        ON pb.id = pt.ref_id
-      WHERE pt.ref_type = 'BL'
-        AND pt.status = 5
-        AND DATE(pt.created_at) = CURRENT_DATE
-        AND ${this.buildBusinessCondition()}
-      GROUP BY pb.flow
-    `;
+          SELECT
+              COALESCE(SUM(pt.amount), 0) AS total,
+              pt.payment_flow
+          FROM payment_transactions pt
+          WHERE pt.ref_type IN ('PT', 'ST')
+              AND pt.status = 5
+              AND DATE(pt.created_at) = CURRENT_DATE
+              AND ${this.buildBusinessCondition()}
+          GROUP BY pt.payment_flow
+          `;
 
     const rows = await query<BalanceRow>(sql, [
       scope.companyIds,

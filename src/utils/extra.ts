@@ -365,7 +365,6 @@ const TABLE_MAP: Record<string, string> = {
   partner_capital_ledger: "PCLG",
   partner_profit_shares: "PPFS",
   partners_info: "PINF",
-  party_balance: "PTBL",
   payment_methods: "PMTH",
   payment_transactions: "PTRN",
   product_categories: "PCAT",

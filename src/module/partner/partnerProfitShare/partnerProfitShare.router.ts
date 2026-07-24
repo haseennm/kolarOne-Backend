@@ -85,6 +85,7 @@ export async function profitShareRouter(app: FastifyInstance) {
       {
         body: {
           type: "object",
+          required: ["entity_id", "entity_type"],
           properties: {
             partner_id: { type: "string" },
             partner_name: { type: "string" },

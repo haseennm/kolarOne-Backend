@@ -14,7 +14,6 @@ const TABLES = [
     'purchase_return',
 
     'payment_transactions',
-    'party_balance',
 
     'stock',
     'ledger_transactions',

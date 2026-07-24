@@ -96,7 +96,7 @@ export function buildJournalMessage(tableName: string, action: "create" | "updat
   const productName = getRecordValue(record, ["product_name", "name", "product"]);
   const categoryName = getRecordValue(record, ["category_name", "name"]);
   const invoiceNo = getRecordValue(record, ["invoice_no", "invoice_number", "invoice", "bill_number", "return_number"]);
-  const amount = getRecordValue(record, ["totalPayAmount","amount", "loan_amount", "salary_amount", "pay_amount", "final_amount"]);
+  const amount = getRecordValue(record, ["totalPayAmount", "amount", "loan_amount", "salary_amount", "pay_amount", "final_amount"]);
   const branchName = getRecordValue(record, ["branch_name"]);
   const vendorName = getRecordValue(record, ["vendor_name"]);
   const customerName = getRecordValue(record, ["customer_name", "full_name"]);
@@ -229,7 +229,7 @@ export function buildJournalMessage(tableName: string, action: "create" | "updat
           ? `Purchase invoice "${invoiceNo ?? ""}" updated. Amount: ${amount ?? 0}.`
           : `Purchase invoice "${invoiceNo ?? ""}" deleted. Amount: ${amount ?? 0}.`;
     case "purchase_return":
-       if (action === "repay") {
+      if (action === "repay") {
         return `Repayment of ${amount ?? 0} recorded for Purchase return invoice "${invoiceNo ?? ""}".`;
       }
       return action === "create"
@@ -244,7 +244,7 @@ export function buildJournalMessage(tableName: string, action: "create" | "updat
           ? `Quotation "${quotationNo ?? ""}" updated.`
           : `Quotation "${quotationNo ?? ""}" deleted.`;
     case "rent_bills":
-       if (action === "repay") {
+      if (action === "repay") {
         return `Repayment of ${amount ?? 0} recorded for rent invoice "${invoiceNo ?? ""}".`;
       }
       return action === "create"
@@ -275,7 +275,7 @@ export function buildJournalMessage(tableName: string, action: "create" | "updat
         ? `Salary confirmed for "${staffName ?? ""}". Amount: ${salaryAmount ?? 0}.`
         : `Salary confirmed for "${staffName ?? ""}". Amount: ${salaryAmount ?? 0}.`;
     case "sales":
-       if (action === "repay") {
+      if (action === "repay") {
         return `Repayment of ${amount ?? 0} recorded for sale invoice "${invoiceNo ?? ""}".`;
       }
       return action === "create"
@@ -284,7 +284,7 @@ export function buildJournalMessage(tableName: string, action: "create" | "updat
           ? `Sale invoice "${invoiceNo ?? ""}" updated. Amount: ${amount ?? 0}.`
           : `Sale invoice "${invoiceNo ?? ""}" deleted. Amount: ${amount ?? 0}.`;
     case "sale_returns":
-       if (action === "repay") {
+      if (action === "repay") {
         return `Repayment of ${amount ?? 0} recorded for sale return invoice "${invoiceNo ?? ""}".`;
       }
       return action === "create"
@@ -305,13 +305,6 @@ export function buildJournalMessage(tableName: string, action: "create" | "updat
         : action === "update"
           ? `Loan for "${staffName ?? ""}" updated. Amount: ${loanAmount ?? 0}.`
           : `Loan of ${loanAmount ?? 0} for "${staffName ?? ""}" deleted.`;
-    case "party_balances":
-      if (action === "repay") return `Party balance repayment of ${balanceAmount ?? amount ?? 0} recorded for "${partyName ?? customerName ?? partnerName ?? staffName ?? ""}".`;
-      return action === "create"
-        ? `Party balance entry created for "${partyName ?? customerName ?? partnerName ?? staffName ?? ""}".`
-        : action === "update"
-          ? `Party balance entry updated for "${partyName ?? customerName ?? partnerName ?? staffName ?? ""}".`
-          : `Party balance entry deleted for "${partyName ?? customerName ?? partnerName ?? staffName ?? ""}".`;
     case "stock_adjustments":
       return action === "create"
         ? `Stock adjustment recorded for "${productName ?? ""}". Quantity: ${quantity ?? 0}.`
