@@ -121,57 +121,7 @@ export class RentService {
 
     return existingRemarks;
   }
-  //     private appendBillRemark(
-  //   remarks: any[] | null,
-  //   action: string,
-  //   data: Record<string, any> = {}
-  // ) {
-  //   const existingRemarks = Array.isArray(remarks)
-  //     ? remarks
-  //     : [];
 
-  //   existingRemarks.push({
-  //     action,
-  //     at: new Date().toISOString(),
-  //     ...data
-  //   });
-
-  //   return existingRemarks;
-  // }
-  //    private appendBillItemRemark(
-  //   remarks: any[] | null,
-  //   action: string,
-  //   data: Record<string, any> = {}
-  // ) {
-  //   const existingRemarks = Array.isArray(remarks)
-  //     ? remarks
-  //     : [];
-
-  //   existingRemarks.push({
-  //     action,
-  //     at: new Date().toISOString(),
-  //     ...data
-  //   });
-
-  //   return existingRemarks;
-  // }
-  //     private appendLedgerRemark(
-  //   remarks: any[] | null,
-  //   action: string,
-  //   data: Record<string, any> = {}
-  // ) {
-  //   const existingRemarks = Array.isArray(remarks)
-  //     ? remarks
-  //     : [];
-
-  //   existingRemarks.push({
-  //     action,
-  //     at: new Date().toISOString(),
-  //     ...data
-  //   });
-
-  //   return existingRemarks;
-  // }
   private async validateAdvanceBalance(
     ledger_id: number,
     amount: number,
@@ -853,6 +803,12 @@ export class RentService {
       }
     );
     let data: QueryResult;
+      const allReturned =
+      await this.checkAllItemsReturned(
+        bill_id,
+        client
+      );
+
     if (discount === false) {
       data = await executeInTransaction(
         client,
@@ -860,14 +816,16 @@ export class RentService {
       UPDATE rent_bills
       SET
         total_paid = total_paid - $1,
-        remarks = $2
-      WHERE id = $3
-      AND branch_id =$4
+        remarks = $2,
+        status =$3
+      WHERE id = $4
+      AND branch_id =$5
       RETURNING *
       `,
         [
           amount,
           JSON.stringify(updatedRemarks),
+          this.getRentBillStatus(allReturned,rent_bill.total_paid-amount,rent_bill.total_amount),
           bill_id,
           branch_id
         ]
@@ -880,14 +838,16 @@ export class RentService {
       SET
         total_paid = total_paid - $1,
         total_amount = total_amount - $1,
-        remarks = $2
-      WHERE id = $3
-      AND branch_id =$4
+        remarks = $2,
+     status =$3
+      WHERE id = $4
+      AND branch_id =$5
       RETURNING *
       `,
         [
           amount,
           JSON.stringify(updatedRemarks),
+          this.getRentBillStatus(allReturned,rent_bill.total_paid-amount,rent_bill.total_amount - amount),
           bill_id,
           branch_id
         ]

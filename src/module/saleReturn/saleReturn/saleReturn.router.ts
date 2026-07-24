@@ -297,7 +297,6 @@ export async function saleReturnRouter(app: FastifyInstance) {
       request: FastifyRequest<{ Body: SaleReturnDeleteBody }>,
       reply: FastifyReply
     ) => {
-      try {
         const controller = new SaleReturnController();
         const data = await controller.saleReturnDelete(request.body);
 
@@ -305,14 +304,6 @@ export async function saleReturnRouter(app: FastifyInstance) {
           status: "success",
           message: data
         });
-      } catch (error) {
-        request.log.error(error);
-
-        return reply.status(500).send({
-          status: "error",
-          message: "Internal Server Error"
-        });
-      }
     }
   );
 

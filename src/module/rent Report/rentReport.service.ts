@@ -257,182 +257,197 @@ export class ReportService {
       return finalResponse;
     });
   }
-  async getProductWiseRentReport(data: { company_id: number; branch_id?: number; level: "company" | "branch" }) {
-    const { company_id, branch_id, level } = data;
+ async getProductWiseRentReport(data: { company_id: number; branch_id?: number; level: "company" | "branch" }) {
+  const { company_id, branch_id, level } = data;
 
-    return transaction(async (client) => {
-      const statusDamaged = getStatusCode("Damaged");
-      const statusMissing = getStatusCode("Miss");
+  return transaction(async (client) => {
+    // 1. Safe fallback status codes to avoid SQL syntax invalidation
+    const statusDamaged = getStatusCode("Damaged") ?? 0;
+    const statusMissing = getStatusCode("Miss") ?? 0;
 
-      let queryArgs: any[] = [];
-      let branchCondition = "";
+    // 2. Validate input parameters to prevent filtering by $1 = undefined
+    let queryArgs: any[] = [];
+    let branchCondition = "";
 
-      if (level === "branch") {
-        queryArgs.push(branch_id);
-        branchCondition = `AND rb.branch_id = $${queryArgs.length}`;
-      } else {
-        queryArgs.push(company_id);
-        branchCondition = `AND b.company_id = $${queryArgs.length}`;
+    if (level === "branch") {
+      if (!branch_id) {
+        throw new AppError("branch_id is required when level is 'branch'", 400);
+      }
+      queryArgs.push(Number(branch_id));
+      branchCondition = `AND rb.branch_id = $${queryArgs.length}`;
+    } else {
+      if (!company_id) {
+        throw new AppError("company_id is required when level is 'company'", 400);
+      }
+      queryArgs.push(Number(company_id));
+      branchCondition = `AND b.company_id = $${queryArgs.length}`;
+    }
+
+    // 3. Query using LEFT JOINs & COALESCE to safely fallback product IDs
+    const query = `
+      SELECT 
+        COALESCE(rbi.product_id, rs.product_id, 0) as product_id,
+        COALESCE(p.name, 'Unknown Product') AS product_name,
+        rs.stock_type,
+        COALESCE(rs.hourly_rate, 0) as hourly_rate,
+        COALESCE(rs.daily_rate, 0) as daily_rate,
+        b.id as branch_id,
+        COALESCE(b.branch_name, 'Unknown Branch') as branch_name,
+        COALESCE(rbi.quantity_taken, 0) as quantity_taken,
+        COALESCE(rbi.returned_qty, 0) as returned_qty,
+        COALESCE(rbi.amount, 0) as item_revenue,
+        rb.start_date as created_at,
+        
+        COALESCE((
+          SELECT SUM(ls.quantity) 
+          FROM loss_stocks ls 
+          WHERE ls.rent_stock_id = rbi.rent_stock_id 
+          AND ls.status IN (${statusDamaged}, ${statusMissing})
+        ), 0) as units_lost,
+        
+        COALESCE((
+          SELECT SUM(ls.amount) 
+          FROM loss_stocks ls 
+          WHERE ls.rent_stock_id = rbi.rent_stock_id 
+          AND ls.status IN (${statusDamaged}, ${statusMissing})
+        ), 0) as penalty_charged,
+        
+        COALESCE((
+          SELECT SUM(ls.paid) 
+          FROM loss_stocks ls 
+          WHERE ls.rent_stock_id = rbi.rent_stock_id 
+          AND ls.status IN (${statusDamaged}, ${statusMissing})
+        ), 0) as penalty_collected
+
+      FROM rent_bill_items rbi
+      JOIN rent_bills rb ON rbi.bill_id = rb.id
+      LEFT JOIN rental_stocks rs ON rbi.rent_stock_id = rs.id
+      LEFT JOIN products p ON COALESCE(rbi.product_id, rs.product_id) = p.id
+      LEFT JOIN branches b ON rb.branch_id = b.id
+      WHERE 1=1 ${branchCondition}
+    `;
+
+    const result = await executeInTransaction(client, query, queryArgs);
+    const rows = result.rows || [];
+
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth();
+    const curDay = now.getDate();
+
+    const productMap: Record<string, any> = {};
+    const branchMap: Record<string, any> = {};
+
+    let gRented = 0, gRevenue = 0, gLost = 0;
+    let gToday = { units_rented: 0, revenue: 0 };
+    let gMonth = { units_rented: 0, revenue: 0 };
+    let gYear = { units_rented: 0, revenue: 0 };
+
+    rows.forEach(row => {
+      const pId = row.product_id;
+      const qty = Number(row.quantity_taken || 0);
+      const rev = Number(row.item_revenue || 0);
+      const lost = Number(row.units_lost || 0);
+      const txDate = new Date(row.created_at);
+
+      const isToday = txDate.getFullYear() === curYear && txDate.getMonth() === curMonth && txDate.getDate() === curDay;
+      const isMonth = txDate.getFullYear() === curYear && txDate.getMonth() === curMonth;
+      const isYear = txDate.getFullYear() === curYear;
+
+      // 1. Core Product Aggregation
+      if (!productMap[pId]) {
+        productMap[pId] = {
+          product_id: pId,
+          product_name: row.product_name,
+          stock_type: row.stock_type,
+          hourly_rate: Number(row.hourly_rate || 0),
+          daily_rate: Number(row.daily_rate || 0),
+          total_units_rented: 0, 
+          total_units_returned: 0, 
+          total_units_lost: 0,
+          total_revenue: 0, 
+          total_loss_penalty_charged: 0, 
+          total_loss_collected: 0,
+          today: { units_rented: 0, revenue: 0 },
+          this_month: { units_rented: 0, revenue: 0 },
+          this_year: { units_rented: 0, revenue: 0 }
+        };
       }
 
-      const query = `
-        SELECT 
-          p.id as product_id,
-          p.name AS product_name,
-          rs.stock_type,
-          rs.hourly_rate,
-          rs.daily_rate,
-          b.id as branch_id,
-          b.branch_name,
-          rbi.quantity_taken,
-          rbi.returned_qty,
-          rbi.amount as item_revenue, -- Updated here to target your newly added amount column
-          rb.start_date as created_at,
-          
-          COALESCE((
-            SELECT SUM(ls.quantity) 
-            FROM loss_stocks ls 
-            WHERE ls.rent_stock_id = rbi.rent_stock_id 
-            AND ls.status IN (${statusDamaged}, ${statusMissing})
-          ), 0) as units_lost,
-          
-          COALESCE((
-            SELECT SUM(ls.amount) 
-            FROM loss_stocks ls 
-            WHERE ls.rent_stock_id = rbi.rent_stock_id 
-            AND ls.status IN (${statusDamaged}, ${statusMissing})
-          ), 0) as penalty_charged,
-          
-          COALESCE((
-            SELECT SUM(ls.paid) 
-            FROM loss_stocks ls 
-            WHERE ls.rent_stock_id = rbi.rent_stock_id 
-            AND ls.status IN (${statusDamaged}, ${statusMissing})
-          ), 0) as penalty_collected
+      const p = productMap[pId];
+      p.total_units_rented += qty;
+      p.total_units_returned += Number(row.returned_qty || 0);
+      p.total_units_lost += lost;
+      p.total_revenue += rev;
+      p.total_loss_penalty_charged += Number(row.penalty_charged || 0);
+      p.total_loss_collected += Number(row.penalty_collected || 0);
 
-        FROM rent_bill_items rbi
-        JOIN rent_bills rb ON rbi.bill_id = rb.id
-        JOIN products p ON rbi.product_id = p.id
-        JOIN rental_stocks rs ON rbi.rent_stock_id = rs.id
-        JOIN branches b ON rb.branch_id = b.id
-        WHERE 1=1 ${branchCondition}
-      `;
+      if (isToday) { p.today.units_rented += qty; p.today.revenue += rev; }
+      if (isMonth) { p.this_month.units_rented += qty; p.this_month.revenue += rev; }
+      if (isYear) { p.this_year.units_rented += qty; p.this_year.revenue += rev; }
 
-      const result = await executeInTransaction(client, query, queryArgs);
-      const rows = result.rows;
+      // 2. Master Global Aggregations
+      gRented += qty;
+      gRevenue += rev;
+      gLost += lost;
+      if (isToday) { gToday.units_rented += qty; gToday.revenue += rev; }
+      if (isMonth) { gMonth.units_rented += qty; gMonth.revenue += rev; }
+      if (isYear) { gYear.units_rented += qty; gYear.revenue += rev; }
 
-      const now = new Date();
-      const curYear = now.getFullYear();
-      const curMonth = now.getMonth();
-      const curDay = now.getDate();
-
-      const productMap: Record<string, any> = {};
-      const branchMap: Record<string, any> = {};
-
-      let gRented = 0, gRevenue = 0, gLost = 0;
-      let gToday = { units_rented: 0, revenue: 0 };
-      let gMonth = { units_rented: 0, revenue: 0 };
-      let gYear = { units_rented: 0, revenue: 0 };
-
-      rows.forEach(row => {
-        const qty = Number(row.quantity_taken || 0);
-        const rev = Number(row.item_revenue || 0);
-        const lost = Number(row.units_lost || 0);
-        const txDate = new Date(row.created_at);
-
-        const isToday = txDate.getFullYear() === curYear && txDate.getMonth() === curMonth && txDate.getDate() === curDay;
-        const isMonth = txDate.getFullYear() === curYear && txDate.getMonth() === curMonth;
-        const isYear = txDate.getFullYear() === curYear;
-
-        // 1. Core Product Aggregation
-        if (!productMap[row.product_id]) {
-          productMap[row.product_id] = {
-            product_id: row.product_id,
-            product_name: row.product_name,
-            stock_type: row.stock_type,
-            hourly_rate: Number(row.hourly_rate || 0),
-            daily_rate: Number(row.daily_rate || 0),
-            total_units_rented: 0, total_units_returned: 0, total_units_lost: 0,
-            total_revenue: 0, total_loss_penalty_charged: 0, total_loss_collected: 0,
-            today: { units_rented: 0, revenue: 0 },
-            this_month: { units_rented: 0, revenue: 0 },
-            this_year: { units_rented: 0, revenue: 0 }
+      // 3. Branch Specific Hierarchies (Company Level View)
+      if (level === "company") {
+        const bId = row.branch_id;
+        if (!branchMap[bId]) {
+          branchMap[bId] = {
+            branch_id: bId,
+            branch_name: row.branch_name,
+            total_units_rented: 0,
+            total_revenue: 0,
+            today_summary: { units_rented: 0, revenue: 0 },
+            month_summary: { units_rented: 0, revenue: 0 },
+            year_summary: { units_rented: 0, revenue: 0 },
+            products: {}
           };
         }
 
-        const p = productMap[row.product_id];
-        p.total_units_rented += qty;
-        p.total_units_returned += Number(row.returned_qty || 0);
-        p.total_units_lost += lost;
-        p.total_revenue += rev;
-        p.total_loss_penalty_charged += Number(row.penalty_charged || 0);
-        p.total_loss_collected += Number(row.penalty_collected || 0);
+        const b = branchMap[bId];
+        b.total_units_rented += qty;
+        b.total_revenue += rev;
 
-        if (isToday) { p.today.units_rented += qty; p.today.revenue += rev; }
-        if (isMonth) { p.this_month.units_rented += qty; p.this_month.revenue += rev; }
-        if (isYear) { p.this_year.units_rented += qty; p.this_year.revenue += rev; }
+        if (isToday) { b.today_summary.units_rented += qty; b.today_summary.revenue += rev; }
+        if (isMonth) { b.month_summary.units_rented += qty; b.month_summary.revenue += rev; }
+        if (isYear) { b.year_summary.units_rented += qty; b.year_summary.revenue += rev; }
 
-        // 2. Master Global Aggregations
-        gRented += qty;
-        gRevenue += rev;
-        gLost += lost;
-        if (isToday) { gToday.units_rented += qty; gToday.revenue += rev; }
-        if (isMonth) { gMonth.units_rented += qty; gMonth.revenue += rev; }
-        if (isYear) { gYear.units_rented += qty; gYear.revenue += rev; }
-
-        // 3. Branch Specific Hierarchies (Company Level View)
-        if (level === "company") {
-          if (!branchMap[row.branch_id]) {
-            branchMap[row.branch_id] = {
-              branch_id: row.branch_id,
-              branch_name: row.branch_name,
-              total_units_rented: 0,
-              total_revenue: 0,
-              today_summary: { units_rented: 0, revenue: 0 },
-              month_summary: { units_rented: 0, revenue: 0 },
-              year_summary: { units_rented: 0, revenue: 0 },
-              products: {}
-            };
-          }
-
-          const b = branchMap[row.branch_id];
-          b.total_units_rented += qty;
-          b.total_revenue += rev;
-
-          if (isToday) { b.today_summary.units_rented += qty; b.today_summary.revenue += rev; }
-          if (isMonth) { b.month_summary.units_rented += qty; b.month_summary.revenue += rev; }
-          if (isYear) { b.year_summary.units_rented += qty; b.year_summary.revenue += rev; }
-
-          if (!b.products[row.product_id]) {
-            b.products[row.product_id] = {
-              product_id: row.product_id,
-              product_name: row.product_name,
-              units_rented: 0,
-              revenue: 0
-            };
-          }
-          b.products[row.product_id].units_rented += qty;
-          b.products[row.product_id].revenue += rev;
+        if (!b.products[pId]) {
+          b.products[pId] = {
+            product_id: pId,
+            product_name: row.product_name,
+            units_rented: 0,
+            revenue: 0
+          };
         }
-      });
-
-      return {
-        summary: {
-          total_units_rented: gRented,
-          total_revenue: gRevenue,
-          total_units_lost: gLost,
-          today_summary: gToday,
-          month_summary: gMonth,
-          year_summary: gYear
-        },
-        products_data: Object.values(productMap),
-        branch_wise: level === "company" ? Object.values(branchMap).map((b: any) => ({
-          ...b,
-          products: Object.values(b.products)
-        })) : undefined
-      };
+        b.products[pId].units_rented += qty;
+        b.products[pId].revenue += rev;
+      }
     });
-  }
+
+    return {
+      summary: {
+        total_units_rented: gRented,
+        total_revenue: gRevenue,
+        total_units_lost: gLost,
+        today_summary: gToday,
+        month_summary: gMonth,
+        year_summary: gYear
+      },
+      products_data: Object.values(productMap),
+      branch_wise: level === "company" ? Object.values(branchMap).map((b: any) => ({
+        ...b,
+        products: Object.values(b.products)
+      })) : undefined
+    };
+  });
+}
   private buildBranchCondition(level: string, company_id: number, branch_id?: number, queryArgs: any[] = []): { condition: string, args: any[] } {
     let condition = "";
     if (level === "branch") {
@@ -713,7 +728,7 @@ export class ReportService {
     const { branch_id, month, year } = data;
     return transaction(async (client) => {
 
-     const result= await executeInTransaction(client,
+      const result = await executeInTransaction(client,
         `
     WITH daily_transactions AS (
       SELECT

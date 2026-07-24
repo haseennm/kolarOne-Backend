@@ -628,7 +628,7 @@ export default class SaleReturnController {
   }
   async saleReturnDelete(data: SaleReturnDeleteBody) {
     const { branch_id, deleted_by, ...rest } = data
-    transaction(async (client) => {
+    return transaction(async (client) => {
 
       const remark = {
         action: `Deleted sale return`,
@@ -666,18 +666,12 @@ export default class SaleReturnController {
         entityId: saleReturn.id,
         entityType: "F",
         companyId: saleReturn.company_id,
-        tableName: "saleReturn",
+        tableName: "sale_return",
         tableRowId: saleReturn.id,
         action: "delete",
         record: saleReturn,
       });
-      // await partyBalanceService.deletePartyBalance(
-      //   {
-      //     delete_by: deleted_by, firm_id: rest.firm_id, sale_return_id: rest.id
-      //   },
-      //   client
-      // );
-      payment_transactions_service.deletePaymentTransaction({
+      await payment_transactions_service.deletePaymentTransaction({
         company_id: saleReturn.company_id,
         ref_id: rest.id,
         ref_type: PaymentTransactionTypeCodeMap["sale_return"],

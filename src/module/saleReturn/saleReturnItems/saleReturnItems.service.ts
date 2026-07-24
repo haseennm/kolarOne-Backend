@@ -360,7 +360,7 @@ export default class SaleReturnItemService {
       `SELECT * FROM sale_return_items WHERE sale_return_id =$1 AND firm_id= $2`,
       [sale_return_id, firm_id]
     )
-    if (isItemExist) {
+    if (!isItemExist) {
       throw new AppError("Sale item not found for this Sale", 404)
     }
     const deleteQuery = `

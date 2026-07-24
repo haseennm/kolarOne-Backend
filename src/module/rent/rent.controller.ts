@@ -55,11 +55,11 @@ export class RentController {
       const bill = await this.rentService.payBill(body, client);
       await emitAuditJournal({
         client,
-        entityId: bill.data.branch_id,
+        entityId: body.branch_id,
         entityType: "B",
         companyId: body.company_id,
         tableName: "rent_bills",
-        tableRowId: bill.data.id,
+        tableRowId: body.bill_id,
         action: "repay",
         record: bill.data
       });

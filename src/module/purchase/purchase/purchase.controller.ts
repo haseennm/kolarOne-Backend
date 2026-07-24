@@ -415,58 +415,117 @@ export default class PurchaseController {
     };
   }
   async purchaseDelete(data: PurchaseDeleteBody) {
-    const { deleted_by, ...rest } = data
-    transaction(async (client) => {
+  const { deleted_by, ...rest } = data;
 
-      const remark = {
-        action: `Deleted purchase`,
-        deleted_by,
-        created_at: Date.now(),
-      };
-      const purchaseService = new PurchaseService();
-      const itemService = new PurchaseItemController();
-      const stockService = new StockController();
-      // const partyBalanceService = new PartyBalanceController();
-      const payment_transactions_service = new PaymentTransactionService()
+  return await transaction(async (client) => {
+    const remark = {
+      action: "Deleted purchase",
+      deleted_by,
+      created_at: Date.now(),
+    };
 
-      const purchase = await purchaseService.deletePurchase({ remark, ...rest }, client);
-      await itemService.deletePurchaseItem(
-        {
-          purchase_id: rest.id,
-          firm_id: rest.firm_id,
-        },
-        client
-      );
-      await stockService.deleteStock(
-        {
-          purchase_id: rest.id,
-          firm_id: rest.firm_id,
-        },
-        client
-      );
-      // await partyBalanceService.deletePartyBalance(
-      //   {
-      //     delete_by: deleted_by, firm_id: rest.firm_id, purchase_id: rest.id
-      //   },
-      //   client
-      // );
-      await payment_transactions_service.deletePaymentTransaction({
+    const purchaseService = new PurchaseService();
+    const itemService = new PurchaseItemController();
+    const stockService = new StockController();
+    const payment_transactions_service = new PaymentTransactionService();
+
+    const purchase = await purchaseService.deletePurchase(
+      { remark, ...rest },
+      client
+    );
+
+    await itemService.deletePurchaseItem(
+      {
+        purchase_id: rest.id,
+        firm_id: rest.firm_id,
+      },
+      client
+    );
+
+    await stockService.deleteStock(
+      {
+        purchase_id: rest.id,
+        firm_id: rest.firm_id,
+      },
+      client
+    );
+
+    await payment_transactions_service.deletePaymentTransaction(
+      {
         company_id: purchase.company_id,
         ref_id: rest.id,
         ref_type: PaymentTransactionTypeCodeMap["purchase"],
-      }, client)
-      await emitAuditJournal({
-        client,
-        entityId: rest.firm_id,
-        entityType: "F",
-        companyId: purchase.company_id,
-        tableName: "purchases",
-        tableRowId: purchase.id,
-        action: "delete",
-        record: purchase,
-      });
+      },
+      client
+    );
 
-      return "purchase deleted successfully"
-    })
-  }
+    await emitAuditJournal({
+      client,
+      entityId: rest.firm_id,
+      entityType: "F",
+      companyId: purchase.company_id,
+      tableName: "purchases",
+      tableRowId: purchase.id,
+      action: "delete",
+      record: purchase,
+    });
+
+    return "purchase deleted successfully";
+  });
+}
+  // async purchaseDelete(data: PurchaseDeleteBody) {
+  //   const { deleted_by, ...rest } = data
+  //   transaction(async (client) => {
+
+  //     const remark = {
+  //       action: `Deleted purchase`,
+  //       deleted_by,
+  //       created_at: Date.now(),
+  //     };
+  //     const purchaseService = new PurchaseService();
+  //     const itemService = new PurchaseItemController();
+  //     const stockService = new StockController();
+  //     // const partyBalanceService = new PartyBalanceController();
+  //     const payment_transactions_service = new PaymentTransactionService()
+
+  //     const purchase = await purchaseService.deletePurchase({ remark, ...rest }, client);
+  //     await itemService.deletePurchaseItem(
+  //       {
+  //         purchase_id: rest.id,
+  //         firm_id: rest.firm_id,
+  //       },
+  //       client
+  //     );
+  //     await stockService.deleteStock(
+  //       {
+  //         purchase_id: rest.id,
+  //         firm_id: rest.firm_id,
+  //       },
+  //       client
+  //     );
+  //     // await partyBalanceService.deletePartyBalance(
+  //     //   {
+  //     //     delete_by: deleted_by, firm_id: rest.firm_id, purchase_id: rest.id
+  //     //   },
+  //     //   client
+  //     // );
+  //     await payment_transactions_service.deletePaymentTransaction({
+  //       company_id: purchase.company_id,
+  //       ref_id: rest.id,
+  //       ref_type: PaymentTransactionTypeCodeMap["purchase"],
+  //     }, client)
+  //     await emitAuditJournal({
+  //       client,
+  //       entityId: rest.firm_id,
+  //       entityType: "F",
+  //       companyId: purchase.company_id,
+  //       tableName: "purchases",
+  //       tableRowId: purchase.id,
+  //       action: "delete",
+  //       record: purchase,
+  //     });
+
+  //     return "purchase deleted successfully"
+  //   })
+  // }
 }

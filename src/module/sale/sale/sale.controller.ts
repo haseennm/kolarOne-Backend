@@ -573,7 +573,7 @@ export default class SaleController {
   }
   async saleDelete(data: SaleDeleteBody) {
     const { deleted_by, branch_id, ...rest } = data
-    transaction(async (client) => {
+   return transaction(async (client) => {
 
       const remark = {
         action: `Deleted purchase`,

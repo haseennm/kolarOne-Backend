@@ -704,11 +704,12 @@ OFFSET $${values.length + 2}
     SELECT 1
     FROM stock s
     JOIN sales_items si ON si.stock_id = s.id
-    WHERE s.purchase_id = $1
+    WHERE s.purchase_id = $1 
       AND s.firm_id = $2
+      AND si.status !=$3
     LIMIT 1
     `,
-      [id, firm_id]
+      [id, firm_id,getStatusCode("Deleted")]
     );
 
     if (stockUsedInSales.rows.length > 0) {

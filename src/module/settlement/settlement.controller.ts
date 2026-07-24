@@ -78,7 +78,7 @@ export default class SettlementController {
       }
       // 4. Phase 2: Directional Cash Distribution Engine
 
-      const netSystemDue = currentPurchaseDue + currentReturnDue;  const isIncomeFlow = netSystemDue < 0;
+      const netSystemDue = currentPurchaseDue + currentReturnDue; const isIncomeFlow = netSystemDue < 0;
       let remainingCash = totalExternalPayment;
       if (remainingCash > 0) {
         if (isIncomeFlow) {
@@ -240,7 +240,7 @@ export default class SettlementController {
 
       // Sanitize and cap initial DB inputs so bad DB state doesn't crash calculations
       let salePaid = sale ? Math.min(saleFinal, Math.max(0, Number(sale.paid))) : 0;
-      let returnRefund = saleReturn ? Math.min(returnFinal, Math.max(0, Number(sale.paid_amount))) : 0;
+      let returnRefund = saleReturn ? Math.min(returnFinal, Math.max(0, Number(sale.paid))) : 0;
 
       let saleDue = Math.max(0, saleFinal - salePaid);
       let returnDue = Math.max(0, returnFinal - returnRefund);
@@ -282,10 +282,9 @@ export default class SettlementController {
         }
       }
 
-      // Ensure final values never exceed final amounts
       salePaid = Math.min(saleFinal, salePaid);
       returnRefund = Math.min(returnFinal, returnRefund);
-
+      console.log(`returnRefund ${returnRefund} returnFinal ${returnFinal}, returnRefund ${returnRefund})`)
       // 4. Update Sales Table
       if (sale) {
         const status = billStatus(sale.final_amount, salePaid);

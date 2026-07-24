@@ -192,7 +192,7 @@ export default class LedgerTransactionController {
       role: staff.role,
       id: staff.id,
       entity_type: convertEntityCode(staff.entity_type) ?? staff.entity_type,
-      entity_id: staff.transferred_entity_id || staff.entity_id,
+      entity_id: staff.transfer_entity_id || staff.entity_id,
       company_id: staff.company_id,
       message: `staff ${staff.full_name} Login success`
     }

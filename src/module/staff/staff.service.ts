@@ -611,7 +611,7 @@ export default class StaffService {
       const updateQuery = `
     UPDATE staff
     SET
-      transferred_entity_id = COALESCE($1, transferred_entity_id),
+      transfer_entity_id = COALESCE($1, transfer_entity_id),
       remarks =
         CASE
           WHEN remarks IS NULL THEN $2::jsonb
@@ -619,7 +619,7 @@ export default class StaffService {
             THEN remarks || $2::jsonb
           ELSE jsonb_build_array(remarks) || $2::jsonb
         END
-    WHERE id = $3 AND company_id =$4 AND transferred_entity_id =$5
+    WHERE id = $3 AND company_id =$4 AND transfer_entity_id =$5
     RETURNING *;
   `;
 
@@ -658,7 +658,7 @@ export default class StaffService {
         const updateQuery = `
     UPDATE staff
     SET
-      transferred_entity_id = COALESCE($1, transferred_entity_id),
+      transfer_entity_id = COALESCE($1, transfer_entity_id),
       remarks =
         CASE
           WHEN remarks IS NULL THEN $2::jsonb
