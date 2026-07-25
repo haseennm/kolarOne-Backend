@@ -1,10 +1,9 @@
 import * as crypto from 'crypto';
+import { env } from './env';
 
 // Ensure you have a 32-byte (64 hex characters) key in your environment variables
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '64_HEX_CHARACTERS_LONG_SECRET_KEY_GOES_HERE';
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // Standard for GCM
-const AUTH_TAG_LENGTH = 16;
 
 export class Cryption {
   encrypt(data: any): string {
@@ -13,11 +12,14 @@ export class Cryption {
 
     // 2. Generate a random Initialization Vector (IV) for uniqueness
     const iv = crypto.randomBytes(IV_LENGTH);
-
+    if (!env.ENCRIPTION_KEY) {
+      throw new Error('ENCRIPTION_KEY is not defined in environment variables.');
+    }
+    const enc_key = env.ENCRIPTION_KEY
     // 3. Create the cipher
     const cipher = crypto.createCipheriv(
       ALGORITHM,
-      Buffer.from(ENCRYPTION_KEY, 'hex'),
+      Buffer.from(enc_key, 'hex'),
       iv
     ) as crypto.CipherGCM;
 
@@ -41,11 +43,14 @@ export class Cryption {
 
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
-
+    if (!env.ENCRIPTION_KEY) {
+      throw new Error('ENCRIPTION_KEY is not defined in environment variables.');
+    }
+    const enc_key = env.ENCRIPTION_KEY
     // 2. Create the decipher
     const decipher = crypto.createDecipheriv(
       ALGORITHM,
-      Buffer.from(ENCRYPTION_KEY, 'hex'),
+      Buffer.from(enc_key, 'hex'),
       iv
     ) as crypto.DecipherGCM;
 

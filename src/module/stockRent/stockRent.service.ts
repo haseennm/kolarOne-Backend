@@ -103,7 +103,7 @@ export default class StockRentalService {
           ]
         );
 
-        insertedRows.push(rows[0]);
+        insertedRows.push({...rows[0],product_name : isproductExist.name});
       }
 
       return {

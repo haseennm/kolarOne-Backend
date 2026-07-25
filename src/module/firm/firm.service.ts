@@ -31,7 +31,8 @@ export default class FirmService {
       pan_number,
       hashed,
       username,
-      role
+      role,
+      category
     } = data;
     const result = transaction(async (client) => {
 
@@ -62,11 +63,12 @@ export default class FirmService {
     firm_code,
     password,
     username,
-    role
+    role,
+    category
     )
      VALUES (
   $1,$2,$3,$4,$5,$6,$7,$8,
-  $9,$10,$11,$12,$13,$14,$15
+  $9,$10,$11,$12,$13,$14,$15,$16
 )
     RETURNING *;
   `;
@@ -86,7 +88,8 @@ export default class FirmService {
         firm_code,
         hashed,
         username,
-        role
+        role,
+        category
       ];
 
       const { rows } = await executeInTransaction(client, queryText, values);
@@ -184,6 +187,7 @@ export default class FirmService {
       firm_name,
       firm_code,
       role,
+      category,
       company_id
     } = data;
     const result = transaction(async (client) => {
@@ -221,8 +225,9 @@ SET
       WHEN jsonb_typeof(remarks) = 'array'
         THEN remarks || $12::jsonb
       ELSE jsonb_build_array(remarks) || $12::jsonb
-    END
-WHERE id = $13
+    END,
+    category =$13
+WHERE id = $14
 RETURNING *;
   `;
 
@@ -239,6 +244,7 @@ RETURNING *;
         firm_code ?? isFirmExist.firm_code,
         role ?? isFirmExist.role,
         JSON.stringify(remark),
+        category ?? isFirmExist.category,
         id
       ];
 

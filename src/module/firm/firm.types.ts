@@ -14,6 +14,7 @@ export interface CreateFirmBody {
   firm_code: string
   username: string;
   password: string;
+  category?:string;
   role:string[]
 }
 
@@ -65,6 +66,7 @@ export interface EditFirmBody {
   gstin?: string | null;
   pan_number?: string | null;
   role?:string[];
+  category?:string;
   company_id:number;
 }
 
