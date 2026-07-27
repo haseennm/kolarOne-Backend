@@ -803,7 +803,7 @@ export class RentService {
       }
     );
     let data: QueryResult;
-      const allReturned =
+    const allReturned =
       await this.checkAllItemsReturned(
         bill_id,
         client
@@ -825,7 +825,7 @@ export class RentService {
         [
           amount,
           JSON.stringify(updatedRemarks),
-          this.getRentBillStatus(allReturned,rent_bill.total_paid-amount,rent_bill.total_amount),
+          this.getRentBillStatus(allReturned, rent_bill.total_paid - amount, rent_bill.total_amount),
           bill_id,
           branch_id
         ]
@@ -847,7 +847,7 @@ export class RentService {
         [
           amount,
           JSON.stringify(updatedRemarks),
-          this.getRentBillStatus(allReturned,rent_bill.total_paid-amount,rent_bill.total_amount - amount),
+          this.getRentBillStatus(allReturned, rent_bill.total_paid - amount, rent_bill.total_amount - amount),
           bill_id,
           branch_id
         ]
@@ -2776,7 +2776,6 @@ export class RentService {
     );
 
     const bill = billResult.rows[0];
-
     if (!bill) {
       throw new AppError(
         "Rent bill not found",
@@ -2798,10 +2797,12 @@ export class RentService {
           getStatusCode("Deleted")
         ]
       );
-
+    const company_id =await executeInTransaction(client,
+      `SELECT company_id FROM branches WHERE id=$1 AND status !=$2`,
+      [branch_id, getStatusCode("Deleted")]
+    )
     const billItems =
       billItemsResult.rows;
-
     // Restore all quantities back to stock
     for (const item of billItems) {
       const outstandingQty =
@@ -2861,15 +2862,16 @@ export class RentService {
         }
       );
 
-    await executeInTransaction(
+    const { rows } = await executeInTransaction(
       client,
       `
-    UPDATE rent_bills
-    SET
-      status = $1,
-      remarks = $2
-    WHERE id = $3
-    `,
+  UPDATE rent_bills
+  SET
+    status = $1,
+    remarks = $2
+  WHERE id = $3
+  RETURNING *
+  `,
       [
         getStatusCode("Deleted"),
         JSON.stringify(billRemarks),
@@ -2877,8 +2879,9 @@ export class RentService {
       ]
     );
 
+
     // Soft delete bill payments only
-    const { rows } = await executeInTransaction(
+    await executeInTransaction(
       client,
       `
     UPDATE rent_payments
@@ -2894,19 +2897,11 @@ export class RentService {
         bill_id
       ]
     );
-
     return {
       message:
         "Rent bill deleted successfully",
-      data: rows[0]
+      data: rows[0],
+      company_id:company_id.rows[0]
     };
   }
-
-
-
-
-
-
-
-
 }

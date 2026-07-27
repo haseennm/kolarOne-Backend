@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { executeInTransaction, query, transaction } from "../../config/db";
 import { AppError } from "../../utils/AppError";
 import { getRecord } from "../../utils/extra";
-import { FetchPopup, StockAdditionalParams, StockAdjustFetchParams, StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
+import { FetchPopup, InsertStockParams, StockAdditionalParams, StockAdjustFetchParams, StockChangeBody, StockChangeParams, StockCreateBody, StockCreateParams, StockDelete, StockEditParams, StockFetchParams, StockPriceSet, StockQtyChangeBody, StockReport } from "./stock.types";
 import { buildAuditChanges } from "../journal/journal.utils";
 
 const generateBarcode = (): string => {
@@ -972,6 +972,7 @@ export default class StockService {
     if (!isFirmExist) {
       throw new AppError("Firm not found", 404);
     }
+    const barcode = await generateUniqueBarcode(client);
 
     // 🎯 SCENARIO 1 & 3 → Batch provided
     if (insert_batch_number) {
@@ -983,7 +984,8 @@ export default class StockService {
         qty,
         statusCode,
         reason,
-        client
+        client,
+        barcode
       });
     }
 
@@ -995,7 +997,8 @@ export default class StockService {
       qty,
       statusCode,
       reason,
-      client
+      client,
+      barcode
     });
   }
 
@@ -1011,7 +1014,8 @@ export default class StockService {
       qty,
       statusCode,
       reason,
-      client
+      client,
+      barcode
     } = params;
 
     // 🔒 Lock row if exists
@@ -1060,7 +1064,8 @@ export default class StockService {
       firm_id,
       product_id,
       statusCode,
-      batch_number
+      batch_number,
+      barcode
     });
 
     await this.insertMovement({
@@ -1087,7 +1092,8 @@ export default class StockService {
       qty,
       statusCode,
       reason,
-      client
+      client,
+      barcode
     } = params;
 
     const lastStock = await executeInTransaction(
@@ -1113,7 +1119,8 @@ export default class StockService {
       firm_id,
       product_id,
       statusCode,
-      batch_number
+      batch_number,
+      barcode
     });
 
     await this.insertMovement({
@@ -1132,7 +1139,7 @@ export default class StockService {
   // ============================================
   // 🔹 INSERT STOCK
   // ============================================
-  private async insertStock(params: any) {
+  private async insertStock(params: InsertStockParams) {
     const {
       client,
       qty,
@@ -1140,7 +1147,8 @@ export default class StockService {
       firm_id,
       product_id,
       statusCode,
-      batch_number
+      batch_number,
+      barcode
     } = params;
 
     const result = await executeInTransaction(
@@ -1154,9 +1162,10 @@ export default class StockService {
         purchase_id,
         purchased_qty,
         status,
-        batch_number
+        batch_number,
+        barcode
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       RETURNING *;
       `,
       [
@@ -1167,7 +1176,8 @@ export default class StockService {
         null,
         qty,
         statusCode,
-        batch_number
+        batch_number,
+        barcode
       ]
     );
 

@@ -1,5 +1,5 @@
 import { query, transaction, executeInTransaction } from "../../config/db";
-import { getRecord } from "../../utils/extra";
+import { getRecord, getStatusCode } from "../../utils/extra";
 import { AppError } from "../../utils/AppError";
 import {
   AddNewFirm,
@@ -233,6 +233,10 @@ export default class VendorService {
     if (filters.gstin) {
       values.push(filters.gstin);
       where.push(`v.gstin = $${values.length}`);
+    }
+    if (filters.status) {
+      values.push(getStatusCode(filters.status));
+      where.push(`v.status = $${values.length}`);
     }
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";

@@ -37,8 +37,13 @@ export async function staffRouter(app: FastifyInstance) {
         // ================= FILE HANDLING =================
         if (part.type === "file") {
           if (!part.filename) continue;
+          const safeFileName = path.basename(part.filename).replace(/[^a-zA-Z0-9.-]/g, "_");
 
-          const fileName = `${Date.now()}-${part.filename}`;
+          // Truncate if the filename is excessively long
+          const truncatedFileName = safeFileName.length > 100
+            ? safeFileName.substring(safeFileName.length - 100)
+            : safeFileName;
+          const fileName = `${Date.now()}-${truncatedFileName}`;
           const fullPath = path.join(uploadDir, fileName);
 
           await pipeline(part.file, fs.createWriteStream(fullPath));
@@ -271,9 +276,13 @@ export async function staffRouter(app: FastifyInstance) {
       for await (const part of parts) {
         if (part.type === "file") {
           if (!part.filename) continue;
-          const safeFileName = path.basename(part.filename || "file");
+          const safeFileName = path.basename(part.filename).replace(/[^a-zA-Z0-9.-]/g, "_");
 
-          const fileName = `${Date.now()}-${safeFileName}`;
+          // Truncate if the filename is excessively long
+          const truncatedFileName = safeFileName.length > 100
+            ? safeFileName.substring(safeFileName.length - 100)
+            : safeFileName;
+          const fileName = `${Date.now()}-${truncatedFileName}`;
           const fullPath = path.join(uploadDir, fileName);
 
           await pipeline(part.file, fs.createWriteStream(fullPath));

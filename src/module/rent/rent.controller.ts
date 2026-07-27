@@ -193,11 +193,11 @@ export class RentController {
         client,
         entityId: delete_rent.data.branch_id,
         entityType: "B",
-        companyId: delete_rent.data.company_id,
+        companyId: delete_rent.company_id.company_id,
         tableName: "rent_bills",
         tableRowId: delete_rent.data.id,
         action: "delete",
-        record: delete_rent,
+        record: delete_rent.data,
       });
     })
   }

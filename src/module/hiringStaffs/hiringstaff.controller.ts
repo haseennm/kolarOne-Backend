@@ -187,11 +187,11 @@ export default class HiringStaffController {
   async encryptUrl(data: EncryptHireStaffBody) {
     const cryption = new Cryption
     const encrypted = cryption.encrypt(data)
-    return `http://192.168.0.103:5173/apply?${encrypted}`
+    return `https://hr.buildstories.com?${encrypted}`
   }
   async decryptUrl(data: string) {
     const cryption = new Cryption
-    const cleanedData = data.replace("http://192.168.0.103:5173/apply?", "");
+    const cleanedData = data.replace("https://hr.buildstories.com/?", "");
     const decrypt = cryption.decrypt(cleanedData);
     return decrypt
   }

@@ -36,7 +36,7 @@ export class Cryption {
   decrypt<T = any>(encryptedString: string): T {
     // 1. Split the component parts out of the string
     const [ivHex, authTagHex, encryptedHex] = encryptedString.split(':');
-
+console.log(encryptedString)
     if (!ivHex || !authTagHex || !encryptedHex) {
       throw new Error('Invalid encrypted string format.');
     }

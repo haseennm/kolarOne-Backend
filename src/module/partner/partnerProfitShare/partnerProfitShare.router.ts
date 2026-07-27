@@ -85,7 +85,7 @@ export async function profitShareRouter(app: FastifyInstance) {
       {
         body: {
           type: "object",
-          required: ["entity_id", "entity_type"],
+          required: ["company_id"],
           properties: {
             partner_id: { type: "string" },
             partner_name: { type: "string" },
@@ -93,6 +93,7 @@ export async function profitShareRouter(app: FastifyInstance) {
             profit_share_lt: { type: "number" },
             page: { type: "number", minimum: 1, default: 1 },
             limit: { type: "number", minimum: 1, maximum: 100, default: 10 },
+            company_id: { type: "number" },
             entity_id: { type: "number" },
             entity_type: { type: "string", enum: ["Branch", "Firm", "Company"] }
           },

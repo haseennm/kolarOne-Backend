@@ -238,54 +238,75 @@ export default class SettlementController {
       const saleFinal = sale ? Number(sale.final_amount) : 0;
       const returnFinal = saleReturn ? Number(saleReturn.final_amount) : 0;
 
-      // Sanitize and cap initial DB inputs so bad DB state doesn't crash calculations
+      // Fixed Bug: Read saleReturn.paid_amount correctly instead of sale.paid
       let salePaid = sale ? Math.min(saleFinal, Math.max(0, Number(sale.paid))) : 0;
-      let returnRefund = saleReturn ? Math.min(returnFinal, Math.max(0, Number(sale.paid))) : 0;
+      let returnRefund = saleReturn ? Math.min(returnFinal, Math.max(0, Number(saleReturn.paid_amount))) : 0;
 
-      let saleDue = Math.max(0, saleFinal - salePaid);
-      let returnDue = Math.max(0, returnFinal - returnRefund);
+      // Positive = Customer owes us money (Receivable)
+      // Negative = We owe customer money for return (Payable)
+      let currentSaleDue = sale ? (saleFinal - salePaid) : 0;
+      let currentReturnDue = saleReturn ? -(returnFinal - returnRefund) : 0;
 
       // 2. Phase 1: Virtual Zero-Cash Cross-Offsetting
       let offsetAmount = 0;
-      if (sale && saleReturn && saleDue > 0 && returnDue > 0) {
-        offsetAmount = Math.min(saleDue, returnDue);
+      if (sale && saleReturn && currentSaleDue > 0 && currentReturnDue < 0) {
+        offsetAmount = Math.min(currentSaleDue, Math.abs(currentReturnDue));
+
+        currentSaleDue -= offsetAmount;
+        currentReturnDue += offsetAmount;
 
         salePaid += offsetAmount;
         returnRefund += offsetAmount;
-
-        saleDue -= offsetAmount;
-        returnDue -= offsetAmount;
 
         saleRemarks.push({ action: `${offsetAmount} cleared via return credit balance`, created_at: timestamp });
         returnRemarks.push({ action: `${offsetAmount} applied to clear open sale balance`, created_at: timestamp });
       }
 
-      // 3. Phase 2: Direct Cash Allocation Engine
+      // 3. Phase 2: Directional Cash Distribution Engine
+      const netSystemDue = currentSaleDue + currentReturnDue;
+      // If netSystemDue >= 0 -> Customer owes us overall -> INCOME ("I")
+      // If netSystemDue < 0  -> We owe customer overall -> EXPENSE ("E")
+      const isIncomeFlow = netSystemDue >= 0;
+
       let remainingCash = totalExternalPayment;
 
       if (remainingCash > 0) {
-
-        // Priority 1: Clear open sale due
-        if (sale && saleDue > 0) {
-          const allocated = Math.min(saleDue, remainingCash);
-          salePaid += allocated;
-          saleDue -= allocated;
-          remainingCash -= allocated;
-        }
-
-        // Priority 2: Clear open return refund due
-        if (saleReturn && returnDue > 0 && remainingCash > 0) {
-          const allocated = Math.min(returnDue, remainingCash);
-          returnRefund += allocated;
-          returnDue -= allocated;
-          remainingCash -= allocated;
+        if (isIncomeFlow) {
+          // Cash Influx (Income): Customer is paying us
+          if (sale && currentSaleDue > 0 && remainingCash > 0) {
+            const allocated = Math.min(currentSaleDue, remainingCash);
+            currentSaleDue -= allocated;
+            salePaid += allocated;
+            remainingCash -= allocated;
+          }
+          if (saleReturn && currentReturnDue > 0 && remainingCash > 0) {
+            const allocated = Math.min(currentReturnDue, remainingCash);
+            currentReturnDue -= allocated;
+            returnRefund += allocated;
+            remainingCash -= allocated;
+          }
+        } else {
+          // Cash Outflux (Expense): We are giving refund/cash to customer
+          if (saleReturn && currentReturnDue < 0 && remainingCash > 0) {
+            const absoluteNeed = Math.abs(currentReturnDue);
+            const allocated = Math.min(absoluteNeed, remainingCash);
+            currentReturnDue += allocated;
+            returnRefund += allocated;
+            remainingCash -= allocated;
+          }
+          if (sale && currentSaleDue < 0 && remainingCash > 0) {
+            const absoluteNeed = Math.abs(currentSaleDue);
+            const allocated = Math.min(absoluteNeed, remainingCash);
+            currentSaleDue += allocated;
+            salePaid += allocated;
+            remainingCash -= allocated;
+          }
         }
       }
 
       salePaid = Math.min(saleFinal, salePaid);
       returnRefund = Math.min(returnFinal, returnRefund);
-      console.log(`returnRefund ${returnRefund} returnFinal ${returnFinal}, returnRefund ${returnRefund})`)
-      // 4. Update Sales Table
+
       if (sale) {
         const status = billStatus(sale.final_amount, salePaid);
         await client.query(
@@ -294,7 +315,6 @@ export default class SettlementController {
         );
       }
 
-      // 5. Update Sale Return Table
       if (saleReturn) {
         const status = billStatus(saleReturn.final_amount, returnRefund);
         await client.query(
@@ -302,10 +322,17 @@ export default class SettlementController {
           [returnRefund, JSON.stringify(returnRemarks), sale_return_id, status]
         );
       }
+      let dominantEntity: "sale" | "sale_return" = "sale";
+      if (sale && saleReturn) {
+        dominantEntity = isIncomeFlow ? "sale" : "sale_return";
+      } else {
+        dominantEntity = sale ? "sale" : "sale_return";
+      }
+      const dominantRefId = dominantEntity === "sale" ? sale_id : sale_return_id;
 
-      // 6. Record Payment Transaction Log
-      const dominantRefId = sale_id || sale_return_id;
       if (totalExternalPayment > 0 && dominantRefId) {
+        const paymentFlow = isIncomeFlow ? "I" : "E";
+
         for (const payment of payments) {
           if (Number(payment.payment_amount) <= 0) continue;
 
@@ -319,11 +346,10 @@ export default class SettlementController {
             business_id: firm_id,
             business_ref: convertEntityType("Firm" as EntityKey),
             company_id,
-            payment_flow: "I"
+            payment_flow: paymentFlow
           }, client);
         }
       }
-
       // 7. Calculate Final Financial Summary
       const finalSaleDue = Math.max(0, saleFinal - salePaid);
       const finalReturnDue = Math.max(0, returnFinal - returnRefund);
@@ -338,6 +364,7 @@ export default class SettlementController {
         message: "Settlement executed successfully.",
         offset_applied: offsetAmount,
         total_external_payment_applied: totalExternalPayment,
+        payment_flow_recorded: isIncomeFlow ? "INCOME (I)" : "EXPENSE (E)",
         sales_paid: salePaid,
         sale_return_refunded: returnRefund,
         balance_due_to_me: balanceDueToMe,

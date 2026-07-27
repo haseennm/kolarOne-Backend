@@ -58,8 +58,9 @@ export interface ProfitShareFilters {
   profit_share_lt?: number;
   page?: number;
   limit?: number;
-  entity_id: number;
-  entity_type: string;
+  company_id: number;
+  entity_id?: number;
+  entity_type?: string;
 }
 
 export interface ProfitShareRow extends Omit<CreateProfitShareBody, "created_by" | "status"> {

@@ -45,7 +45,7 @@ export interface FetchVendorBody {
   company_id?: number;
 
   search?: string | null;
-  status?: number;
+  status?: string;
 }
 
 export interface FetchVendorParams {

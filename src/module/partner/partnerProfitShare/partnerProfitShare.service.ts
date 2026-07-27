@@ -160,92 +160,162 @@ export default class ProfitShareService {
     return rows[0];
   }
 
-  async fetchProfitShares(data: ProfitShareFilters) {
-    const {
-      partner_id,
-      partner_name,
-      profit_share_gt,
-      profit_share_lt,
-      page = 1,
-      limit = 10,
-      entity_id,
-      entity_type
-    } = data;
-    const offset = (page - 1) * limit;
+ async fetchProfitShares(data: ProfitShareFilters) {
+  const {
+    partner_id,
+    partner_name,
+    profit_share_gt,
+    profit_share_lt,
+    page = 1,
+    limit = 10,
+    entity_id,
+    entity_type,
+    company_id
+  } = data;
 
-    let conditions: string[] = ["pps.status != 0"];
-    let values: any[] = [];
-    let i = 1;
+  const offset = (page - 1) * limit;
 
-    if (partner_id) {
-      conditions.push(`pps.partner_id = $${i++}`);
-      values.push(partner_id);
-    }
+  const conditions: string[] = ["pps.status != 0"];
+  const values: any[] = [];
+  let i = 1;
 
-    if (partner_name) {
-      conditions.push(`pi.name ILIKE $${i++}`);
-      values.push(`%${partner_name}%`);
-    }
-    if (entity_id && entity_type) {
-      conditions.push(
-        `pps.entity_id = $${i++} AND pps.entity_type = $${i++}`
-      );
-      values.push(entity_id, entity_type);
-    }
-    if (profit_share_gt) {
-      conditions.push(`pps.profit_share > $${i++}`);
-      values.push(profit_share_gt);
-    }
+  if (partner_id) {
+    conditions.push(`pps.partner_id = $${i++}`);
+    values.push(partner_id);
+  }
 
-    if (profit_share_lt) {
-      conditions.push(`pps.profit_share < $${i++}`);
-      values.push(profit_share_lt);
-    }
+  if (partner_name) {
+    conditions.push(`pi.name ILIKE $${i++}`);
+    values.push(`%${partner_name}%`);
+  }
 
-    const whereClause = conditions.length
-      ? `WHERE ${conditions.join(" AND ")}`
-      : "";
+  if (entity_id && entity_type) {
+    conditions.push(`pps.entity_id = $${i++}`);
+    values.push(entity_id);
 
-    const rows = await query(
-      `
-  SELECT 
-    pps.*, 
-    pi.name as partner_name,
-    pi.email as partner_email,
-    pi.phone_number as partner_mobile_number,
-    (
-      SELECT TO_CHAR(
-        TO_TIMESTAMP((elem->>'created_at')::bigint / 1000),
-        'YYYY-MM-DD HH24:MI:SS'
+    conditions.push(`pps.entity_type = $${i++}`);
+    values.push(entity_type);
+  }
+
+  if (company_id) {
+    conditions.push(`
+      (
+        (pps.entity_type = 'C' AND c.id = $${i})
+        OR
+        (pps.entity_type = 'B' AND b.company_id = $${i})
+        OR
+        (pps.entity_type = 'F' AND fb.company_id = $${i})
       )
-      FROM jsonb_array_elements(pps.remarks) elem
-      WHERE elem->>'action' = 'Created'
-      LIMIT 1
-    ) AS joined_at
-  FROM partner_profit_shares pps
-  LEFT JOIN partners_info pi ON pps.partner_id = pi.id
-  ${whereClause}
-  LIMIT $${i++} OFFSET $${i++}
-  `,
-      [...values, limit, offset]
-    );
-    const count = await query(
-      `
-    SELECT COUNT(*) 
+    `);
+    values.push(company_id);
+    i++;
+  }
+
+  if (profit_share_gt) {
+    conditions.push(`pps.profit_share > $${i++}`);
+    values.push(profit_share_gt);
+  }
+
+  if (profit_share_lt) {
+    conditions.push(`pps.profit_share < $${i++}`);
+    values.push(profit_share_lt);
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`;
+
+  const rows = await query(
+    `
+    SELECT
+      pps.*,
+      pi.name AS partner_name,
+      pi.email AS partner_email,
+      pi.phone_number AS partner_mobile_number,
+
+      c.company_name,
+
+      COALESCE(b.branch_name, fb.branch_name) AS branch_name,
+
+      f.firm_name,
+
+      (
+        SELECT TO_CHAR(
+          TO_TIMESTAMP((elem->>'created_at')::bigint / 1000),
+          'YYYY-MM-DD HH24:MI:SS'
+        )
+        FROM jsonb_array_elements(pps.remarks) elem
+        WHERE elem->>'action' = 'Created'
+        LIMIT 1
+      ) AS joined_at
+
     FROM partner_profit_shares pps
-    LEFT JOIN partners_info pi ON pps.partner_id = pi.id
+
+    LEFT JOIN partners_info pi
+      ON pi.id = pps.partner_id
+
+    -- Company entity
+    LEFT JOIN company c
+      ON pps.entity_type = 'C'
+     AND c.id = pps.entity_id
+
+    -- Branch entity
+    LEFT JOIN branches b
+      ON pps.entity_type = 'B'
+     AND b.id = pps.entity_id
+
+    -- Firm entity
+    LEFT JOIN firm f
+      ON pps.entity_type = 'F'
+     AND f.id = pps.entity_id
+
+    LEFT JOIN branches fb
+      ON fb.id = f.branch_id
+
+    ${whereClause}
+
+    ORDER BY pps.id DESC
+
+    LIMIT $${i++}
+    OFFSET $${i++}
+    `,
+    [...values, limit, offset]
+  );
+
+  const count = await query(
+    `
+    SELECT COUNT(*) AS count
+
+    FROM partner_profit_shares pps
+
+    LEFT JOIN partners_info pi
+      ON pi.id = pps.partner_id
+
+    LEFT JOIN company c
+      ON pps.entity_type = 'C'
+     AND c.id = pps.entity_id
+
+    LEFT JOIN branches b
+      ON pps.entity_type = 'B'
+     AND b.id = pps.entity_id
+
+    LEFT JOIN firm f
+      ON pps.entity_type = 'F'
+     AND f.id = pps.entity_id
+
+    LEFT JOIN branches fb
+      ON fb.id = f.branch_id
+
     ${whereClause}
     `,
-      values
-    );
+    values
+  );
 
-    return {
-      rows,
-      total: Number(count[0].count),
-      page,
-      limit
-    };
-  }
+  return {
+    rows,
+    total: Number(count[0].count),
+    page,
+    limit
+  };
+}
   async deletePartnerProfit(data: DeletePartnerProfitParams) {
     return transaction(async (client) => {
 

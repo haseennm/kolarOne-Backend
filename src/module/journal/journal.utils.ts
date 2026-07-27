@@ -97,24 +97,18 @@ export function buildJournalMessage(tableName: string, action: "create" | "updat
   const categoryName = getRecordValue(record, ["category_name", "name"]);
   const invoiceNo = getRecordValue(record, ["invoice_no", "invoice_number", "invoice", "bill_number", "return_number"]);
   const amount = getRecordValue(record, ["totalPayAmount", "amount", "loan_amount", "salary_amount", "pay_amount", "final_amount"]);
-  const branchName = getRecordValue(record, ["branch_name"]);
   const vendorName = getRecordValue(record, ["vendor_name"]);
   const customerName = getRecordValue(record, ["customer_name", "full_name"]);
-  const companyName = getRecordValue(record, ["company_name"]);
-  const firmName = getRecordValue(record, ["firm_name"]);
   const staffName = getRecordValue(record, ["staff_name", "full_name", "name"]);
   const roleName = getRecordValue(record, ["role_name", "role"]);
   const quantity = getRecordValue(record, ["quantity", "qty"]);
   const loanAmount = getRecordValue(record, ["loan_amount"]);
   const salaryAmount = getRecordValue(record, ["salary_amount", "final_salary"]);
   const partnerName = getRecordValue(record, ["partner_name"]);
-  const partyName = getRecordValue(record, ["party_name", "party", "customer_name", "full_name"]);
-  const balanceAmount = getRecordValue(record, ["balance", "amount", "pay_amount"]);
   const methodName = getRecordValue(record, ["method_name", "name"]);
   const quotationNo = getRecordValue(record, ["quotation_no"]);
   const billNo = getRecordValue(record, ["bill_no"]);
   const financialYear = getRecordValue(record, ["financial_year"]);
-  const branchNameOrCompany = branchName ?? companyName ?? firmName;
 
   switch (normalized) {
     case "branches":

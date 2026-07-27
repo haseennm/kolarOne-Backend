@@ -1,3 +1,5 @@
+import { PoolClient } from "pg";
+
 export interface StockCreateBody {
   firm_id: number;
   branch_id: number;
@@ -139,4 +141,14 @@ export interface StockQtyChangeBody {
   company_id: number;
   available_qty: number;
   note: string;
+}
+export interface InsertStockParams {
+  client:PoolClient
+  qty:number;
+  branch_id:number;
+  firm_id:number;
+  product_id:number;
+  statusCode:number;
+  batch_number:string;
+  barcode:string;
 }

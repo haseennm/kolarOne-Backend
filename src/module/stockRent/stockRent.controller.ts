@@ -76,9 +76,9 @@ export default class StockRentalController {
         entityType: "B",
         companyId: rest.company_id,
         tableName: "rental_stocks",
-        tableRowId: stock_rent.data.id,
+        tableRowId: stock_rent.data[0].id,
         action: "create",
-        record: stock_rent.data,
+        record: stock_rent.data[0],
       });
       return stock_rent
     })

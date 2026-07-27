@@ -91,7 +91,9 @@ export async function vendorRouter(app: FastifyInstance) {
               type: ["string", "null"]
             },
 
-            status: { type: "number" }
+            status: { type: "string" ,
+              enum:["Active","Inactive"]
+            }
           }
         }
       }

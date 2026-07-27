@@ -41,23 +41,33 @@ export default class ProfitShareController {
 
   async fetchProfitShares(filters: ProfitShareFilters) {
     const { entity_type, entity_id, ...rest } = filters
+    let dbEntityType = undefined
     if ((entity_type && !entity_id) || (!entity_type && entity_id)) {
       throw new AppError(
         "Both entity_type and entity_id must be provided together",
         400
       );
     }
-    const dbEntityType = convertEntityType(entity_type as EntityKey);
+    if (entity_type) dbEntityType = convertEntityType(entity_type as EntityKey);
 
-    const result = await this.service.fetchProfitShares({ entity_type: dbEntityType, entity_id, ...rest });
+    const result = await this.service.fetchProfitShares({
+      entity_type: dbEntityType,
+      entity_id,
+      ...rest
+    });
+
     return {
       total: result.total,
       page: result.page,
       limit: result.limit,
-      data: result.rows.map((r: any) => ({
-        ...r,
-        status: getStatusText(r.status)
-      }))
+      data: result.rows.map((r: any) => {
+        const { remarks, ...restRow } = r;
+
+        return {
+          ...restRow,
+          status: getStatusText(r.status),
+        };
+      })
     };
   }
 
