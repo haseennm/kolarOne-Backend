@@ -41,6 +41,8 @@ import { quotationRouter } from './module/quotation/quotation/quotation.router'
 import { journalRouter } from './module/journal/journal.router'
 import settlementRoutes from './module/settlement/settlement.router'
 import { paymentTransactionRouter } from './module/paymentTransaction/paymenttransaction.router'
+import { assetProductRouter } from './module/assetProduct/assetProduct.router'
+import { assetPurchaseRouter } from './module/assetPurchase/assetPurchase/assetPurchase.router'
 
 export default async function registerRoutes(app: FastifyInstance) {
   app.register(companyRoutes, { prefix: '/company' })
@@ -84,4 +86,6 @@ export default async function registerRoutes(app: FastifyInstance) {
   app.register(journalRouter, { prefix: '/journal' })
   app.register(settlementRoutes, { prefix: '/settlement' })
   app.register(paymentTransactionRouter, { prefix: '/payment/transaction' })
+  app.register(assetProductRouter, { prefix: '/asset/product' })
+  app.register(assetPurchaseRouter, { prefix: '/asset/purchase' })
 }

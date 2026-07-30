@@ -12,6 +12,7 @@ export interface CreatePaymentTransaction {
     | "LN"  // loan
     | "LR"  // loanrepay
     | "SY"  // salary
+    | "APS"  // asset_purchase
     | "LT"; // ledger_transaction
     status: number;
     payment_method_id?: number | null;
@@ -35,6 +36,7 @@ export interface EditPaymentTransaction {
     | "BL"  // balance
     | "LN"  // loan
     | "LR"  // loanrepay
+    | "APS"  // asset_purchase
     | "SY"  // salary
     | "LT"; // ledger_transaction
     status?: number;
@@ -58,6 +60,7 @@ export interface DeletePaymentTransaction {
     | "LN"  // loan
     | "LR"  // loanrepay
     | "SY"  // salary
+    | "APS"  // asset_purchase
     | "LT"; // ledger_transaction
 }
 export enum PaymentTransactionCode {
@@ -72,6 +75,7 @@ export enum PaymentTransactionCode {
   LR = "loan_repay",
   SY = "salary",
   LT = "ledger_transaction",
+  APS = "asset_purchase",
 }
 // paymenttransaction.types.ts
 

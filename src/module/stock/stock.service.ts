@@ -170,7 +170,7 @@ export default class StockService {
     );
 
     if (!is_stock_exist) {
-      throw new AppError("Firm not found", 404);
+      throw new AppError("Stock not found", 404);
     }
     if (product_id && product_id !== is_stock_exist.product_id) {
       const is_product_exist = await getRecord(

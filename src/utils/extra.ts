@@ -156,7 +156,8 @@ export enum PaymentTransactionCode {
   LOAN = "LN",
   LOAN_REPAY = "LR",
   SALARY = "SY",
-  LEDGER_TRANSACTION = "LT"
+  LEDGER_TRANSACTION = "LT",
+  ASSET_PURCHASE = "APS"
 }
 export const PaymentTransactionTypeCodeMap: Record<string, PaymentTransactionCode> = {
   sale_settlement: PaymentTransactionCode.SALE_SETTLEMENT,
@@ -169,7 +170,8 @@ export const PaymentTransactionTypeCodeMap: Record<string, PaymentTransactionCod
   loan: PaymentTransactionCode.LOAN,
   loanrepay: PaymentTransactionCode.LOAN_REPAY,
   salary: PaymentTransactionCode.SALARY,
-  ledger_transaction: PaymentTransactionCode.LEDGER_TRANSACTION
+  ledger_transaction: PaymentTransactionCode.LEDGER_TRANSACTION,
+  asset_purchase: PaymentTransactionCode.ASSET_PURCHASE
 };
 
 export const PaymentTransactionCodeTypeMap: Record<PaymentTransactionCode, string> = {
@@ -183,7 +185,8 @@ export const PaymentTransactionCodeTypeMap: Record<PaymentTransactionCode, strin
   LN: "loan",
   LR: "loanrepay",
   SY: "salary",
-  LT: "ledger_transaction"
+  LT: "ledger_transaction",
+  APS:"asset_purchase"
 };
 
 
